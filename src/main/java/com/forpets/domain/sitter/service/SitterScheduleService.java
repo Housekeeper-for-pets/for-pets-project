@@ -1,5 +1,7 @@
 package com.forpets.domain.sitter.service;
 
+import com.forpets.domain.member.entity.Member;
+import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.sitter.dto.schedule.ScheduleItemRequest;
 import com.forpets.domain.sitter.dto.schedule.ScheduleResponseDto;
 import com.forpets.domain.sitter.dto.schedule.UpdateScheduleRequest;
@@ -23,25 +25,24 @@ import java.util.Set;
 public class SitterScheduleService {
     private final SitterScheduleRepository sitterScheduleRepository;
     private final SitterService sitterService;
+    private final MemberService memberService;
 
     /*
     시터 가능 시간 전체 교체
     1. 요청 목록 유효성 검증 (시간 역전, 요일 중복)
-    2. AVAILABLE 상태 스케줄만 삭제 (BOOKED 상태는 유지)
+    2. 기존 스케줄 다 삭제
     3. 신규 스케줄 전체 삽입
-
-    BOOKED 상태 스케줄이 존재하는 요일에 대해 새 스케줄이 들어오면
-    DB Unique 제약에 의해 예외 발생 → 409 DUPLICATE_SCHEDULE
- */
+    */
     @Transactional
     public List<ScheduleResponseDto> replaceAll(Long memberId, UpdateScheduleRequest request) {
         SitterProfile sitter = sitterService.findByMemberId(memberId);
 
         validateScheduleItems(request.schedules());
 
-        // AVAILABLE 상태만 삭제 (BOOKED는 보존)
         sitterScheduleRepository.deleteAllBySitterProfileId(sitter.getId());
         sitterScheduleRepository.flush();
+        // Delete 와 saveAll 이 순서 보장이 안 될 가능성이 있기 때문에
+        // flush 로 보내주기
 
         List<SitterSchedule> newSchedules = request.schedules().stream()
                 .map(item -> SitterSchedule.builder()
@@ -57,12 +58,11 @@ public class SitterScheduleService {
                 .toList();
     }
 
-
-    public List<ScheduleResponseDto> getSchedules(Long sitterId) {
+    public List<ScheduleResponseDto> getSchedules(Long memberId) {
         // 시터 존재 여부 확인
-        sitterService.findByMemberId(sitterId);
+        SitterProfile sitterProfile = sitterService.findByMemberId(memberId);
 
-        return sitterScheduleRepository.findAllBySitterProfileId(sitterId).stream()
+        return sitterScheduleRepository.findAllBySitterProfileId(sitterProfile.getId()).stream()
                 .map(ScheduleResponseDto::from)
                 .toList();
     }

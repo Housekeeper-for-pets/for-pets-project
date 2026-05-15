@@ -54,7 +54,8 @@ public enum CommonErrorCode implements ErrorCode {
     SITTER_NOT_FOUND(HttpStatus.NOT_FOUND, "S004", "존재하지 않는 시터입니다."),
 
     INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "S005", "시작 시간은 종료 시간보다 빨라야합니다."),
-    DUPLICATE_SCHEDULE(HttpStatus.CONFLICT, "S006", "요일별 1개 시간대만 등록 가능합니다.")
+    DUPLICATE_SCHEDULE(HttpStatus.CONFLICT, "S006", "요일별 1개 시간대만 등록 가능합니다."),
+    NOT_SCHEDULE_OWNER(HttpStatus.FORBIDDEN, "S007", "본인의 스케줄이 아닙니다.")
 
     ;
 

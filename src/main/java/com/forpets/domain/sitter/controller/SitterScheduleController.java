@@ -34,14 +34,13 @@ public class SitterScheduleController {
     }
 
     /*
-    특정 시터의 가능 시간 조회
-    비로그인 사용자도 조회 가능 (Public GET)
+    내가 등록한 스케줄 조회 (사실상... 사용할 일이 있을까 싶긴 함)
      */
-    @GetMapping("/{sitterId}/schedules")
+    @GetMapping("/me/schedules")
     public ResponseEntity<ApiResponse<List<ScheduleResponseDto>>> getSchedules(
-            @PathVariable Long sitterId) {
+            @LoginUser CurrentMember currentMember) {
         return ResponseEntity.ok(
-                ApiResponse.success(sitterScheduleService.getSchedules(sitterId)));
+                ApiResponse.success(sitterScheduleService.getSchedules(currentMember.id())));
     }
 }
 
