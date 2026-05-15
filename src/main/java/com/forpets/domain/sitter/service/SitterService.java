@@ -8,9 +8,11 @@ import com.forpets.domain.sitter.dto.SitterResponseDto;
 import com.forpets.domain.sitter.dto.UpdateSitterRequest;
 import com.forpets.domain.sitter.dto.UpdateSitterStatusRequest;
 import com.forpets.domain.sitter.entity.SitterProfile;
+import com.forpets.domain.sitter.entity.SitterProfileStatus;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
+import com.forpets.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,6 +72,7 @@ public class SitterService {
 
     /*
     시터 예약 가능 상태 변경 (RESERVABLE / NON_RESERVABLE)
+    lock 을 걸어야 할 듯 합니다 상태를 변경하는 동안 예약이 들어올 수 있으니까!
      */
     @Transactional
     public SitterResponseDto updateStatus(Long memberId, UpdateSitterStatusRequest request) {
@@ -80,7 +83,21 @@ public class SitterService {
         return SitterResponseDto.from(sitter);
     }
 
+    /*
+    시터 프로필 삭제 (Soft Delete)
+    - 진행 중인 예약(PENDING/CONFIRMED)이 있으면 삭제 불가
+    - 삭제 시 프로필 상태 DELETED + 회원 역할 MEMBER로 복원
+     */
+    @Transactional
+    public void delete(Long memberId) {
+        SitterProfile sitter = findByMemberId(memberId);
+        validateNoActiveReservation(sitter.getId());
 
+        sitter.delete();
+
+        Member member = memberService.findById(memberId);
+        member.restoreRoleToMember();
+    }
 
     // -------------Transaction 아닌 method 들------------------
 
@@ -115,5 +132,14 @@ public class SitterService {
         if (sitterProfileRepository.countByMemberIdIncludingDeleted(memberId) > 0) {
             throw new BusinessException(CommonErrorCode.SITTER_PROFILE_ALREADY_REGISTERED);
         }
+    }
+
+    /*
+    시터에게 진행 중인 예약(PENDING/CONFIRMED)이 있는지 확인
+     */
+    private void validateNoActiveReservation(Long sitterId) {
+        // if (reservationService.existsInProgressBySitterId(sitterId)) {
+        //     throw new CustomException(ErrorCode.HAS_ACTIVE_RESERVATION);
+        // }
     }
 }

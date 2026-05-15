@@ -49,5 +49,10 @@ public class SitterController {
         return ResponseEntity.ok(ApiResponse.success(sitterService.updateStatus(currentMember.id(), request)));
     }
 
-
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @LoginUser CurrentMember currentMember) {
+        sitterService.delete(currentMember.id());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
 }
