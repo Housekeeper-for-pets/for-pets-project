@@ -6,12 +6,16 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "sitter_profile")
+@Table(name = "sitter_profile", uniqueConstraints = {
+        @UniqueConstraint(columnNames = "member_id")
+})
+@SQLRestriction("deleted_at IS NULL")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SitterProfile extends BaseEntity {
 
@@ -73,12 +77,8 @@ public class SitterProfile extends BaseEntity {
         this.pricePerHour = pricePerHour;
     }
 
-    public void markNonReservable() {
-        this.status = SitterProfileStatus.NON_RESERVABLE;
-    }
-
-    public void markReservable() {
-        this.status = SitterProfileStatus.RESERVABLE;
+    public void changeStatus(SitterProfileStatus status) {
+        this.status = status;
     }
 
     public void delete() {
@@ -87,5 +87,9 @@ public class SitterProfile extends BaseEntity {
 
     public boolean isDeleted() {
         return this.deletedAt != null;
+    }
+
+    public boolean isReservable() {
+        return this.status == SitterProfileStatus.RESERVABLE;
     }
 }
