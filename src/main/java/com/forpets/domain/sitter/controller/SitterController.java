@@ -42,10 +42,12 @@ public class SitterController {
         return ResponseEntity.ok(ApiResponse.success(sitterService.update(currentMember.id(), request)));
     }
 
-    @PutMapping("/me")
+    @PatchMapping("/me/status")
     public ResponseEntity<ApiResponse<SitterResponseDto>> update(
             @LoginUser CurrentMember currentMember,
             @RequestBody @Valid UpdateSitterStatusRequest request) {
         return ResponseEntity.ok(ApiResponse.success(sitterService.updateStatus(currentMember.id(), request)));
     }
+
+
 }
