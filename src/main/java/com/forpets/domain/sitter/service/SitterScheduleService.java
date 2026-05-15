@@ -25,7 +25,6 @@ import java.util.Set;
 public class SitterScheduleService {
     private final SitterScheduleRepository sitterScheduleRepository;
     private final SitterService sitterService;
-    private final MemberService memberService;
 
     /*
     시터 가능 시간 전체 교체

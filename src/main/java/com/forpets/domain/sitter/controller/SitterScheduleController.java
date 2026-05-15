@@ -21,9 +21,9 @@ public class SitterScheduleController {
     private final SitterScheduleService sitterScheduleService;
 
     /*
-    시터 가능 시간 전체 교체 (PUT)
+    1. 시터 가능 시간 전체 교체 (PUT)
     프론트에서 요일별 토글/드래그로 설정한 전체 스케줄을 한 번에 저장
-    기존 AVAILABLE 스케줄 전체 삭제 → 신규 전체 삽입
+    기존 스케줄 전체 삭제 -> 신규 전체 삽입
      */
     @PutMapping("/me/schedules")
     public ResponseEntity<ApiResponse<List<ScheduleResponseDto>>> putSchedules(
