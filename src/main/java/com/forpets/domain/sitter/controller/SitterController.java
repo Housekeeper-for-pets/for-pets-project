@@ -2,6 +2,8 @@ package com.forpets.domain.sitter.controller;
 
 import com.forpets.domain.sitter.dto.CreateSitterRequest;
 import com.forpets.domain.sitter.dto.SitterResponseDto;
+import com.forpets.domain.sitter.dto.UpdateSitterRequest;
+import com.forpets.domain.sitter.dto.UpdateSitterStatusRequest;
 import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
@@ -31,5 +33,19 @@ public class SitterController {
     public ResponseEntity<ApiResponse<SitterResponseDto>> getMyProfile(
             @LoginUser CurrentMember currentMember) {
         return ResponseEntity.ok(ApiResponse.success(sitterService.getMyProfile(currentMember.id())));
+    }
+
+    @PutMapping("/me")
+    public ResponseEntity<ApiResponse<SitterResponseDto>> update(
+            @LoginUser CurrentMember currentMember,
+            @RequestBody @Valid UpdateSitterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(sitterService.update(currentMember.id(), request)));
+    }
+
+    @PutMapping("/me")
+    public ResponseEntity<ApiResponse<SitterResponseDto>> update(
+            @LoginUser CurrentMember currentMember,
+            @RequestBody @Valid UpdateSitterStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(sitterService.updateStatus(currentMember.id(), request)));
     }
 }

@@ -5,6 +5,8 @@ import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.sitter.dto.CreateSitterRequest;
 import com.forpets.domain.sitter.dto.SitterResponseDto;
+import com.forpets.domain.sitter.dto.UpdateSitterRequest;
+import com.forpets.domain.sitter.dto.UpdateSitterStatusRequest;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.global.exception.BusinessException;
@@ -44,6 +46,37 @@ public class SitterService {
 
     public SitterResponseDto getMyProfile(Long memberId) {
         SitterProfile sitter = findByMemberId(memberId);
+        return SitterResponseDto.from(sitter);
+    }
+
+    /*
+    시터 프로필 수정 (전체 교체 방식)
+     */
+    @Transactional
+    public SitterResponseDto update(Long memberId, UpdateSitterRequest request) {
+        SitterProfile sitter = findByMemberId(memberId);
+
+        sitter.update(
+                request.region(),
+                request.introduction(),
+                request.experienceYears(),
+                request.possiblePetType(),
+                request.possiblePetSize(),
+                request.pricePerHour()
+        );
+
+        return SitterResponseDto.from(sitter);
+    }
+
+    /*
+    시터 예약 가능 상태 변경 (RESERVABLE / NON_RESERVABLE)
+     */
+    @Transactional
+    public SitterResponseDto updateStatus(Long memberId, UpdateSitterStatusRequest request) {
+        SitterProfile sitter = findByMemberId(memberId);
+
+        sitter.changeStatus(request.status());
+
         return SitterResponseDto.from(sitter);
     }
 
