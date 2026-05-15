@@ -1,0 +1,85 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.14'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.ecommerce'
+version = '0.0.1-SNAPSHOT'
+description = 'for-pets'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    implementation 'org.springframework.kafka:spring-kafka'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testImplementation 'com.h2database:h2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// ---------------------------------------------------------------
+// Windows + 한글/공백 경로 환경에서 Gradle 테스트 워커의 @argfile
+// 인코딩 문제를 우회: 로컬 빌드 아웃풋을 임시 경로(ASCII only)로
+// 복사한 뒤 classpath 를 교체한다.
+// ---------------------------------------------------------------
+tasks.named('test') {
+    useJUnitPlatform()
+    jvmArgs '-Dfile.encoding=UTF-8'
+    environment 'JAVA_TOOL_OPTIONS', '-Dfile.encoding=UTF-8'
+
+    doFirst {
+        def tmp = new File(System.getProperty('java.io.tmpdir'), 'forpets-build')
+
+        def safeTest    = new File(tmp, 'test-classes')
+        def safeTestRes = new File(tmp, 'test-resources')
+        def safeMain    = new File(tmp, 'main-classes')
+        def safeMainRes = new File(tmp, 'main-resources')
+
+        [safeTest, safeTestRes, safeMain, safeMainRes].each { it.deleteDir(); it.mkdirs() }
+
+        copy { from sourceSets.test.output.classesDirs;     into safeTest }
+        copy { from sourceSets.main.output.classesDirs;     into safeMain }
+
+        def testResDir = sourceSets.test.output.resourcesDir
+        if (testResDir?.exists()) copy { from testResDir; into safeTestRes }
+        def mainResDir = sourceSets.main.output.resourcesDir
+        if (mainResDir?.exists()) copy { from mainResDir; into safeMainRes }
+
+        classpath = files(safeTest, safeTestRes, safeMain, safeMainRes) +
+                    configurations.testRuntimeClasspath
+    }
+}

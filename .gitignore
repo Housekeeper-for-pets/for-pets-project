@@ -1,0 +1,77 @@
+### Build ###
+build/
+out/
+target/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### Gradle ###
+.gradle/
+gradle-app.setting
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse / STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### OS specific ###
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+### Logs ###
+logs/
+*.log
+*.log.*
+
+### Compiled ###
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+
+### Environment & Secrets ###
+.env
+.env.*
+!.env.example
+
+### Spring Boot local/prod config (contains real credentials) ###
+src/main/resources/application-local.yml
+src/main/resources/application-prod.yml
+src/main/resources/application-docker.yml
+
+### Temp ###
+*.tmp
+*.swp
+*.swo
+*~
+
+
