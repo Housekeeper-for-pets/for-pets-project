@@ -1,9 +1,9 @@
 package com.forpets.domain.sitter.controller;
 
-import com.forpets.domain.sitter.dto.CreateSitterRequest;
-import com.forpets.domain.sitter.dto.SitterResponseDto;
-import com.forpets.domain.sitter.dto.UpdateSitterRequest;
-import com.forpets.domain.sitter.dto.UpdateSitterStatusRequest;
+import com.forpets.domain.sitter.dto.profile.CreateSitterRequest;
+import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
+import com.forpets.domain.sitter.dto.profile.UpdateSitterRequest;
+import com.forpets.domain.sitter.dto.profile.UpdateSitterStatusRequest;
 import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;

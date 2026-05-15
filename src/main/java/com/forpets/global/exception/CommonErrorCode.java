@@ -2,6 +2,7 @@ package com.forpets.global.exception;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.graphql.GraphQlProperties;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -50,8 +51,10 @@ public enum CommonErrorCode implements ErrorCode {
     ADMIN_CANNOT_REGISTER_SITTER(HttpStatus.FORBIDDEN, "S001", "관리자는 시터 프로필을 등록할 수 없습니다."),
     SITTER_PROFILE_EXISTS(HttpStatus.BAD_REQUEST, "S002", "이미 시터 프로필이 존재합니다."),
     SITTER_PROFILE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST, "S003", "시터 프로필을 삭제 한 이후 다시 생성할 수 없습니다."),
-    SITTER_NOT_FOUND(HttpStatus.NOT_FOUND, "S004", "존재하지 않는 시터입니다.")
+    SITTER_NOT_FOUND(HttpStatus.NOT_FOUND, "S004", "존재하지 않는 시터입니다."),
 
+    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "S005", "시작 시간은 종료 시간보다 빨라야합니다."),
+    DUPLICATE_SCHEDULE(HttpStatus.CONFLICT, "S006", "요일별 1개 시간대만 등록 가능합니다.")
 
     ;
 
