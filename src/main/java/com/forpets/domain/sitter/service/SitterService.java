@@ -3,19 +3,21 @@ package com.forpets.domain.sitter.service;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.service.MemberService;
-import com.forpets.domain.sitter.dto.CreateSitterRequest;
-import com.forpets.domain.sitter.dto.SitterResponseDto;
-import com.forpets.domain.sitter.dto.UpdateSitterRequest;
-import com.forpets.domain.sitter.dto.UpdateSitterStatusRequest;
+import com.forpets.domain.sitter.dto.profile.CreateSitterRequest;
+import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
+import com.forpets.domain.sitter.dto.profile.UpdateSitterRequest;
+import com.forpets.domain.sitter.dto.profile.UpdateSitterStatusRequest;
 import com.forpets.domain.sitter.entity.SitterProfile;
-import com.forpets.domain.sitter.entity.SitterProfileStatus;
+import com.forpets.domain.sitter.entity.SitterSchedule;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
+import com.forpets.domain.sitter.repository.SitterScheduleRepository;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
-import com.forpets.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SitterService {
     private final MemberService memberService;
     private final SitterProfileRepository sitterProfileRepository;
+    private final SitterScheduleRepository sitterScheduleRepository;
 
     @Transactional
     public SitterResponseDto create(Long memberId, CreateSitterRequest request) {
@@ -48,7 +51,12 @@ public class SitterService {
 
     public SitterResponseDto getMyProfile(Long memberId) {
         SitterProfile sitter = findByMemberId(memberId);
-        return SitterResponseDto.from(sitter);
+
+        // sitter profile 이랑 잘 출력 되는지 확인하고 싶어서 테스트 용으로 내 정보 조회에 넣어봤습니다!
+        // 경안님도 아래 로직 똑같이 사용하면 getOne'sProfile API 구현할 때 편할 것 같아요
+        List<SitterSchedule> schedules = sitterScheduleRepository.findAllBySitterProfileId(sitter.getId());
+
+        return SitterResponseDto.from(sitter, schedules);
     }
 
     /*

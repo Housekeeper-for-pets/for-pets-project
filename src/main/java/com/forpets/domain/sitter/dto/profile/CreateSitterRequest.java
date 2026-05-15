@@ -1,7 +1,5 @@
-package com.forpets.domain.sitter.dto;
+package com.forpets.domain.sitter.dto.profile;
 
-import com.forpets.domain.pet.entity.PetSize;
-import com.forpets.domain.pet.entity.PetSpecies;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
 import jakarta.validation.constraints.NotBlank;
