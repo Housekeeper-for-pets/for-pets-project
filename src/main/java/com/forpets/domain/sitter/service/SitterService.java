@@ -42,7 +42,20 @@ public class SitterService {
         return SitterResponseDto.from(sitter);
     }
 
+    public SitterResponseDto getMyProfile(Long memberId) {
+        SitterProfile sitter = findByMemberId(memberId);
+        return SitterResponseDto.from(sitter);
+    }
 
+
+
+    // -------------Transaction 아닌 method 들------------------
+
+    public SitterProfile findByMemberId(Long memberId){
+        return sitterProfileRepository.findByMemberId(memberId).orElseThrow(
+                ()->new BusinessException(CommonErrorCode.SITTER_NOT_FOUND)
+        );
+    }
 
     /*
     관리자는 관리 역할을 기본으로 하기 때문에 시터 프로필을 등록하는 것을 막아둠

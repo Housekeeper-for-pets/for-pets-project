@@ -49,7 +49,8 @@ public enum CommonErrorCode implements ErrorCode {
 
     ADMIN_CANNOT_REGISTER_SITTER(HttpStatus.FORBIDDEN, "S001", "관리자는 시터 프로필을 등록할 수 없습니다."),
     SITTER_PROFILE_EXISTS(HttpStatus.BAD_REQUEST, "S002", "이미 시터 프로필이 존재합니다."),
-    SITTER_PROFILE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST, "S003", "시터 프로필을 삭제 한 이후 다시 생성할 수 없습니다.")
+    SITTER_PROFILE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST, "S003", "시터 프로필을 삭제 한 이후 다시 생성할 수 없습니다."),
+    SITTER_NOT_FOUND(HttpStatus.NOT_FOUND, "S004", "존재하지 않는 시터입니다.")
 
 
     ;

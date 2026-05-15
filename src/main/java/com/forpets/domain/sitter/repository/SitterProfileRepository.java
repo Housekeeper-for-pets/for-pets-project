@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Optional;
+
 public interface SitterProfileRepository extends JpaRepository<SitterProfile, Long> {
 
     @Query(value =
@@ -13,4 +15,6 @@ public interface SitterProfileRepository extends JpaRepository<SitterProfile, Lo
     int countByMemberIdIncludingDeleted(@Param("memberId") Long memberId);
 
     boolean existsByMemberId(Long memberId);
+
+    Optional<SitterProfile> findByMemberId(Long memberId);
 }

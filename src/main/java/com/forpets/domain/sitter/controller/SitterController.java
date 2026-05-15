@@ -27,5 +27,9 @@ public class SitterController {
                 .body(ApiResponse.success(sitterService.create(currentMember.id(), request)));
     }
 
-
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<SitterResponseDto>> getMyProfile(
+            @LoginUser CurrentMember currentMember) {
+        return ResponseEntity.ok(ApiResponse.success(sitterService.getMyProfile(currentMember.id())));
+    }
 }
