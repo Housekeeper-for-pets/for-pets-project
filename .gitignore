@@ -2,7 +2,6 @@
 build/
 out/
 target/
-!gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 !**/src/main/**/out/
@@ -53,7 +52,6 @@ logs/
 
 ### Compiled ###
 *.class
-*.jar
 *.war
 *.ear
 *.nar
