@@ -1,11 +1,10 @@
 package com.forpets.domain.sitter.dto.profile;
 
-import com.forpets.domain.sitter.entity.PossiblePetSize;
-import com.forpets.domain.sitter.entity.PossiblePetType;
-import com.forpets.domain.sitter.entity.SitterProfile;
-import com.forpets.domain.sitter.entity.SitterProfileStatus;
+import com.forpets.domain.sitter.dto.schedule.ScheduleResponseDto;
+import com.forpets.domain.sitter.entity.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record SitterResponseDto(
         Long id,
@@ -17,10 +16,15 @@ public record SitterResponseDto(
         PossiblePetSize possiblePetSize,
         Integer pricePerHour,
         SitterProfileStatus status,
+        List<ScheduleResponseDto> schedules,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
     public static SitterResponseDto from(SitterProfile sitter) {
+        return from(sitter, List.of());
+    }
+
+    public static SitterResponseDto from(SitterProfile sitter, List<SitterSchedule> schedules) {
         return new SitterResponseDto(
                 sitter.getId(),
                 sitter.getMemberId(),
@@ -31,6 +35,7 @@ public record SitterResponseDto(
                 sitter.getPossiblePetSize(),
                 sitter.getPricePerHour(),
                 sitter.getStatus(),
+                schedules.stream().map(ScheduleResponseDto::from).toList(),
                 sitter.getCreatedAt(),
                 sitter.getUpdatedAt()
         );
