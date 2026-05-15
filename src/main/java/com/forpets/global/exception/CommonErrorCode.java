@@ -43,10 +43,13 @@ public enum CommonErrorCode implements ErrorCode {
     PET_USED_IN_ACTIVE_RESERVATION(HttpStatus.BAD_REQUEST, "P008", "진행 중인 예약에 포함된 반려동물은 수정 및 삭제가 불가합니다."),
     PET_USED_IN_OPEN_POST(HttpStatus.BAD_REQUEST, "P009", "열려있는 공고에 포함된 반려동물은 삭제가 불가능합니다."),
     PET_USED_IN_PENDING_REQUEST(HttpStatus.BAD_REQUEST, "P010", "수락 대기중인 요청에 포함된 반려동물은 삭제가 불가능합니다."),
-    PET_CORE_FIELD_CHANGE_RESTRICTED(HttpStatus.BAD_REQUEST, "P011", "예약이 진행중이라 주요 정보 수정이 불가능한 상태입니다.")
+    PET_CORE_FIELD_CHANGE_RESTRICTED(HttpStatus.BAD_REQUEST, "P011", "예약이 진행중이라 주요 정보 수정이 불가능한 상태입니다."),
 
-    // ---------------------------------
+    // ------------- SITTER -------------
 
+    ADMIN_CANNOT_REGISTER_SITTER(HttpStatus.FORBIDDEN, "S001", "관리자는 시터 프로필을 등록할 수 없습니다."),
+    SITTER_PROFILE_EXISTS(HttpStatus.BAD_REQUEST, "S002", "이미 시터 프로필이 존재합니다."),
+    SITTER_PROFILE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST, "S003", "시터 프로필을 삭제 한 이후 다시 생성할 수 없습니다.")
 
 
     ;
