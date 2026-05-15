@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Table(name = "sitter_profile", uniqueConstraints = {
         @UniqueConstraint(columnNames = "member_id")
 })
-@SQLRestriction("deleted_at IS NULL")
+@SQLRestriction("deleted = false")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SitterProfile extends BaseEntity {
 
@@ -50,6 +50,9 @@ public class SitterProfile extends BaseEntity {
     @Column(nullable = false, length = 20)
     private SitterProfileStatus status;
 
+    @Column(nullable = false)
+    private boolean deleted = false;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -82,11 +85,8 @@ public class SitterProfile extends BaseEntity {
     }
 
     public void delete() {
+        this.deleted = true;
         this.deletedAt = LocalDateTime.now();
-    }
-
-    public boolean isDeleted() {
-        return this.deletedAt != null;
     }
 
     public boolean isReservable() {
