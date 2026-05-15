@@ -82,9 +82,9 @@ public class PetService {
         Pet pet = findById(petId);
         validateOwner(memberId, pet);
 
-        if (hasActiveReservation(petId)){
-            isCoreFieldChanged(pet, request);
-        }
+//        if (hasActiveReservation(petId)){
+//            isCoreFieldChanged(pet, request);
+//        }
 
         pet.update(
                 request.name(),
@@ -104,7 +104,7 @@ public class PetService {
     public void delete(Long memberId, Long petId) {
         Pet pet = findById(petId);
         validateOwner(memberId, pet);
-        validateDeletable(petId);
+//        validateDeletable(petId);
 
         pet.delete();
     }
@@ -140,40 +140,40 @@ public class PetService {
         }
     }
 
-    /*
-    예약이 PENDING 또는 CONFIRMED 상태 일 때
-    보호자가 해당 동물의 주요 정보를 수정하는 시나리오 방지
-    ex) 예약 생성은 아기고양이, 2kg 으로 잡고 결제 이후 갑자기 골든리트리버, 30kg 으로 수정하는 경우
-
-    -> PENDING 또는 CONFIRMED 예약이 존재할 때 핵심 필드 수정을 제한
-     */
-    private boolean hasActiveReservation(Long petId){
-        // return reservationService.existsInProgressReservationByPetId(petId)
-        // if 문에 넣어서 CustomException(ErrorCode.PET_USED_IN_ACTIVE_RESERVATION) 던지기
-        return true;
-    }
-
-    /*
-    중요한 정보 (종, 크기 등) 을 수정하려고 하면 PET_CORE_FIELD_CHANGE_RESTRICTED error
-     */
-    private void isCoreFieldChanged(Pet pet, UpdatePetRequest request) {
-        if (pet.getSpecies() != request.species() || pet.getSize() != request.size()) {
-            throw new BusinessException(CommonErrorCode.PET_CORE_FIELD_CHANGE_RESTRICTED);
-        }
-    }
-
-    /*
-    해당 반려동물이 삭제 가능 상태인지 확인하는 로직
-
-    1. Reservation -> PENDING 또는 CONFIRMED 인 경우 삭제 불가능
-    2. Post -> OPEN 상태의 공고에 등록되어 있는 경우 삭제 불가능
-    3. CareRequest -> PENDING 상태의 케어 요청에 포함되어 있는 경우 삭제 불가능
-
-    상태 변경 불가능 상태로 업데이트 이후 삭제가 가능하도록 함
-     */
-    private void validateDeletable(Long petId) {
-        // if (hasActiveReservation(petId)) PET_USED_IN_ACTIVE_RESERVATION
-        // if (postService . . .) PET_USED_IN_OPEN_POST error
-        // if (careRequestService . . .) PET_USED_IN_PENDING_REQUEST error
-    }
+//    /*
+//    예약이 PENDING 또는 CONFIRMED 상태 일 때
+//    보호자가 해당 동물의 주요 정보를 수정하는 시나리오 방지
+//    ex) 예약 생성은 아기고양이, 2kg 으로 잡고 결제 이후 갑자기 골든리트리버, 30kg 으로 수정하는 경우
+//
+//    -> PENDING 또는 CONFIRMED 예약이 존재할 때 핵심 필드 수정을 제한
+//     */
+//    private boolean hasActiveReservation(Long petId){
+//        // return reservationService.existsInProgressReservationByPetId(petId)
+//        // if 문에 넣어서 CustomException(ErrorCode.PET_USED_IN_ACTIVE_RESERVATION) 던지기
+//        return true;
+//    }
+//
+//    /*
+//    중요한 정보 (종, 크기 등) 을 수정하려고 하면 PET_CORE_FIELD_CHANGE_RESTRICTED error
+//     */
+//    private void isCoreFieldChanged(Pet pet, UpdatePetRequest request) {
+//        if (pet.getSpecies() != request.species() || pet.getSize() != request.size()) {
+//            throw new BusinessException(CommonErrorCode.PET_CORE_FIELD_CHANGE_RESTRICTED);
+//        }
+//    }
+//
+//    /*
+//    해당 반려동물이 삭제 가능 상태인지 확인하는 로직
+//
+//    1. Reservation -> PENDING 또는 CONFIRMED 인 경우 삭제 불가능
+//    2. Post -> OPEN 상태의 공고에 등록되어 있는 경우 삭제 불가능
+//    3. CareRequest -> PENDING 상태의 케어 요청에 포함되어 있는 경우 삭제 불가능
+//
+//    상태 변경 불가능 상태로 업데이트 이후 삭제가 가능하도록 함
+//     */
+//    private void validateDeletable(Long petId) {
+//        // if (hasActiveReservation(petId)) PET_USED_IN_ACTIVE_RESERVATION
+//        // if (postService . . .) PET_USED_IN_OPEN_POST error
+//        // if (careRequestService . . .) PET_USED_IN_PENDING_REQUEST error
+//    }
 }
