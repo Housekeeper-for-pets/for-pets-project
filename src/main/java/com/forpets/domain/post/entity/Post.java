@@ -7,12 +7,14 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
 @Getter
 @Entity
 @Table(name = "post")
+@SQLRestriction("status != 'DELETED'")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Post extends BaseEntity {
 
@@ -20,10 +22,10 @@ public class Post extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "author_id", nullable = false)
-    private Long authorId;
+    @Column(name = "member_id", nullable = false)
+    private Long memberId;
 
-    @Column(nullable = false, length = 150)
+    @Column(nullable = false, length = 100)
     private String title;
 
     @Column(nullable = false, columnDefinition = "TEXT")
@@ -36,51 +38,39 @@ public class Post extends BaseEntity {
     @Column(nullable = false, length = 20)
     private CareType careType;
 
+    @Column
     private Integer budgetAmount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private PostStatus status;
 
-    @Column(nullable = false)
-    private int viewCount;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
     @Builder
-    private Post(Long authorId, String title, String content, String region,
-                 CareType careType, Integer budgetAmount) {
-        this.authorId = authorId;
+    private Post(Long memberId, String title, String content,
+                 String region, CareType careType, Integer budgetAmount) {
+        this.memberId = memberId;
         this.title = title;
         this.content = content;
         this.region = region;
         this.careType = careType;
         this.budgetAmount = budgetAmount;
         this.status = PostStatus.OPEN;
-        this.viewCount = 0;
     }
 
-    public void update(String title, String content, String region, Integer budgetAmount) {
+    public void update(String title, String content, String region,
+                       CareType careType, Integer budgetAmount) {
         this.title = title;
         this.content = content;
         this.region = region;
+        this.careType = careType;
         this.budgetAmount = budgetAmount;
     }
 
-    public void close() {
-        this.status = PostStatus.CLOSED;
+    public void changeStatus(PostStatus status) {
+        this.status = status;
     }
 
-    public void delete() {
-        this.deletedAt = LocalDateTime.now();
-    }
-
-    public boolean isDeleted() {
-        return this.deletedAt != null;
-    }
-
-    public void increaseViewCount() {
-        this.viewCount++;
+    public boolean isOpen() {
+        return this.status == PostStatus.OPEN;
     }
 }
