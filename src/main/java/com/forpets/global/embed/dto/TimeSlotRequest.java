@@ -1,4 +1,4 @@
-package com.forpets.global.embed;
+package com.forpets.global.embed.dto;
 
 import jakarta.validation.constraints.NotNull;
 

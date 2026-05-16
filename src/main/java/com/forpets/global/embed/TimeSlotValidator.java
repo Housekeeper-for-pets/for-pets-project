@@ -1,5 +1,6 @@
 package com.forpets.global.embed;
 
+import com.forpets.global.embed.dto.TimeSlotRequest;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import org.springframework.stereotype.Component;

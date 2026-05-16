@@ -2,6 +2,8 @@ package com.forpets.domain.post.entity;
 
 import com.forpets.global.common.CareType;
 import com.forpets.global.entity.BaseEntity;
+import com.forpets.global.exception.BusinessException;
+import com.forpets.global.exception.CommonErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -14,7 +16,7 @@ import java.time.LocalDateTime;
 @Getter
 @Entity
 @Table(name = "post")
-@SQLRestriction("status != 'DELETED'")
+@SQLRestriction("deleted = false")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Post extends BaseEntity {
 
@@ -45,6 +47,18 @@ public class Post extends BaseEntity {
     @Column(nullable = false, length = 20)
     private PostStatus status;
 
+    @Column(nullable = false)
+    private boolean deleted = false;
+
+    @Column
+    private LocalDateTime deletedAt;
+
+    public void delete() {
+        this.status = PostStatus.CLOSED;
+        this.deleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
     @Builder
     private Post(Long memberId, String title, String content,
                  String region, CareType careType, Integer budgetAmount) {
@@ -66,11 +80,16 @@ public class Post extends BaseEntity {
         this.budgetAmount = budgetAmount;
     }
 
-    public void changeStatus(PostStatus status) {
-        this.status = status;
+    public void close() {
+        if (!isOpen()) throw new BusinessException(CommonErrorCode.INVALID_STATUS_TRANSITION);
+        this.status = PostStatus.CLOSED;
     }
 
     public boolean isOpen() {
         return this.status == PostStatus.OPEN;
+    }
+
+    public boolean isOwnedBy(Long memberId) {
+        return this.memberId.equals(memberId);
     }
 }
