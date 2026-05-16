@@ -232,4 +232,8 @@ public class PostService {
 
         return postTimeSlotRepository.saveAll(postTimeSlots);
     }
+
+    public List<Post> getTest() {
+        return postRepository.findAll();
+    }
 }

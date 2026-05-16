@@ -3,6 +3,7 @@ package com.forpets.domain.post.controller;
 import com.forpets.domain.post.dto.CreatePostRequest;
 import com.forpets.domain.post.dto.PostResponseDto;
 import com.forpets.domain.post.dto.UpdatePostRequest;
+import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.service.PostService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
@@ -12,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -74,5 +77,13 @@ public class PostController {
             @PathVariable Long postId) {
         postService.delete(currentMember.id(), postId);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    /*
+    test 용 공고 목록 조회
+     */
+    @GetMapping("/test")
+    public ResponseEntity<ApiResponse<List<Post>>> getTest(){
+        return ResponseEntity.ok(ApiResponse.success(postService.getTest()));
     }
 }
