@@ -57,7 +57,7 @@ public class Proposal extends BaseEntity {
         this.status = ProposalStatus.REJECTED;
     }
 
-    public void withdraw(String reason) {
+    public void withdraw() {
         this.status = ProposalStatus.WITHDRAWN;
     }
 
