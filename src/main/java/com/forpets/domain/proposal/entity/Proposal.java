@@ -9,13 +9,9 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(
-        name = "proposal",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_proposal_post_sitter",
-                columnNames = {"post_id", "sitter_profile_id"}
-        )
-)
+@Table(name = "proposal", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"post_id", "sitter_profile_id"})
+})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Proposal extends BaseEntity {
 
@@ -29,8 +25,11 @@ public class Proposal extends BaseEntity {
     @Column(name = "sitter_profile_id", nullable = false)
     private Long sitterProfileId;
 
+    @Column(name = "member_id", nullable = false)
+    private Long memberId;
+
     @Column(nullable = false)
-    private int proposedPrice;
+    private Integer proposedPrice;
 
     @Column(columnDefinition = "TEXT")
     private String message;
@@ -40,9 +39,11 @@ public class Proposal extends BaseEntity {
     private ProposalStatus status;
 
     @Builder
-    private Proposal(Long postId, Long sitterProfileId, int proposedPrice, String message) {
+    private Proposal(Long postId, Long sitterProfileId, Long memberId,
+                     Integer proposedPrice, String message) {
         this.postId = postId;
         this.sitterProfileId = sitterProfileId;
+        this.memberId = memberId;
         this.proposedPrice = proposedPrice;
         this.message = message;
         this.status = ProposalStatus.PENDING;
@@ -56,7 +57,15 @@ public class Proposal extends BaseEntity {
         this.status = ProposalStatus.REJECTED;
     }
 
-    public void withdraw() {
+    public void withdraw(String reason) {
         this.status = ProposalStatus.WITHDRAWN;
+    }
+
+    public boolean isPending() {
+        return this.status == ProposalStatus.PENDING;
+    }
+
+    public boolean isOwnedBySitter(Long sitterProfileId) {
+        return this.sitterProfileId.equals(sitterProfileId);
     }
 }
