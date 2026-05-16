@@ -55,7 +55,15 @@ public enum CommonErrorCode implements ErrorCode {
 
     INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "S005", "시작 시간은 종료 시간보다 빨라야합니다."),
     DUPLICATE_SCHEDULE(HttpStatus.CONFLICT, "S006", "요일별 1개 시간대만 등록 가능합니다."),
-    NOT_SCHEDULE_OWNER(HttpStatus.FORBIDDEN, "S007", "본인의 스케줄이 아닙니다.")
+    NOT_SCHEDULE_OWNER(HttpStatus.FORBIDDEN, "S007", "본인의 스케줄이 아닙니다."),
+
+    // ------------ TIME SLOT ----------------
+
+    TIME_SLOT_REQUIRED(HttpStatus.BAD_REQUEST, "T001", "TimeSlot 은 최소 하나 등록이 필요합니다."),
+    TIMESLOT_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "T001", "TimeSlot 은 공고, 요청 당 30개만 가능합니다."),
+    PAST_DATE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "T001", "과거 날짜를 추가할 수 없습니다."),
+    DUPLICATE_TIME_SLOT(HttpStatus.BAD_REQUEST, "T001", "TimeSlot 이 중복됩니다."),
+
 
     ;
 
