@@ -36,6 +36,8 @@ public class PostController {
 
     /*
     2. 공고 목록 조회
+     - 공고 전체 조회
+     - 내가 쓴 공고 목록 조회
     3. 공고 상세 조회
      */
 
@@ -83,7 +85,7 @@ public class PostController {
     test 용 공고 목록 조회
      */
     @GetMapping("/test")
-    public ResponseEntity<ApiResponse<List<Post>>> getTest(){
+    public ResponseEntity<ApiResponse<List<PostResponseDto>>> getTest(){
         return ResponseEntity.ok(ApiResponse.success(postService.getTest()));
     }
 }

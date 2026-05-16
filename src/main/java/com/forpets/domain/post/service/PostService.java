@@ -233,7 +233,13 @@ public class PostService {
         return postTimeSlotRepository.saveAll(postTimeSlots);
     }
 
-    public List<Post> getTest() {
-        return postRepository.findAll();
+    public List<PostResponseDto> getTest() {
+        return postRepository.findAll().stream()
+                .map(post -> PostResponseDto.from(
+                        post,
+                        postPetRepository.findAllByPostId(post.getId()),
+                        postTimeSlotRepository.findAllByPostIdOrderByTimeSlotInfoSequence(post.getId())
+                ))
+                .toList();
     }
 }
