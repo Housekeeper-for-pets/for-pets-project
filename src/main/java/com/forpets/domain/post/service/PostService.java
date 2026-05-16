@@ -6,7 +6,6 @@ import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.post.dto.CreatePostRequest;
 import com.forpets.domain.post.dto.PostResponseDto;
 import com.forpets.domain.post.dto.UpdatePostRequest;
-import com.forpets.domain.post.dto.UpdatePostStatusRequest;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostStatus;
@@ -38,22 +37,6 @@ public class PostService {
     private final PetService petService;
     private final TimeSlotValidator timeSlotValidator;
 
-    // ===== 외부 도메인 조회용 =====
-
-    public Post findById(Long postId) {
-        return postRepository.findById(postId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.POST_NOT_FOUND));
-    }
-
-    public List<PostTimeSlot> findTimeSlotsByPostId(Long postId) {
-        return postTimeSlotRepository.findAllByPostIdOrderByTimeSlotInfoSequence(postId);
-    }
-
-    public List<PostPet> findPetsByPostId(Long postId) {
-        return postPetRepository.findAllByPostId(postId);
-    }
-
-    // ===== API =====
 
     /*
     공고 등록
@@ -125,20 +108,19 @@ public class PostService {
     }
 
     /*
-    공고 상태 변경 (수동)
-    허용 전이:
-    - OPEN → CLOSED (ACCEPTED Proposal 없을 때만)
-    이 API에서 DELETED 전환은 불가 (DELETE API 사용)
-    CLOSED → OPEN 불가
+    공고 close 상태로 변경하기
+
+    근데 어차피 Close 상태인데 postPet 이랑 postTimeSlot 을 출력해주는 의미가 있나?
+    DB 부하 심해질 것 같으면 따로 Dto 만들어서 빼주기
+    아니면 void 반환해줘도 될 것 같음 고민해보기
      */
     @Transactional
-    public PostResponseDto updateStatus(Long memberId, Long postId, UpdatePostStatusRequest request) {
+    public PostResponseDto closePost(Long memberId, Long postId) {
         Post post = findById(postId);
         validateAuthor(memberId, post);
-        validateManualStatusTransition(post, request.status());
-        validateNoAcceptedProposal(postId);
+        validateNoActiveProposal(postId);
 
-        post.changeStatus(request.status());
+        post.close();
 
         List<PostPet> postPets = postPetRepository.findAllByPostId(postId);
         List<PostTimeSlot> postTimeSlots = postTimeSlotRepository
@@ -158,12 +140,25 @@ public class PostService {
     public void delete(Long memberId, Long postId) {
         Post post = findById(postId);
         validateAuthor(memberId, post);
-        validateNoAcceptedProposal(postId);
+        validateNoActiveProposal(postId);
 
         post.delete();
     }
 
-    // ===== private methods =====
+    // ===== 트랜잭션 아닌 애들 =====
+
+    public Post findById(Long postId) {
+        return postRepository.findById(postId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.POST_NOT_FOUND));
+    }
+
+    public List<PostTimeSlot> findTimeSlotsByPostId(Long postId) {
+        return postTimeSlotRepository.findAllByPostIdOrderByTimeSlotInfoSequence(postId);
+    }
+
+    public List<PostPet> findPetsByPostId(Long postId) {
+        return postPetRepository.findAllByPostId(postId);
+    }
 
     /*
     반려동물 존재 여부 + 본인 소유 검증
@@ -194,32 +189,14 @@ public class PostService {
     }
 
     /*
-    수동 상태 전이 규칙:
-    - DELETED 전환은 이 API에서 불가 (DELETE API 사용)
-    - OPEN → CLOSED만 허용
-    - CLOSED → OPEN 불가
-     */
-    private void validateManualStatusTransition(Post post, PostStatus newStatus) {
-        if (!post.isOpen()) {
-            throw new BusinessException(CommonErrorCode.INVALID_STATUS_TRANSITION);
-        }
-    }
+    PENDING 또는 ACCEPTED Proposal이 있으면 수정, 상태변경, 삭제 불가
 
-    /*
-    PENDING 또는 ACCEPTED Proposal이 있으면 수정 불가
+    MVP 정책이 원래 PENDING Proposal만 있으면 상태 변경, 삭제 가능이었는데
+    그냥 구분하지 않고 모든 요청을 다 REJECT 처리 다 해야 상태 변경, 삭제 가능하도록 하는게 깔끔할듯
      */
     private void validateNoActiveProposal(Long postId) {
         // if (proposalService.existsPendingOrAcceptedByPostId(postId)) {
         //     throw new BusinessException(CommonErrorCode.HAS_PENDING_PROPOSAL);
-        // }
-    }
-
-    /*
-    ACCEPTED Proposal이 있으면 상태 변경/삭제 불가
-     */
-    private void validateNoAcceptedProposal(Long postId) {
-        // if (proposalService.existsAcceptedByPostId(postId)) {
-        //     throw new BusinessException(CommonErrorCode.HAS_ACCEPTED_PROPOSAL);
         // }
     }
 
