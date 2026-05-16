@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @Getter
 @Entity
 @Table(name = "post")
-@SQLRestriction("status != 'DELETED'")
+@SQLRestriction("deleted = false")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Post extends BaseEntity {
 
@@ -45,6 +45,17 @@ public class Post extends BaseEntity {
     @Column(nullable = false, length = 20)
     private PostStatus status;
 
+    @Column(nullable = false)
+    private boolean deleted = false;
+
+    @Column
+    private LocalDateTime deletedAt;
+
+    public void delete() {
+        this.deleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
     @Builder
     private Post(Long memberId, String title, String content,
                  String region, CareType careType, Integer budgetAmount) {
@@ -72,5 +83,9 @@ public class Post extends BaseEntity {
 
     public boolean isOpen() {
         return this.status == PostStatus.OPEN;
+    }
+
+    public boolean isOwnedBy(Long memberId) {
+        return this.memberId.equals(memberId);
     }
 }

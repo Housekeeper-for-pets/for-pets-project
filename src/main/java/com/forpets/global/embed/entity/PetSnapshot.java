@@ -1,4 +1,4 @@
-package com.forpets.domain.post.entity;
+package com.forpets.global.embed.entity;
 
 import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.entity.PetGender;

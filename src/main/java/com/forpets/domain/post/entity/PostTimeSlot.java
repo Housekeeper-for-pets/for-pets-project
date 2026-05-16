@@ -1,5 +1,6 @@
 package com.forpets.domain.post.entity;
 
+import com.forpets.global.embed.entity.TimeSlotInfo;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

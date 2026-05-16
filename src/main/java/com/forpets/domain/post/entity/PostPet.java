@@ -1,6 +1,7 @@
 package com.forpets.domain.post.entity;
 
 import com.forpets.domain.pet.entity.Pet;
+import com.forpets.global.embed.entity.PetSnapshot;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

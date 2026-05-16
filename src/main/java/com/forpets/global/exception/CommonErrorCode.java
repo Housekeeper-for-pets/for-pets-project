@@ -35,16 +35,16 @@ public enum CommonErrorCode implements ErrorCode {
 
     // ----------- PET ------------
 
-    INVALID_PET_SPECIES(HttpStatus.BAD_REQUEST, "P002", "허용되지 않은 반려동물 종류입니다."),
-    INVALID_PET_SIZE(HttpStatus.BAD_REQUEST, "P003", "허용되지 않은 반려동물 크기입니다."),
-    INVALID_PET_GENDER(HttpStatus.BAD_REQUEST, "P004", "허용되지 않은 반려동물 성별입니다."),
-    PET_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "P005", "최대 10마리까지만 등록 가능합니다"),
-    NOT_PET_OWNER(HttpStatus.FORBIDDEN, "P006", "본인의 반려동물이 아닙니다."),
-    PET_NOT_FOUND(HttpStatus.NOT_FOUND, "P007", "존재하지 않는 반려동물입니다."),
-    PET_USED_IN_ACTIVE_RESERVATION(HttpStatus.BAD_REQUEST, "P008", "진행 중인 예약에 포함된 반려동물은 수정 및 삭제가 불가합니다."),
-    PET_USED_IN_OPEN_POST(HttpStatus.BAD_REQUEST, "P009", "열려있는 공고에 포함된 반려동물은 삭제가 불가능합니다."),
-    PET_USED_IN_PENDING_REQUEST(HttpStatus.BAD_REQUEST, "P010", "수락 대기중인 요청에 포함된 반려동물은 삭제가 불가능합니다."),
-    PET_CORE_FIELD_CHANGE_RESTRICTED(HttpStatus.BAD_REQUEST, "P011", "예약이 진행중이라 주요 정보 수정이 불가능한 상태입니다."),
+    INVALID_PET_SPECIES(HttpStatus.BAD_REQUEST, "PET001", "허용되지 않은 반려동물 종류입니다."),
+    INVALID_PET_SIZE(HttpStatus.BAD_REQUEST, "PET002", "허용되지 않은 반려동물 크기입니다."),
+    PET_CORE_FIELD_CHANGE_RESTRICTED(HttpStatus.BAD_REQUEST, "PET003", "예약이 진행중이라 주요 정보 수정이 불가능한 상태입니다."),
+    INVALID_PET_GENDER(HttpStatus.BAD_REQUEST, "PET004", "허용되지 않은 반려동물 성별입니다."),
+    PET_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "PET005", "최대 10마리까지만 등록 가능합니다"),
+    NOT_PET_OWNER(HttpStatus.FORBIDDEN, "PET006", "본인의 반려동물이 아닙니다."),
+    PET_NOT_FOUND(HttpStatus.NOT_FOUND, "PET007", "존재하지 않는 반려동물입니다."),
+    PET_USED_IN_ACTIVE_RESERVATION(HttpStatus.BAD_REQUEST, "PET008", "진행 중인 예약에 포함된 반려동물은 수정 및 삭제가 불가합니다."),
+    PET_USED_IN_OPEN_POST(HttpStatus.BAD_REQUEST, "PET009", "열려있는 공고에 포함된 반려동물은 삭제가 불가능합니다."),
+    PET_USED_IN_PENDING_REQUEST(HttpStatus.BAD_REQUEST, "PET010", "수락 대기중인 요청에 포함된 반려동물은 삭제가 불가능합니다."),
 
     // ------------- SITTER -------------
 
@@ -60,9 +60,16 @@ public enum CommonErrorCode implements ErrorCode {
     // ------------ TIME SLOT ----------------
 
     TIME_SLOT_REQUIRED(HttpStatus.BAD_REQUEST, "T001", "TimeSlot 은 최소 하나 등록이 필요합니다."),
-    TIMESLOT_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "T001", "TimeSlot 은 공고, 요청 당 30개만 가능합니다."),
-    PAST_DATE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "T001", "과거 날짜를 추가할 수 없습니다."),
-    DUPLICATE_TIME_SLOT(HttpStatus.BAD_REQUEST, "T001", "TimeSlot 이 중복됩니다."),
+    TIMESLOT_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "T002", "TimeSlot 은 공고, 요청 당 30개만 가능합니다."),
+    PAST_DATE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "T003", "과거 날짜를 추가할 수 없습니다."),
+    DUPLICATE_TIME_SLOT(HttpStatus.BAD_REQUEST, "T004", "TimeSlot 이 중복됩니다."),
+
+    // -------- POST ---------
+    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "존재하지 않는 공고입니다."),
+    NOT_POST_AUTHOR(HttpStatus.FORBIDDEN, "P002", "본인의 공고가 아닙니다."),
+    POST_NOT_OPEN(HttpStatus.BAD_REQUEST, "P003", "종료된 공고입니다."),
+    INVALID_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "P004", "수정 불가한 공고 상태입니다."),
+
 
 
     ;

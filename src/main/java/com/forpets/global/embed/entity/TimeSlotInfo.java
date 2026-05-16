@@ -1,4 +1,4 @@
-package com.forpets.domain.post.entity;
+package com.forpets.global.embed.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
