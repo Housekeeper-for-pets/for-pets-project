@@ -1,5 +1,6 @@
 package com.forpets.domain.carerequest.entity;
 
+import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.entity.CreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -14,7 +15,7 @@ import java.time.LocalTime;
 @Entity
 @Table(name = "care_request_time_slot")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CareRequestTimeSlot extends CreatedEntity {
+public class CareRequestTimeSlot {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,25 +24,13 @@ public class CareRequestTimeSlot extends CreatedEntity {
     @Column(name = "care_request_id", nullable = false)
     private Long careRequestId;
 
-    @Column(nullable = false)
-    private LocalDate careDate;
+    @Embedded
+    private TimeSlotInfo timeSlotInfo;
 
-    @Column(nullable = false)
-    private LocalTime startTime;
-
-    @Column(nullable = false)
-    private LocalTime endTime;
-
-    @Column(nullable = false)
-    private int sequence;
-
-    @Builder
-    private CareRequestTimeSlot(Long careRequestId, LocalDate careDate,
-                                LocalTime startTime, LocalTime endTime, int sequence) {
-        this.careRequestId = careRequestId;
-        this.careDate = careDate;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.sequence = sequence;
+    public static CareRequestTimeSlot create(Long careRequestId, TimeSlotInfo timeSlotInfo) {
+        CareRequestTimeSlot slot = new CareRequestTimeSlot();
+        slot.careRequestId = careRequestId;
+        slot.timeSlotInfo = timeSlotInfo;
+        return slot;
     }
 }
