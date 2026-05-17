@@ -116,7 +116,7 @@ public class PetService {
     pet Id 가 존재하지 않거나, Soft Deleted 된 상태라면 PET_NOT_FOUND error 를 throw 합니다.
 
     타 도메인에서 Pet Entity 에 접근할 때 사용할 수 있습니다.
-    ex) Pet pet = petService.findById(id);
+    ex) Pet pet = petService.findById(timeSlotId);
      */
     public Pet findById(Long petId) {
         return petRepository.findById(petId)
