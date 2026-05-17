@@ -22,6 +22,7 @@ import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class CareRequestService {
 
     private final CareRequestRepository careRequestRepository;
@@ -40,9 +42,6 @@ public class CareRequestService {
     private final PetService petService;
     private final SitterService sitterService;
     private final TimeSlotValidator timeSlotValidator;
-
-
-    // ===== API =====
 
     /*
     케어 요청 등록
@@ -57,7 +56,11 @@ public class CareRequestService {
     public CareRequestResponseDto create(Long memberId, Long sitterId, CreateCareRequestDto request) {
         SitterProfile sitter = sitterService.findById(sitterId);
         validateReservable(sitter);
-        validateNotSelf(memberId, sitter);
+
+        log.info("로그인 한 유저의 member Id: {}", memberId);
+        log.info("타겟 시터의 member Id: {}", sitter.getMemberId());
+
+        validateNotSelf(memberId, sitter.getMemberId());
 
         List<Pet> pets = validateAndGetPets(memberId, request.petIds());
         timeSlotValidator.validate(request.timeSlots());
@@ -151,6 +154,7 @@ public class CareRequestService {
 
         request.accept();
 
+        log.info("[CareRequestService] PENDING 상태의 예약 생성");
         // Reservation 자동 생성
         // List<CareRequestPet> crPets = careRequestPetRepository.findAllByCareRequestId(request.getId());
         // List<CareRequestTimeSlot> crTimeSlots =
@@ -195,8 +199,8 @@ public class CareRequestService {
         }
     }
 
-    private void validateNotSelf(Long memberId, SitterProfile sitter) {
-        if (sitter.getMemberId().equals(memberId)) {
+    private void validateNotSelf(Long memberId, Long targetSitterId) {
+        if (targetSitterId.equals(memberId)) {
             throw new BusinessException(CommonErrorCode.CANNOT_REQUEST_TO_SELF);
         }
     }
