@@ -47,6 +47,8 @@ public class ProposalService {
 
         SitterProfile sitter = sitterService.findByMemberId(memberId);
         validateNoDuplicate(postId, sitter.getId());
+        // 현재 Sitter 의 CONFIRMED 된 예약과 중복되는지 확인
+        // 중복이면 등록 못 함
         validateNoReservationConflict(sitter.getId(), postId);
 
         Proposal proposal = proposalRepository.save(Proposal.builder()
@@ -56,6 +58,14 @@ public class ProposalService {
                 .proposedPrice(request.proposedPrice())
                 .message(request.message())
                 .build());
+
+        /*
+         V2: 등록 후 Event send 하는 로직 추가
+         Kafka 로 Post 의 proposal 개수 저장 (모니터링)
+         sitter 에게 메시지 : 제안이 등록되었습니다.
+         공고 작성자에게 메시지 : 새로운 제안이 들어왔습니다.
+         ... 또 뭐가 있을까
+         */
 
         return ProposalResponseDto.from(proposal);
     }
@@ -104,7 +114,8 @@ public class ProposalService {
     4. 선택한 제안 → ACCEPTED
     5. 같은 공고의 나머지 PENDING 제안 → REJECTED
     6. 공고 상태 → CLOSED
-    7. TODO: Reservation 자동 생성 (PENDING)
+
+    7. Reservation 자동 생성 (PENDING)
        - PostPet → ReservationPet 스냅샷 복사
        - PostTimeSlot → ReservationTimeSlot 복사
      */
@@ -120,17 +131,14 @@ public class ProposalService {
         // 제안 채택
         proposal.accept();
 
-        // 같은 공고의 나머지 PENDING 제안 → REJECTED
-        rejectRemainingProposals(post.getId(), proposalId);
+        // Reservation 자동 생성
+        // 동기 처리로 구현하는게 좋을듯 나중에 주석 빼기
 
-        // 공고 상태 → CLOSED
-        post.close();
-
-        // TODO: Reservation 자동 생성
-        // 동기 처리 vs EventListener 방식 결정 후 구현
         // List<PostPet> postPets = postService.findPetsByPostId(post.getId());
         // List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(post.getId());
         // reservationService.createFromProposal(proposal, post, postPets, postTimeSlots);
+
+        // 비동기 처리 (eventListener 또는 kafka) 는 알림이나 로그.. 같은거 작성 할 때 쓰자 ~
 
         return ProposalResponseDto.from(proposal);
     }
@@ -186,13 +194,6 @@ public class ProposalService {
                 postId, List.of(ProposalStatus.PENDING, ProposalStatus.ACCEPTED));
     }
 
-    /*
-    PostService에서 사용 — 공고 상태 변경/삭제 시 ACCEPTED Proposal 존재 여부 확인
-     */
-    public boolean existsAcceptedByPostId(Long postId) {
-        return proposalRepository.existsByPostIdAndStatus(postId, ProposalStatus.ACCEPTED);
-    }
-
     private void validatePostOpen(Post post) {
         if (!post.isOpen()) {
             throw new BusinessException(CommonErrorCode.POST_NOT_OPEN);
@@ -205,6 +206,10 @@ public class ProposalService {
         }
     }
 
+    /*
+    이거 Duplicated 조건에 PENDING 상태인 이미 보낸 제안이 있으면 불가능으로 하는게 좋지 않을까...
+    잘못 보낸 제안이 있으면 취소하고 다시 넣을 수 있으면 좋으니까 -> 수정 안 만들어도 됨
+     */
     private void validateNoDuplicate(Long postId, Long sitterProfileId) {
         if (proposalRepository.existsByPostIdAndSitterProfileId(postId, sitterProfileId)) {
             throw new BusinessException(CommonErrorCode.DUPLICATE_PROPOSAL);
@@ -228,16 +233,9 @@ public class ProposalService {
     공고 작성자 또는 제안한 시터만 접근 가능
      */
     private void validateParty(Long memberId, Proposal proposal) {
-        boolean isPostAuthor = false;
-        try {
-            Post post = postService.findById(proposal.getPostId());
-            isPostAuthor = post.isOwnedBy(memberId);
-        } catch (BusinessException ignored) {
-        }
+        Post post = postService.findById(proposal.getPostId());
 
-        boolean isProposalSitter = proposal.getMemberId().equals(memberId);
-
-        if (!isPostAuthor && !isProposalSitter) {
+        if (!post.isOwnedBy(memberId) && !proposal.getMemberId().equals(memberId)) {
             throw new BusinessException(CommonErrorCode.NOT_PROPOSAL_PARTY);
         }
     }
@@ -249,9 +247,10 @@ public class ProposalService {
     }
 
     /*
-    CONFIRMED 예약과 시간 충돌 검증
-    TODO: Reservation 도메인 구현 후 연동
+    시터의 CONFIRMED 예약과 시간 충돌 검증
     시터의 CONFIRMED 예약 시간과 공고의 TimeSlot이 겹치는지 확인
+
+    Reservation 도메인 구현 후 연동시키기
      */
     private void validateNoReservationConflict(Long sitterProfileId, Long postId) {
         // List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(postId);
@@ -262,6 +261,8 @@ public class ProposalService {
 
     /*
     같은 공고의 나머지 PENDING 제안을 REJECTED로 일괄 변경
+
+    Reservation 확정 이벤트 발행 시 호출하기
      */
     private void rejectRemainingProposals(Long postId, Long acceptedProposalId) {
         proposalRepository.findAllByPostIdAndStatus(postId, ProposalStatus.PENDING).stream()
