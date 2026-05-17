@@ -1,4 +1,4 @@
-package com.forpets.domain.care.entity;
+package com.forpets.domain.carerequest.entity;
 
 public enum CareRequestStatus {
     PENDING,
