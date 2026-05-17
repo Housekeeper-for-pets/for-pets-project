@@ -2,6 +2,7 @@ package com.forpets.domain.proposal.service;
 
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostStatus;
+import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.service.PostService;
 import com.forpets.domain.proposal.dto.CreateProposalRequest;
 import com.forpets.domain.proposal.dto.ProposalResponseDto;
@@ -24,7 +25,7 @@ import java.util.List;
 public class ProposalService {
 
     private final ProposalRepository proposalRepository;
-    private final PostService postService;
+    private final PostRepository postRepository;
     private final SitterService sitterService;
 
 
@@ -41,7 +42,7 @@ public class ProposalService {
      */
     @Transactional
     public ProposalResponseDto create(Long memberId, Long postId, CreateProposalRequest request) {
-        Post post = postService.findById(postId);
+        Post post = findPost(postId);
         validatePostOpen(post);
         validateNotOwnPost(memberId, post);
 
@@ -75,7 +76,7 @@ public class ProposalService {
     공고 작성자만 조회 가능
      */
     public List<ProposalResponseDto> getByPostId(Long memberId, Long postId) {
-        Post post = postService.findById(postId);
+        Post post = findPost(postId);
         validatePostAuthor(memberId, post);
 
         return proposalRepository.findAllByPostId(postId).stream()
@@ -124,7 +125,7 @@ public class ProposalService {
         Proposal proposal = findById(proposalId);
         validatePending(proposal);
 
-        Post post = postService.findById(proposal.getPostId());
+        Post post = findPost(proposal.getPostId());
         validatePostAuthor(memberId, post);
         validatePostOpen(post);
 
@@ -153,7 +154,7 @@ public class ProposalService {
         Proposal proposal = findById(proposalId);
         validatePending(proposal);
 
-        Post post = postService.findById(proposal.getPostId());
+        Post post = findPost(proposal.getPostId());
         validatePostAuthor(memberId, post);
 
         proposal.reject();
@@ -233,7 +234,7 @@ public class ProposalService {
     공고 작성자 또는 제안한 시터만 접근 가능
      */
     private void validateParty(Long memberId, Proposal proposal) {
-        Post post = postService.findById(proposal.getPostId());
+        Post post = findPost(proposal.getPostId());
 
         if (!post.isOwnedBy(memberId) && !proposal.getMemberId().equals(memberId)) {
             throw new BusinessException(CommonErrorCode.NOT_PROPOSAL_PARTY);
@@ -268,5 +269,14 @@ public class ProposalService {
         proposalRepository.findAllByPostIdAndStatus(postId, ProposalStatus.PENDING).stream()
                 .filter(p -> !p.getId().equals(acceptedProposalId))
                 .forEach(Proposal::reject);
+    }
+
+    /*
+    PostService 와 ProposalService 사이에 순환참조 발생
+    -> ProposalService 에서 PostRepository 를 직접 참조하도록 함
+     */
+    private Post findPost(Long postId) {
+        return postRepository.findById(postId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.POST_NOT_FOUND));
     }
 }
