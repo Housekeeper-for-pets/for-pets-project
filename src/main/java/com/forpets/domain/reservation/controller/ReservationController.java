@@ -8,6 +8,7 @@ import com.forpets.global.security.dto.CurrentMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,6 +32,14 @@ public class ReservationController {
             @LoginUser CurrentMember currentMember) {
         return ResponseEntity.ok(
                 ApiResponse.success(reservationService.getMyReservations(currentMember.id())));
+    }
+
+    @GetMapping("/{reservationId}")
+    public ResponseEntity<ApiResponse<ReservationResponseDto>> getDetail(
+            @LoginUser CurrentMember currentMember,
+            @PathVariable Long reservationId) {
+        return ResponseEntity.ok(
+                ApiResponse.success(reservationService.getDetail(currentMember.id(), reservationId)));
     }
 
 

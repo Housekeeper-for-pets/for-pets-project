@@ -110,6 +110,9 @@ public class ReservationService {
     }
 
 
+    /*
+    내 예약 목록 조회
+     */
     public List<ReservationResponseDto> getMyReservations(Long memberId) {
         List<Reservation> asGuardian = reservationRepository.findAllByGuardianId(memberId);
         List<Reservation> asSitter = reservationRepository.findAllBySitterMemberId(memberId);
@@ -123,7 +126,25 @@ public class ReservationService {
                 .toList();
     }
 
+    /*
+    예약 상세 조회
+    예약 당사자여야 가능
+     */
+    public ReservationResponseDto getDetail(Long memberId, Long reservationId) {
+        Reservation reservation = findById(reservationId);
+        validateParty(memberId, reservation);
+        return toResponseDto(reservation);
+    }
+
+
+
     // transaction 아닌 애들
+
+    private void validateParty(Long memberId, Reservation reservation) {
+        if (!reservation.isParty(memberId)) {
+            throw new BusinessException(CommonErrorCode.NOT_RESERVATION_PARTY);
+        }
+    }
 
     public Reservation findById(Long reservationId) {
         return reservationRepository.findById(reservationId)
