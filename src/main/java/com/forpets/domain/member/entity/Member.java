@@ -77,10 +77,11 @@ public class Member extends BaseEntity {
         this.role = MemberRole.MEMBER;
     }
 
-    public void updateProfile(String nickname, String phone, MemberGender gender) {
+    public void updateProfile(String nickname, String phone, MemberGender gender, Region region) {
         this.nickname = nickname;
         this.phone = phone;
         this.gender = gender == null ? MemberGender.UNKNOWN : gender;
+        this.region = region == null ? Region.UNKNOWN : region;
     }
 
     public void changePassword(String encodedPassword) {
