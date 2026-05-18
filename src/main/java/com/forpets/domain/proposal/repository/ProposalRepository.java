@@ -20,6 +20,8 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
 
     boolean existsByPostIdAndStatusIn(Long postId, List<ProposalStatus> statuses);
 
+    List<Proposal> findAllByMemberIdAndStatus(Long memberId, ProposalStatus status);
+
     List<Proposal> findAllBySitterProfileIdAndStatus(Long sitterProfileId, ProposalStatus status);
 
 }
