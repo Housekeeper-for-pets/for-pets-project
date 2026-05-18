@@ -13,6 +13,8 @@ import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.proposal.entity.Proposal;
+import com.forpets.domain.reservation.entity.Reservation;
+import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.service.SitterService;
@@ -42,6 +44,7 @@ public class CareRequestService {
     private final PetService petService;
     private final SitterService sitterService;
     private final TimeSlotValidator timeSlotValidator;
+    private final ReservationService reservationService;
 
     /*
     케어 요청 등록
@@ -144,23 +147,22 @@ public class CareRequestService {
         validateTargetSitter(sitter.getId(), request);
 
         // CONFIRMED 예약 충돌 검증
-        // List<CareRequestTimeSlot> timeSlots =
-        //     careRequestTimeSlotRepository.findAllByCareRequestIdOrderByTimeSlotInfoSequence(request.getId());
-        // if (reservationService.hasConfirmedConflict(sitter.getId(), timeSlots)) {
-        //     throw new BusinessException(CommonErrorCode.RESERVATION_CONFLICT);
-        // }
-        // if (rservationService.hasPendingConflict(sitter.getId, timeSlots)) {
-        // ... 경고 메시지 띄우기 근데 수락이 가능하긴 함 한 번 더 물어보기
+         List<CareRequestTimeSlot> timeSlots =
+             careRequestTimeSlotRepository.findAllByCareRequestIdOrderByTimeSlotInfoSequence(request.getId());
+         if (reservationService.hasConfirmedConflict(sitter.getId(), timeSlots)) {
+             throw new BusinessException(CommonErrorCode.RESERVATION_CONFLICT);
+         }
+         //if (rservationService.hasPendingConflict(sitter.getId, timeSlots)) { }
+         // V2: 경고 메시지 띄우기 근데 수락이 가능하긴 함 한 번 더 물어보기
 
         request.accept();
 
-        log.info("[CareRequestService] PENDING 상태의 예약 생성");
-        // Reservation 자동 생성
-        // List<CareRequestPet> crPets = careRequestPetRepository.findAllByCareRequestId(request.getId());
-        // List<CareRequestTimeSlot> crTimeSlots =
-        //     careRequestTimeSlotRepository.findAllByCareRequestIdOrderByTimeSlotInfoSequence(request.getId());
-        // reservationService.createFromCareRequest(request, sitter, crPets, crTimeSlots);
-
+//       log.info("[CareRequestService] PENDING 상태의 예약 생성");
+//       Reservation 자동 생성: 주체가 Sitter
+         List<CareRequestPet> crPets = careRequestPetRepository.findAllByCareRequestId(request.getId());
+         List<CareRequestTimeSlot> crTimeSlots =
+             careRequestTimeSlotRepository.findAllByCareRequestIdOrderByTimeSlotInfoSequence(request.getId());
+         reservationService.createFromCareRequest(request, memberId, crPets, crTimeSlots);
         return toResponseDto(request);
     }
 

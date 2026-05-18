@@ -1,16 +1,18 @@
 package com.forpets.domain.reservation.service;
 
+import com.forpets.domain.carerequest.entity.CareRequest;
+import com.forpets.domain.carerequest.entity.CareRequestPet;
+import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.proposal.repository.ProposalRepository;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
-import com.forpets.domain.reservation.entity.Reservation;
-import com.forpets.domain.reservation.entity.ReservationPayment;
-import com.forpets.domain.reservation.entity.ReservationPet;
-import com.forpets.domain.reservation.entity.ReservationTimeSlot;
+import com.forpets.domain.reservation.entity.*;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
+import com.forpets.global.embed.HasTimeSlotInfo;
+import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,36 @@ public class ReservationService {
     private final ReservationPetRepository reservationPetRepository;
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
     private final ReservationPaymentRepository reservationPaymentRepository;
+
+    /*
+    예약 생성 1: 순방향로직에서 Reservation 생성 (트리거: CareRequest 수락)
+     */
+    @Transactional
+    public Reservation createFromCareRequest(CareRequest careRequest, Long sitterMemberId,
+                                             List<CareRequestPet> crPets,
+                                             List<CareRequestTimeSlot> crTimeSlots) {
+        Reservation reservation = reservationRepository.save(Reservation.builder()
+                .guardianId(careRequest.getMemberId())
+                .sitterMemberId(sitterMemberId)
+                .sitterProfileId(careRequest.getSitterProfileId())
+                .careType(careRequest.getCareType())
+                .source(ReservationSource.CARE_REQUEST)
+                .sourceId(careRequest.getId())
+                .build());
+
+        // PetSnapshot 복사
+        crPets.forEach(crPet -> reservationPetRepository.save(
+                ReservationPet.createFrom(reservation.getId(), crPet.getPetId(), crPet.getPetSnapshot())));
+
+        // TimeSlot 복사
+        crTimeSlots.forEach(crSlot -> reservationTimeSlotRepository.save(
+                ReservationTimeSlot.create(reservation.getId(), crSlot.getTimeSlotInfo())));
+
+        // Payment 생성
+        reservationPaymentRepository.save(ReservationPayment.create(reservation.getId(), careRequest.));
+
+        return reservation;
+    }
 
 
     public List<ReservationResponseDto> getMyReservations(Long memberId) {
@@ -70,4 +102,46 @@ public class ReservationService {
         return reservationPaymentRepository.findByReservationId(reservationId)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.RESERVATION_NOT_FOUND));
     }
+
+    public boolean hasConfirmedConflict(Long sitterProfileId, List<? extends HasTimeSlotInfo> timeSlots) {
+        List<Reservation> confirmed = reservationRepository
+                .findAllBySitterProfileIdAndStatus(sitterProfileId, ReservationStatus.CONFIRMED);
+
+        return hasConflictWith(confirmed, timeSlots);
+    }
+
+    /*
+    V2
+    PENDING 예약과 시간 충돌 여부 확인
+    충돌 시 true 반환 → 호출하는 쪽에서 경고 처리
+     */
+//    public boolean hasPendingConflict(Long sitterProfileId, List<? extends HasTimeSlotInfo> timeSlots) {
+//        List<Reservation> pending = reservationRepository
+//                .findAllBySitterProfileIdAndStatus(sitterProfileId, ReservationStatus.PENDING);
+//
+//        return hasConflictWith(pending, timeSlots);
+//    }
+
+
+    private boolean hasConflictWith(List<Reservation> reservations, List<? extends HasTimeSlotInfo> newSlots) {
+        for (Reservation existing : reservations) {
+            List<ReservationTimeSlot> existingSlots = reservationTimeSlotRepository
+                    .findAllByReservationIdOrderByTimeSlotInfoSequence(existing.getId());
+
+            for (ReservationTimeSlot es : existingSlots) {
+                TimeSlotInfo ei = es.getTimeSlotInfo();
+                for (HasTimeSlotInfo ns : newSlots) {
+                    TimeSlotInfo ni = ns.getTimeSlotInfo();
+
+                    if (ei.getCareDate().equals(ni.getCareDate())
+                            && ei.getStartTime().isBefore(ni.getEndTime())
+                            && ei.getEndTime().isAfter(ni.getStartTime())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
 }

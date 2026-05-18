@@ -1,5 +1,6 @@
 package com.forpets.domain.post.entity;
 
+import com.forpets.global.embed.HasTimeSlotInfo;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -10,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "post_time_slot")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PostTimeSlot {
+public class PostTimeSlot implements HasTimeSlotInfo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

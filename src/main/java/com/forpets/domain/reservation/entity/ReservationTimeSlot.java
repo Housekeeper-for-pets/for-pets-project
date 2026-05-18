@@ -1,5 +1,6 @@
 package com.forpets.domain.reservation.entity;
 
+import com.forpets.global.embed.HasTimeSlotInfo;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.entity.CreatedEntity;
 import jakarta.persistence.*;
@@ -15,7 +16,7 @@ import java.time.LocalTime;
 @Entity
 @Table(name = "reservation_time_slot")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ReservationTimeSlot {
+public class ReservationTimeSlot implements HasTimeSlotInfo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

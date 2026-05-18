@@ -90,6 +90,7 @@ public enum CommonErrorCode implements ErrorCode {
 
     // ---- RERSERVATION ---------
     RESERVATION_NOT_FOUND(HttpStatus.NOT_FOUND, "R001", "존재하지 않는 예약입니다."),
+    RESERVATION_CONFLICT(HttpStatus.CONFLICT, "R002", "해당 시간에 이미 확정된 예약이 있습니다."),
 
 
 
