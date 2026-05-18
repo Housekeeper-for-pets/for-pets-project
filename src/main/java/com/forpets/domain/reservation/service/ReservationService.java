@@ -3,7 +3,11 @@ package com.forpets.domain.reservation.service;
 import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
+import com.forpets.domain.post.entity.Post;
+import com.forpets.domain.post.entity.PostPet;
+import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.repository.PostRepository;
+import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.repository.ProposalRepository;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.entity.*;
@@ -69,6 +73,39 @@ public class ReservationService {
                 (careRequest.getRequestPrice() * DEPOSIT_RATIO) / 100 ));
 
         // 나중에 return 값 써야하면 쓰기 .... Kafka 같은 곳에서!
+//        return reservation;
+    }
+
+    /*
+    예약 생성2: 역방향 매칭 (트리거: proposal 수락)
+     */
+    @Transactional
+    public void createFromProposal(Proposal proposal, Post post, Long sitterMemberId,
+                                          List<PostPet> postPets,
+                                          List<PostTimeSlot> postTimeSlots) {
+        Reservation reservation = reservationRepository.save(Reservation.builder()
+                .guardianId(post.getMemberId())
+                .sitterMemberId(sitterMemberId)
+                .sitterProfileId(proposal.getSitterProfileId())
+                .careType(post.getCareType())
+                .source(ReservationSource.PROPOSAL)
+                .sourceId(proposal.getId())
+                .build());
+
+        // PetSnapshot 복사
+        postPets.forEach(pp -> reservationPetRepository.save(
+                ReservationPet.createFrom(reservation.getId(), pp.getPetId(), pp.getPetSnapshot())));
+
+        // TimeSlot 복사
+        postTimeSlots.forEach(pts -> reservationTimeSlotRepository.save(
+                ReservationTimeSlot.create(reservation.getId(), pts.getTimeSlotInfo())));
+
+        // Payment 생성
+        reservationPaymentRepository.save(ReservationPayment.create(
+                reservation.getId(),
+                proposal.getProposedPrice(),
+                (proposal.getProposedPrice() * DEPOSIT_RATIO) / 100 ));
+
 //        return reservation;
     }
 

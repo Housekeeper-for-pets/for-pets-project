@@ -1,7 +1,9 @@
 package com.forpets.domain.proposal.service;
 
 import com.forpets.domain.post.entity.Post;
+import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostStatus;
+import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.service.PostService;
 import com.forpets.domain.proposal.dto.CreateProposalRequest;
@@ -9,6 +11,7 @@ import com.forpets.domain.proposal.dto.ProposalResponseDto;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
+import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.exception.BusinessException;
@@ -27,9 +30,9 @@ import java.util.List;
 public class ProposalService {
 
     private final ProposalRepository proposalRepository;
-    private final PostRepository postRepository;
     private final SitterService sitterService;
-
+    private final ReservationService reservationService;
+    private final PostService postService;
 
 
     // ===== API =====
@@ -44,7 +47,7 @@ public class ProposalService {
      */
     @Transactional
     public ProposalResponseDto create(Long memberId, Long postId, CreateProposalRequest request) {
-        Post post = findPost(postId);
+        Post post = postService.findById(postId);
         validatePostOpen(post);
         validateNotOwnPost(memberId, post);
 
@@ -78,7 +81,9 @@ public class ProposalService {
     공고 작성자만 조회 가능
      */
     public List<ProposalResponseDto> getByPostId(Long memberId, Long postId) {
-        Post post = findPost(postId);
+//        Post post = findPost(postId);
+        Post post = postService.findById(postId);
+
         validatePostAuthor(memberId, post);
 
         return proposalRepository.findAllByPostId(postId).stream()
@@ -127,7 +132,10 @@ public class ProposalService {
         Proposal proposal = findById(proposalId);
         validatePending(proposal);
 
-        Post post = findPost(proposal.getPostId());
+//        Post post = findPost(proposal.getPostId());
+        Post post = postService.findById(proposal.getPostId());
+
+        SitterProfile sitterProfile = sitterService.findById(proposal.getSitterProfileId());
         validatePostAuthor(memberId, post);
         validatePostOpen(post);
 
@@ -139,9 +147,9 @@ public class ProposalService {
         // Reservation 자동 생성
         // 동기 처리로 구현하는게 좋을듯 나중에 주석 빼기
 
-        // List<PostPet> postPets = postService.findPetsByPostId(post.getId());
-        // List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(post.getId());
-        // reservationService.createFromProposal(proposal, post, postPets, postTimeSlots);
+         List<PostPet> postPets = postService.findPetsByPostId(post.getId());
+         List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(post.getId());
+         reservationService.createFromProposal(proposal, post, sitterProfile.getMemberId(), postPets, postTimeSlots);
 
         // 비동기 처리 (eventListener 또는 kafka) 는 알림이나 로그.. 같은거 작성 할 때 쓰자 ~
 
@@ -158,7 +166,8 @@ public class ProposalService {
         Proposal proposal = findById(proposalId);
         validatePending(proposal);
 
-        Post post = findPost(proposal.getPostId());
+//        Post post = findPost(proposal.getPostId());
+        Post post = postService.findById(proposal.getPostId());
         validatePostAuthor(memberId, post);
 
         proposal.reject();
@@ -238,7 +247,9 @@ public class ProposalService {
     공고 작성자 또는 제안한 시터만 접근 가능
      */
     private void validateParty(Long memberId, Proposal proposal) {
-        Post post = findPost(proposal.getPostId());
+//        Post post = findPost(proposal.getPostId());
+        Post post = postService.findById(proposal.getPostId());
+
 
         if (!post.isOwnedBy(memberId) && !proposal.getMemberId().equals(memberId)) {
             throw new BusinessException(CommonErrorCode.NOT_PROPOSAL_PARTY);
@@ -279,8 +290,8 @@ public class ProposalService {
     PostService 와 ProposalService 사이에 순환참조 발생
     -> ProposalService 에서 PostRepository 를 직접 참조하도록 함
      */
-    private Post findPost(Long postId) {
-        return postRepository.findById(postId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.POST_NOT_FOUND));
-    }
+//    private Post findPost(Long postId) {
+//        return postRepository.findById(postId)
+//                .orElseThrow(() -> new BusinessException(CommonErrorCode.POST_NOT_FOUND));
+//    }
 }
