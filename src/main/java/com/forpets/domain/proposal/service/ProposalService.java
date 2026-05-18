@@ -14,6 +14,7 @@ import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class ProposalService {
 
     private final ProposalRepository proposalRepository;
@@ -131,6 +133,8 @@ public class ProposalService {
 
         // 제안 채택
         proposal.accept();
+
+        log.info("[ProposalService] PENDING 상태의 예약 생성");
 
         // Reservation 자동 생성
         // 동기 처리로 구현하는게 좋을듯 나중에 주석 빼기

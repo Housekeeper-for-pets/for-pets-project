@@ -42,12 +42,8 @@ public record PostResponseDto(
                 post.getCareType(),
                 post.getBudgetAmount(),
                 post.getStatus(),
-                showDetails
-                        ? pets.stream().map(PetSnapshotResponseDto::from).toList()
-                        : List.of(),
-                showDetails
-                        ? timeSlots.stream().map(TimeSlotResponseDto::from).toList()
-                        : List.of(),
+                pets.stream().map(p->PetSnapshotResponseDto.of(p.getPetId(), p.getPetSnapshot())).toList(),
+                timeSlots.stream().map(t->TimeSlotResponseDto.of(t.getId(), t.getTimeSlotInfo())).toList(),
                 post.getCreatedAt(),
                 post.getUpdatedAt()
         );
