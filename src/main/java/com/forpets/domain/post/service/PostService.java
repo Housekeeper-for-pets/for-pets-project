@@ -1,6 +1,8 @@
 package com.forpets.domain.post.service;
 
 
+import com.forpets.domain.member.entity.Member;
+import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.post.dto.CreatePostRequest;
@@ -38,6 +40,7 @@ public class PostService {
     private final ProposalService proposalService;
     private final PetService petService;
     private final TimeSlotValidator timeSlotValidator;
+    private final MemberService memberService;
 
 
     /*
@@ -50,6 +53,7 @@ public class PostService {
      */
     @Transactional
     public PostResponseDto create(Long memberId, CreatePostRequest request) {
+        Member member = memberService.findById(memberId);
         List<Pet> pets = validateAndGetPets(memberId, request.petIds());
         timeSlotValidator.validate(request.timeSlots());
 
@@ -64,7 +68,7 @@ public class PostService {
         List<PostPet> postPets = savePostPets(post.getId(), pets);
         List<PostTimeSlot> postTimeSlots = savePostTimeSlots(post.getId(), request.timeSlots());
 
-        return PostResponseDto.from(post, postPets, postTimeSlots);
+        return PostResponseDto.from(post, member.getRegion(), postPets, postTimeSlots);
     }
 
     /*
@@ -79,6 +83,8 @@ public class PostService {
      */
     @Transactional
     public PostResponseDto update(Long memberId, Long postId, UpdatePostRequest request) {
+        Member member = memberService.findById(memberId);
+
         Post post = findById(postId);
         validateAuthor(memberId, post);
         validateOpen(post);
@@ -104,7 +110,7 @@ public class PostService {
         postTimeSlotRepository.flush();
         List<PostTimeSlot> postTimeSlots = savePostTimeSlots(postId, request.timeSlots());
 
-        return PostResponseDto.from(post, postPets, postTimeSlots);
+        return PostResponseDto.from(post, member.getRegion(), postPets, postTimeSlots);
     }
 
     /*
@@ -116,6 +122,8 @@ public class PostService {
      */
     @Transactional
     public PostResponseDto closePost(Long memberId, Long postId) {
+        Member member = memberService.findById(memberId);
+
         Post post = findById(postId);
         validateAuthor(memberId, post);
         validateNoActiveProposal(postId);
@@ -126,7 +134,7 @@ public class PostService {
         List<PostTimeSlot> postTimeSlots = postTimeSlotRepository
                 .findAllByPostIdOrderByTimeSlotInfoSequence(postId);
 
-        return PostResponseDto.from(post, postPets, postTimeSlots);
+        return PostResponseDto.from(post, member.getRegion(), postPets, postTimeSlots);
     }
 
     /*
@@ -233,13 +241,13 @@ public class PostService {
         return postTimeSlotRepository.saveAll(postTimeSlots);
     }
 
-    public List<PostResponseDto> getTest() {
-        return postRepository.findAll().stream()
-                .map(post -> PostResponseDto.from(
-                        post,
-                        postPetRepository.findAllByPostId(post.getId()),
-                        postTimeSlotRepository.findAllByPostIdOrderByTimeSlotInfoSequence(post.getId())
-                ))
-                .toList();
-    }
+//    public List<PostResponseDto> getTest() {
+//        return postRepository.findAll().stream()
+//                .map(post -> PostResponseDto.from(
+//                        post,
+//                        postPetRepository.findAllByPostId(post.getId()),
+//                        postTimeSlotRepository.findAllByPostIdOrderByTimeSlotInfoSequence(post.getId())
+//                ))
+//                .toList();
+//    }
 }

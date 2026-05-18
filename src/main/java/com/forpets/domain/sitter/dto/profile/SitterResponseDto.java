@@ -1,5 +1,6 @@
 package com.forpets.domain.sitter.dto.profile;
 
+import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.dto.schedule.ScheduleResponseDto;
 import com.forpets.domain.sitter.entity.*;
 
@@ -9,7 +10,7 @@ import java.util.List;
 public record SitterResponseDto(
         Long id,
         Long memberId,
-        String region,
+        Region region,
         String introduction,
         Integer experienceYears,
         PossiblePetType possiblePetType,
@@ -20,15 +21,15 @@ public record SitterResponseDto(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
-    public static SitterResponseDto from(SitterProfile sitter) {
-        return from(sitter, List.of());
+    public static SitterResponseDto from(SitterProfile sitter, Region region) {
+        return from(sitter, region, List.of());
     }
 
-    public static SitterResponseDto from(SitterProfile sitter, List<SitterSchedule> schedules) {
+    public static SitterResponseDto from(SitterProfile sitter, Region region, List<SitterSchedule> schedules) {
         return new SitterResponseDto(
                 sitter.getId(),
                 sitter.getMemberId(),
-                sitter.getRegion(),
+                region,
                 sitter.getIntroduction(),
                 sitter.getExperienceYears(),
                 sitter.getPossiblePetType(),
