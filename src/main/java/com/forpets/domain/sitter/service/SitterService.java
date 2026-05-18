@@ -3,6 +3,7 @@ package com.forpets.domain.sitter.service;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.service.MemberService;
+import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.dto.profile.CreateSitterRequest;
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
@@ -16,6 +17,7 @@ import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
+import com.forpets.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +35,7 @@ public class SitterService {
     private final MemberService memberService;
     private final SitterProfileRepository sitterProfileRepository;
     private final SitterScheduleRepository sitterScheduleRepository;
+    private final ReservationService reservationService;
 
     @Transactional
     public SitterResponseDto create(Long memberId, CreateSitterRequest request) {
@@ -208,8 +211,8 @@ public class SitterService {
     시터에게 진행 중인 예약(PENDING/CONFIRMED)이 있는지 확인
      */
     private void validateNoActiveReservation(Long sitterId) {
-        // if (reservationService.existsInProgressBySitterId(sitterId)) {
-        //     throw new CustomException(ErrorCode.HAS_ACTIVE_RESERVATION);
-        // }
+         if (reservationService.existsInProgressBySitterId(sitterId)) {
+             throw new BusinessException(CommonErrorCode.HAS_ACTIVE_RESERVATION);
+         }
     }
 }

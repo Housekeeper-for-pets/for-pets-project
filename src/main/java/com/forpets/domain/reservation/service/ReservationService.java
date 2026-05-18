@@ -463,4 +463,7 @@ public class ReservationService {
         );
     }
 
+    public boolean existsInProgressBySitterId(Long sitterId) {
+        return reservationRepository.existsBySitterProfileIdAndStatus(sitterId, ReservationStatus.CONFIRMED);
+    }
 }
