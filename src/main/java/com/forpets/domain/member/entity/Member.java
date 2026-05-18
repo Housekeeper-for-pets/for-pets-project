@@ -6,12 +6,14 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
 @Getter
 @Entity
 @Table(name = "member")
+@SQLRestriction("deleted = false")  // 추가
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member extends BaseEntity {
 
@@ -46,6 +48,9 @@ public class Member extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private MemberStatus status;
+
+    @Column(nullable = false)
+    private boolean deleted = false;  // 추가
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -89,11 +94,12 @@ public class Member extends BaseEntity {
     }
 
     public void delete() {
+        this.deleted = true;
         this.deletedAt = LocalDateTime.now();
     }
 
     public boolean isDeleted() {
-        return this.deletedAt != null;
+        return this.deleted;
     }
 
     public boolean isSuspended() {
@@ -101,6 +107,6 @@ public class Member extends BaseEntity {
     }
 
     public boolean isActive() {
-        return this.status == MemberStatus.ACTIVE && this.deletedAt == null;
+        return this.status == MemberStatus.ACTIVE && !this.deleted;  // deletedAt → !this.deleted
     }
 }
