@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -211,6 +212,7 @@ public class ReservationService {
         Reservation reservation = findById(reservationId);
         validateSitter(memberId, reservation);
         validateConfirmed(reservation);
+        validateCareCompleted(reservationId);
 
         reservation.complete();
         log.info("[케어 완료] reservationId={}, 시터(memberId={}) 완료 처리", reservationId, memberId);
@@ -420,6 +422,23 @@ CONFIRMED 예약 시간 충돌 검사
                 // TODO: Proposal에 restoreToPending() 메서드 추가 필요
                 // proposal.restoreToPending();
             });
+        }
+    }
+
+    private void validateCareCompleted(Long reservationId) {
+        List<ReservationTimeSlot> timeSlots = reservationTimeSlotRepository
+                .findAllByReservationIdOrderByTimeSlotInfoSequence(reservationId);
+
+        if (timeSlots.isEmpty()) {
+            throw new BusinessException(CommonErrorCode.RESERVATION_NOT_FOUND);
+        }
+
+        ReservationTimeSlot lastSlot = timeSlots.get(timeSlots.size() - 1);
+        TimeSlotInfo info = lastSlot.getTimeSlotInfo();
+        LocalDateTime careEndDateTime = LocalDateTime.of(info.getCareDate(), info.getEndTime());
+
+        if (LocalDateTime.now().isBefore(careEndDateTime)) {
+            throw new BusinessException(CommonErrorCode.CARE_NOT_COMPLETED_YET);
         }
     }
 
