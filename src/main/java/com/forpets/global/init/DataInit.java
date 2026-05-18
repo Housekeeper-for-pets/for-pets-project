@@ -4,6 +4,7 @@ package com.forpets.global.init;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.entity.MemberGender;
 import com.forpets.domain.member.entity.MemberRole;
+import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.member.repository.MemberRepository;
 import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.entity.PetGender;
@@ -59,11 +60,11 @@ public class DataInit implements CommandLineRunner {
         // =============================================
         // 1. Member 5명
         // =============================================
-        Member member1 = saveMember("giljung@test.com", "째길중", "010-1111-1111", MemberGender.MALE);
-        Member member2 = saveMember("jiwon@test.com", "타코맘", "010-2222-2222", MemberGender.FEMALE);
-        Member member3 = saveMember("jimin@test.com", "지민냥", "010-3333-3333", MemberGender.FEMALE);
-        Member member4 = saveMember("gyeongahn@test.com", "앉은경안", "010-4444-4444", MemberGender.MALE);
-        Member member5 = saveMember("yeongsoo@test.com", "박제로수", "010-5555-5555", MemberGender.MALE);
+        Member member1 = saveMember("giljung@test.com", "째길중", "010-1111-1111", MemberGender.MALE, Region.SEOCHO);
+        Member member2 = saveMember("jiwon@test.com", "타코맘", "010-2222-2222", MemberGender.FEMALE, Region.DONGJAK);
+        Member member3 = saveMember("jimin@test.com", "지민냥", "010-3333-3333", MemberGender.FEMALE, Region.GANGNAM);
+        Member member4 = saveMember("gyeongahn@test.com", "앉은경안", "010-4444-4444", MemberGender.MALE, Region.GWANGJIN);
+        Member member5 = saveMember("yeongsoo@test.com", "박제로수", "010-5555-5555", MemberGender.MALE, Region.YONGSAN);
 
         member2.changeRoleToSitter();
         member3.changeRoleToSitter();
@@ -100,11 +101,11 @@ public class DataInit implements CommandLineRunner {
         // =============================================
         // 3. SitterProfile 3명 (member2, member3, member4)
         // =============================================
-        SitterProfile sitter1 = saveSitter(member2.getId(), "서울 송파구", "고양이 전문 시터, 자격증 보유", 7,
+        SitterProfile sitter1 = saveSitter(member2.getId(), "고양이 전문 시터, 자격증 보유", 7,
                 PossiblePetType.CAT, PossiblePetSize.MEDIUM, 18000);
-        SitterProfile sitter2 = saveSitter(member3.getId(), "서울 강남구", "소형견 전문 시터입니다", 3,
+        SitterProfile sitter2 = saveSitter(member3.getId(), "소형견 전문 시터입니다", 3,
                 PossiblePetType.DOG, PossiblePetSize.SMALL, 15000);
-        SitterProfile sitter3 = saveSitter(member4.getId(), "서울 서초구", "모든 반려동물 케어 가능합니다", 5,
+        SitterProfile sitter3 = saveSitter(member4.getId(), "모든 반려동물 케어 가능합니다", 5,
                 PossiblePetType.ALL, PossiblePetSize.ALL, 20000);
 
 
@@ -141,7 +142,7 @@ public class DataInit implements CommandLineRunner {
 
         // post1: 째길중 — 구피들 방문 돌봄
         Post post1 = savePost(member1.getId(), "구피 밥 좀 주실분", "출장 중 방문 돌봄 부탁드려요",
-                "서울 강남구", CareType.VISIT, 50000, PostStatus.OPEN);
+                CareType.VISIT, 50000, PostStatus.OPEN);
         savePostPet(post1.getId(), pet1);
         savePostPet(post1.getId(), pet2);
         savePostPet(post1.getId(), pet3);
@@ -157,13 +158,13 @@ public class DataInit implements CommandLineRunner {
 
         // post2: 타코맘 — 타코 놀아주세요
         Post post2 = savePost(member2.getId(), "고양이 놀아주세요", "너무 바빠서 고양이가 무기력해서 잘 놀아주실분",
-                "서울 강남구", CareType.VISIT, 120000, PostStatus.OPEN);
+                CareType.VISIT, 120000, PostStatus.OPEN);
         savePostPet(post2.getId(), pet10);
         savePostTimeSlot(post2.getId(), "2026-06-10", "10:00", "20:00", 1);
 
         // post3: 째길중 — 구피 한 마리 임신중이라 잠시 데려가주실분
         Post post3 = savePost(member1.getId(), "구피 맡아주세요 ", "구피 한 마리가 임신중이라 잠시 떨궈둘 생각입니다...",
-                "서울 서초구", CareType.BOARDING, 30000, PostStatus.OPEN);
+                 CareType.BOARDING, 30000, PostStatus.OPEN);
         savePostPet(post3.getId(), pet3);
         savePostTimeSlot(post3.getId(), "2026-06-05", "00:00", "23:59", 1);
         savePostTimeSlot(post3.getId(), "2026-06-06", "00:00", "23:59", 2);
@@ -172,7 +173,7 @@ public class DataInit implements CommandLineRunner {
 
         // post4: 박제로수 — 4조 팀원들좀 데려가세요
         Post post4 = savePost(member5.getId(), "4조 팀원들 잠시만 봐주세요", "잘 좀 부탁드립니다...",
-                "서울 송파구", CareType.VISIT, 40000, PostStatus.OPEN);
+                CareType.VISIT, 40000, PostStatus.OPEN);
         savePostPet(post4.getId(), pet13);
         savePostPet(post4.getId(), pet14);
         savePostPet(post4.getId(), pet15);
@@ -182,14 +183,14 @@ public class DataInit implements CommandLineRunner {
 
         // post5: 박제로수
         Post post5 = savePost(member5.getId(), "중요한 회의가 있어서 고양이 봐주실 분", "많이 시끄러워서 잠시 보내요... 집에서 돌봐주실 분 구합니다",
-                "서울 강남구", CareType.VISIT, 60000, PostStatus.OPEN);
+                CareType.VISIT, 60000, PostStatus.OPEN);
         savePostPet(post5.getId(), pet14);
         savePostTimeSlot(post5.getId(), "2026-06-15", "09:00", "18:00", 1);
         savePostTimeSlot(post5.getId(), "2026-06-16", "09:00", "18:00", 2);
 
         // post7: 지민냥 (시터이지만 보호자로서 공고) — 멋진 말...
         Post post7 = savePost(member3.getId(), "말 산책 시켜주세요", "타면 안 돼요... 힘들어해요",
-                "서울 서초구", CareType.VISIT, 80000, PostStatus.OPEN);
+                CareType.VISIT, 80000, PostStatus.OPEN);
         savePostPet(post7.getId(), pet12);
         savePostTimeSlot(post7.getId(), "2026-06-21", "09:00", "20:00", 1);
         savePostTimeSlot(post7.getId(), "2026-06-22", "09:00", "20:00", 2);
@@ -197,12 +198,12 @@ public class DataInit implements CommandLineRunner {
         // --- CLOSED 공고 2개 ---
 
         Post post8 = savePost(member1.getId(), "[마감] 구피 밥 주실 분", "제곧내",
-                "서울 강남구", CareType.VISIT, 35000, PostStatus.CLOSED);
+                CareType.VISIT, 35000, PostStatus.CLOSED);
         savePostPet(post8.getId(), pet1);
         savePostTimeSlot(post8.getId(), "2026-06-01", "10:00", "16:00", 1);
 
         Post post9 = savePost(member5.getId(), "[마감] 길쭝이 산책", "좋은 시터분 찾았어요",
-                "서울 송파구", CareType.BOARDING, 55000, PostStatus.CLOSED);
+                CareType.BOARDING, 55000, PostStatus.CLOSED);
         savePostPet(post9.getId(), pet13);
         savePostTimeSlot(post9.getId(), "2026-06-01", "09:00", "18:00", 1);
 
@@ -244,13 +245,14 @@ public class DataInit implements CommandLineRunner {
     // ===== Helper Methods =====
 
     private Member saveMember(String email, String nickname, String phone,
-                              MemberGender gender) {
+                              MemberGender gender, Region region) {
         return memberRepository.save(Member.builder()
                 .email(email)
                 .password(passwordEncoder.encode("test1234!"))
                 .nickname(nickname)
                 .phone(phone)
                 .gender(gender)
+                .region(region)
                 .build());
     }
 
@@ -268,12 +270,11 @@ public class DataInit implements CommandLineRunner {
                 .build());
     }
 
-    private SitterProfile saveSitter(Long memberId, String region, String introduction,
+    private SitterProfile saveSitter(Long memberId, String introduction,
                                      int experienceYears, PossiblePetType petType,
                                      PossiblePetSize petSize, int pricePerHour) {
         return sitterProfileRepository.save(SitterProfile.builder()
                 .memberId(memberId)
-                .region(region)
                 .introduction(introduction)
                 .experienceYears(experienceYears)
                 .possiblePetType(petType)
@@ -293,13 +294,12 @@ public class DataInit implements CommandLineRunner {
     }
 
     private Post savePost(Long memberId, String title, String content,
-                          String region, CareType careType, Integer budgetAmount,
+                          CareType careType, Integer budgetAmount,
                           PostStatus status) {
         Post post = postRepository.save(Post.builder()
                 .memberId(memberId)
                 .title(title)
                 .content(content)
-                .region(region)
                 .careType(careType)
                 .budgetAmount(budgetAmount)
                 .build());

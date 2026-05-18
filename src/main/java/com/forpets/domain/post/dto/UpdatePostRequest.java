@@ -20,9 +20,6 @@ public record UpdatePostRequest(
         @NotEmpty(message = "반려동물을 최소 1마리 이상 선택해야 합니다")
         List<Long> petIds,
 
-        @NotBlank(message = "희망 지역은 필수입니다")
-        String region,
-
         @NotNull(message = "돌봄 유형은 필수입니다")
         CareType careType,
 

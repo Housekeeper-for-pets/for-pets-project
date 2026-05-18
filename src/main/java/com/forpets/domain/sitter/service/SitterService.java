@@ -35,7 +35,6 @@ public class SitterService {
 
         SitterProfile sitter = SitterProfile.builder()
                 .memberId(memberId)
-                .region(request.region())
                 .introduction(request.introduction())
                 .experienceYears(request.experienceYears())
                 .possiblePetType(request.possiblePetType())
@@ -46,17 +45,18 @@ public class SitterService {
         sitterProfileRepository.save(sitter);
         member.changeRoleToSitter();
 
-        return SitterResponseDto.from(sitter);
+        return SitterResponseDto.from(sitter, member.getRegion());
     }
 
     public SitterResponseDto getMyProfile(Long memberId) {
         SitterProfile sitter = findByMemberId(memberId);
+        Member member = memberService.findById(memberId);
 
         // sitter profile 이랑 잘 출력 되는지 확인하고 싶어서 테스트 용으로 내 정보 조회에 넣어봤습니다!
         // 경안님도 아래 로직 똑같이 사용하면 getOne'sProfile API 구현할 때 편할 것 같아요
         List<SitterSchedule> schedules = sitterScheduleRepository.findAllBySitterProfileId(sitter.getId());
 
-        return SitterResponseDto.from(sitter, schedules);
+        return SitterResponseDto.from(sitter, member.getRegion(), schedules);
     }
 
     /*
@@ -64,10 +64,10 @@ public class SitterService {
      */
     @Transactional
     public SitterResponseDto update(Long memberId, UpdateSitterRequest request) {
+        Member member = memberService.findById(memberId);
         SitterProfile sitter = findByMemberId(memberId);
 
         sitter.update(
-                request.region(),
                 request.introduction(),
                 request.experienceYears(),
                 request.possiblePetType(),
@@ -75,7 +75,7 @@ public class SitterService {
                 request.pricePerHour()
         );
 
-        return SitterResponseDto.from(sitter);
+        return SitterResponseDto.from(sitter, member.getRegion());
     }
 
     /*
@@ -84,11 +84,12 @@ public class SitterService {
      */
     @Transactional
     public SitterResponseDto updateStatus(Long memberId, UpdateSitterStatusRequest request) {
+        Member member = memberService.findById(memberId);
         SitterProfile sitter = findByMemberId(memberId);
 
         sitter.changeStatus(request.status());
 
-        return SitterResponseDto.from(sitter);
+        return SitterResponseDto.from(sitter, member.getRegion());
     }
 
     /*

@@ -26,9 +26,6 @@ public class SitterProfile extends BaseEntity {
     @Column(name = "member_id", nullable = false)
     private Long memberId;
 
-    @Column(nullable = false, length = 100)
-    private String region;
-
     @Column(columnDefinition = "TEXT")
     private String introduction;
 
@@ -57,11 +54,10 @@ public class SitterProfile extends BaseEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    private SitterProfile(Long memberId, String region, String introduction,
+    private SitterProfile(Long memberId, String introduction,
                           int experienceYears, PossiblePetType possiblePetType,
                           PossiblePetSize possiblePetSize, int pricePerHour) {
         this.memberId = memberId;
-        this.region = region;
         this.introduction = introduction;
         this.experienceYears = experienceYears;
         this.possiblePetType = possiblePetType;
@@ -70,9 +66,8 @@ public class SitterProfile extends BaseEntity {
         this.status = SitterProfileStatus.RESERVABLE;
     }
 
-    public void update(String region, String introduction, int experienceYears,
+    public void update(String introduction, int experienceYears,
                        PossiblePetType possiblePetType, PossiblePetSize possiblePetSize, int pricePerHour) {
-        this.region = region;
         this.introduction = introduction;
         this.experienceYears = experienceYears;
         this.possiblePetType = possiblePetType;
