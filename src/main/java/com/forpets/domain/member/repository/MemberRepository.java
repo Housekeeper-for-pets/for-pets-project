@@ -20,10 +20,10 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     boolean existsByNickname(String nickname);
 
     // 탈퇴 회원 포함 이메일 중복 체크
-    @Query(value = "SELECT COUNT(*) > 0 FROM member WHERE email = :email", nativeQuery = true)
-    boolean existsByEmailIncludingDeleted(@Param("email") String email);
+    @Query(value = "SELECT COUNT(*) FROM member WHERE email = :email", nativeQuery = true)
+    int countByEmailIncludingDeleted(@Param("email") String email);
 
     // 탈퇴 회원 포함 닉네임 중복 체크
-    @Query(value = "SELECT COUNT(*) > 0 FROM member WHERE nickname = :nickname", nativeQuery = true)
-    boolean existsByNicknameIncludingDeleted(@Param("nickname") String nickname);
+    @Query(value = "SELECT COUNT(*) FROM member WHERE nickname = :nickname", nativeQuery = true)
+    int countByNicknameIncludingDeleted(@Param("nickname") String nickname);
 }
