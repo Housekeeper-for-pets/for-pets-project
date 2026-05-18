@@ -88,6 +88,9 @@ public enum CommonErrorCode implements ErrorCode {
     DUPLICATE_PENDING_REQUEST(HttpStatus.BAD_REQUEST, "C003", "중복된 돎봄 요청입니다."),
     NOT_CARE_REQUEST_PARTY(HttpStatus.BAD_REQUEST, "C003", "돌봄 요청 상세 조회는 요청 본인 또는 시터 당사자만 가능합니다."),
 
+    // ---- RERSERVATION ---------
+    RESERVATION_NOT_FOUND(HttpStatus.NOT_FOUND, "R001", "존재하지 않는 예약입니다."),
+
 
 
     ;

@@ -64,7 +64,7 @@ public class MemberService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new MemberException(MemberErrorCode.MEMBER_NOT_FOUND));
 
-        if (reservationRepository.existsByMemberIdAndStatusIn(
+        if (reservationRepository.existsByGuardianIdAndStatusIn(
                 memberId,
                 List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED))) {
             throw new MemberException(MemberErrorCode.HAS_ACTIVE_RESERVATION);

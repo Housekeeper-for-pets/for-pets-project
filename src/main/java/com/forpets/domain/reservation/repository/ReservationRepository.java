@@ -7,6 +7,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
+    List<Reservation> findAllByGuardianId(Long guardianId);
 
-    boolean existsByMemberIdAndStatusIn(Long memberId, List<ReservationStatus> statuses);
+    List<Reservation> findAllBySitterMemberId(Long sitterMemberId);
+
+    List<Reservation> findAllBySitterProfileIdAndStatus(Long sitterProfileId, ReservationStatus status);
+
+    boolean existsBySitterProfileIdAndStatus(Long sitterProfileId, ReservationStatus status);
+
+    boolean existsByGuardianIdAndStatusIn(Long guardianId, List<ReservationStatus> statuses);
 }
