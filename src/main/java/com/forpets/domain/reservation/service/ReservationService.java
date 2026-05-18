@@ -11,6 +11,7 @@ import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
+import com.forpets.domain.reservation.dto.CancelReservationRequest;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.entity.*;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
@@ -190,12 +191,67 @@ public class ReservationService {
     }
 
 
+    /*
+    케어 완료 처리
+    시터만 호출 가능, CONFIRMED 상태에서만 가능
+     */
+    @Transactional
+    public ReservationResponseDto complete(Long memberId, Long reservationId) {
+        /*
+        시스템이 보관하고 있던 돈을 시터에게 보내주는 로직
+         */
+        Reservation reservation = findById(reservationId);
+        validateSitter(memberId, reservation);
+        validateConfirmed(reservation);
 
-    // transaction 아닌 애들
+        reservation.complete();
+        log.info("[케어 완료] reservationId={}, 시터(memberId={}) 완료 처리", reservationId, memberId);
+
+        return toResponseDto(reservation);
+    }
+
+    /*
+    예약 취소
+    PENDING 또는 CONFIRMED 상태만 취소 가능
+    예약 당사자만 취소 가능
+    취소 사유 필수 (최소 10자)
+     */
+    @Transactional
+    public ReservationResponseDto cancel(Long memberId, Long reservationId, CancelReservationRequest request) {
+        Reservation reservation = findById(reservationId);
+        validateParty(memberId, reservation);
+        validateCancelable(reservation);
+
+        CanceledBy canceledBy = reservation.isGuardian(memberId) ? CanceledBy.GUARDIAN : CanceledBy.SITTER;
+
+        reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
+        log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
+
+        // 환불할 예약금이 있으면 환불 처리
+        // V2 결제 연동 시 환불 로직 구현
+        // ReservationPayment payment = findPayment(reservationId);
+        // if (payment.isGuardianPaid()) refundGuardian(reservation);
+        // if (payment.isSitterPaid()) refundSitter(reservation);
+
+        // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
+        handlePostCancellation(reservation);
+
+        return toResponseDto(reservation);
+    }
+
+
+
+    // transaction 아닌 애들 ==========
 
     private void validateParty(Long memberId, Reservation reservation) {
         if (!reservation.isParty(memberId)) {
             throw new BusinessException(CommonErrorCode.NOT_RESERVATION_PARTY);
+        }
+    }
+
+    private void validateSitter(Long memberId, Reservation reservation) {
+        if (!reservation.isSitter(memberId)) {
+            throw new BusinessException(CommonErrorCode.NOT_RESERVATION_SITTER);
         }
     }
 
@@ -267,6 +323,18 @@ public class ReservationService {
         }
     }
 
+    private void validateCancelable(Reservation reservation) {
+        if (!reservation.isCancelable()) {
+            throw new BusinessException(CommonErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+        }
+    }
+
+    private void validateConfirmed(Reservation reservation) {
+        if (!reservation.isConfirmed()) {
+            throw new BusinessException(CommonErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+        }
+    }
+
     /*
 CONFIRMED 예약 시간 충돌 검사
 같은 시터의 CONFIRMED 예약 중 시간이 겹치는 건이 있으면 차단
@@ -331,6 +399,20 @@ CONFIRMED 예약 시간 충돌 검사
 
         // TODO: 같은 시터의 겹치는 시간대 Proposal → WITHDRAWN
         // 겹치는 CareRequest → PENDING 유지 (수락 시 충돌 검증에서 차단)
+    }
+
+
+    /*
+    취소 후속 처리
+    - Proposal 출처: ACCEPTED → PENDING 복원 (다른 제안 채택 가능)
+     */
+    private void handlePostCancellation(Reservation reservation) {
+        if (reservation.getSource() == ReservationSource.PROPOSAL) {
+            proposalRepository.findById(reservation.getSourceId()).ifPresent(proposal -> {
+                // TODO: Proposal에 restoreToPending() 메서드 추가 필요
+                // proposal.restoreToPending();
+            });
+        }
     }
 
 }

@@ -93,6 +93,7 @@ public enum CommonErrorCode implements ErrorCode {
     RESERVATION_CONFLICT(HttpStatus.CONFLICT, "R002", "해당 시간에 이미 확정된 예약이 있습니다."),
     NOT_RESERVATION_PARTY(HttpStatus.FORBIDDEN, "R003", "예약 조회는 당사자만 가능합니다."),
     INVALID_RESERVATION_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "R004", "변경 가능한 예약 상태가 아닙니다."),
+    NOT_RESERVATION_SITTER(HttpStatus.FORBIDDEN, "R005", "해당 예약의 시터가 아닙니다."),
 
 
 

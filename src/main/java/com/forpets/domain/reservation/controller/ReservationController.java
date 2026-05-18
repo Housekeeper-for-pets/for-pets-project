@@ -1,10 +1,12 @@
 package com.forpets.domain.reservation.controller;
 
+import com.forpets.domain.reservation.dto.CancelReservationRequest;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -44,11 +46,6 @@ public class ReservationController {
     보호자 또는 시터가 각각 호출해서 결제 진행 (V2) MVP 에서는 호출만 하면 결제를 한걸로 침
     양쪽 다 완료되면 그 때 CONFIRMED
      */
-        /*
-    예약 확정 요청
-    보호자 또는 시터가 각각 호출하면 해당 측 결제 확인 처리
-    양쪽 다 완료되면 CONFIRMED로 전환
-     */
     @PatchMapping("/{reservationId}/confirm")
     public ResponseEntity<ApiResponse<ReservationResponseDto>> confirm(
             @LoginUser CurrentMember currentMember,
@@ -57,6 +54,27 @@ public class ReservationController {
                 ApiResponse.success(reservationService.confirm(currentMember.id(), reservationId)));
     }
 
+    /*
+    예약 COMPLETE 처리 reservation 이 CONFIRMED 상태일 때, 시터만 가능
+     */
+    @PatchMapping("/{reservationId}/complete")
+    public ResponseEntity<ApiResponse<ReservationResponseDto>> complete(
+            @LoginUser CurrentMember currentMember,
+            @PathVariable Long reservationId) {
+        return ResponseEntity.ok(
+                ApiResponse.success(reservationService.complete(currentMember.id(), reservationId)));
+    }
 
+    /*
+    예약 취소 처리 reservation 이 PENDING 또는 CONFIRMED 상태 일 때 가능
+     */
+    @PatchMapping("/{reservationId}/cancel")
+    public ResponseEntity<ApiResponse<ReservationResponseDto>> cancel(
+            @LoginUser CurrentMember currentMember,
+            @PathVariable Long reservationId,
+            @RequestBody @Valid CancelReservationRequest request) {
+        return ResponseEntity.ok(
+                ApiResponse.success(reservationService.cancel(currentMember.id(), reservationId, request)));
+    }
 
 }
