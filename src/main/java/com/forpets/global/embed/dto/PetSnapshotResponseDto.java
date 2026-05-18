@@ -15,16 +15,9 @@ public record PetSnapshotResponseDto(
         Integer age,
         PetGender gender
 ) {
-    public static PetSnapshotResponseDto from(PostPet postPet) {
-        PetSnapshot s = postPet.getPetSnapshot();
+    public static PetSnapshotResponseDto of(Long petId, PetSnapshot s) {
         return new PetSnapshotResponseDto(
-                postPet.getPetId(),
-                s.getName(),
-                s.getSpecies(),
-                s.getBreed(),
-                s.getSize(),
-                s.getAge(),
-                s.getGender()
-        );
+                petId, s.getName(), s.getSpecies(), s.getBreed(),
+                s.getSize(), s.getAge(), s.getGender());
     }
 }

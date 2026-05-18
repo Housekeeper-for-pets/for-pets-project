@@ -115,6 +115,12 @@ public class SitterService {
         );
     }
 
+    public SitterProfile findById(Long sitterId){
+        return sitterProfileRepository.findById(sitterId).orElseThrow(
+                ()->new BusinessException(CommonErrorCode.SITTER_NOT_FOUND)
+        );
+    }
+
     /*
     관리자는 관리 역할을 기본으로 하기 때문에 시터 프로필을 등록하는 것을 막아둠
     시터 프로필을 등록하려는 멤버가 관리자가 아닌지 확인

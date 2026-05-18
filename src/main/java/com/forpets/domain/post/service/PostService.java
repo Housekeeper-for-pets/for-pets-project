@@ -13,6 +13,7 @@ import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.repository.PostPetRepository;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.repository.PostTimeSlotRepository;
+import com.forpets.domain.proposal.service.ProposalService;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.dto.TimeSlotRequest;
 import com.forpets.global.embed.entity.TimeSlotInfo;
@@ -34,6 +35,7 @@ public class PostService {
     private final PostRepository postRepository;
     private final PostPetRepository postPetRepository;
     private final PostTimeSlotRepository postTimeSlotRepository;
+    private final ProposalService proposalService;
     private final PetService petService;
     private final TimeSlotValidator timeSlotValidator;
 
@@ -195,9 +197,9 @@ public class PostService {
     그냥 구분하지 않고 모든 요청을 다 REJECT 처리 다 해야 상태 변경, 삭제 가능하도록 하는게 깔끔할듯
      */
     private void validateNoActiveProposal(Long postId) {
-        // if (proposalService.existsPendingOrAcceptedByPostId(postId)) {
-        //     throw new BusinessException(CommonErrorCode.HAS_PENDING_PROPOSAL);
-        // }
+         if (proposalService.existsPendingOrAcceptedByPostId(postId)) {
+             throw new BusinessException(CommonErrorCode.HAS_ACTIVE_PROPOSAL);
+         }
     }
 
     /*

@@ -64,11 +64,29 @@ public enum CommonErrorCode implements ErrorCode {
     PAST_DATE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "T003", "과거 날짜를 추가할 수 없습니다."),
     DUPLICATE_TIME_SLOT(HttpStatus.BAD_REQUEST, "T004", "TimeSlot 이 중복됩니다."),
 
-    // -------- POST ---------
+    // -------- POST & PROPOSAL ---------
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "존재하지 않는 공고입니다."),
     NOT_POST_AUTHOR(HttpStatus.FORBIDDEN, "P002", "본인의 공고가 아닙니다."),
     POST_NOT_OPEN(HttpStatus.BAD_REQUEST, "P003", "종료된 공고입니다."),
     INVALID_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "P004", "수정 불가한 공고 상태입니다."),
+
+    PROPOSAL_NOT_FOUND(HttpStatus.NOT_FOUND, "P005", "존재하지 않는 제안입니다."),
+    CANNOT_PROPOSE_OWN_POST(HttpStatus.BAD_REQUEST, "P006", "본인의 공고에 지원할 수 없습니다."),
+    DUPLICATE_PROPOSAL(HttpStatus.BAD_REQUEST, "P007", "중복된 제안입니다."),
+    NOT_PENDING_PROPOSAL(HttpStatus.BAD_REQUEST, "P008", "해당 요청은 제안이 대기상태 일 때 가능합니다."),
+    NOT_PROPOSAL_PARTY(HttpStatus.FORBIDDEN, "P009", "제안 상세 조회는 공고 작성자 또는 제안한 시터만 가능합니다."),
+    HAS_ACTIVE_PROPOSAL(HttpStatus.BAD_REQUEST, "P010", "대기 또는 채택된 제안이 존재합니다."),
+
+    // -------- CARE REQUEST -----
+
+    CARE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "C001", "존재하지 않는 돌봄 요청입니다."),
+    SITTER_NOT_RESERVABLE(HttpStatus.BAD_REQUEST, "C002", "시터가 예약 불가능 상태입니다."),
+    CANNOT_REQUEST_TO_SELF(HttpStatus.BAD_REQUEST, "C003", "본인의 프로필에 돌봄 요청할 수 없습니다."),
+    NOT_CARE_REQUEST_OWNER(HttpStatus.FORBIDDEN, "C003", "본인이 생성한 돌봄 요청이 아닙니다."),
+    NOT_TARGET_SITTER(HttpStatus.FORBIDDEN, "C003", "본인이 받은 돌봄 요청이 아닙니다."),
+    NOT_PENDING_CARE_REQUEST(HttpStatus.BAD_REQUEST, "C003", "해당 요청은 돌봄 요청이 대기상태 일 때 가능합니다."),
+    DUPLICATE_PENDING_REQUEST(HttpStatus.BAD_REQUEST, "C003", "중복된 돎봄 요청입니다."),
+    NOT_CARE_REQUEST_PARTY(HttpStatus.BAD_REQUEST, "C003", "돌봄 요청 상세 조회는 요청 본인 또는 시터 당사자만 가능합니다."),
 
 
 
