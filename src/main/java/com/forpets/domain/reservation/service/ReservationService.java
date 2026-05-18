@@ -5,9 +5,11 @@ import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
+import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.proposal.entity.Proposal;
+import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.entity.*;
@@ -41,6 +43,9 @@ public class ReservationService {
     private final ReservationPetRepository reservationPetRepository;
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
     private final ReservationPaymentRepository reservationPaymentRepository;
+
+    private final PostRepository postRepository;
+    private final ProposalRepository proposalRepository;
 
     /*
     예약 생성 1: 순방향로직에서 Reservation 생성 (트리거: CareRequest 수락)
@@ -136,6 +141,49 @@ public class ReservationService {
         return toResponseDto(reservation);
     }
 
+    /*
+    예약 확정 요청
+    보호자가 호출하면 guardianPaid = true
+    시터가 호출하면 sitterPaid = true
+    양쪽 다 true면 CONFIRMED로 전환 + 후속 처리
+
+    CONFIRMED 전환 시:
+    1. 같은 시터의 겹치는 시간대 CONFIRMED 예약 충돌 검사
+    2. 충돌 없으면 CONFIRMED 전환
+    3. 같은 공고의 나머지 PENDING 제안 → REJECTED (Proposal 출처인 경우)
+    4. 같은 시터의 겹치는 시간대 Proposal → WITHDRAWN
+    5. 공고 → CLOSED (Proposal 출처인 경우)
+     */
+    @Transactional
+    public ReservationResponseDto confirm(Long memberId, Long reservationId) {
+        Reservation reservation = findById(reservationId);
+        validateParty(memberId, reservation);
+        validatePending(reservation);
+
+        ReservationPayment payment = findPayment(reservationId);
+
+        // 보호자/시터 결제 확인 처리
+        if (reservation.isGuardian(memberId)) {
+            payment.guardianConfirm();
+            log.info("[예약 확정] reservationId={}, 보호자(memberId={}) 결제 확인", reservationId, memberId);
+        } else {
+            payment.sitterConfirm();
+            log.info("[예약 확정] reservationId={}, 시터(memberId={}) 결제 확인", reservationId, memberId);
+        }
+
+        // 양쪽 다 결제 완료 시 CONFIRMED 전환
+        if (payment.isBothPaid()) {
+            validateNoConfirmedConflict(reservation);
+            reservation.confirm();
+            log.info("[예약 확정] reservationId={}, 양측 결제 완료 → CONFIRMED", reservationId);
+
+            // 후속 처리
+            handlePostConfirmation(reservation);
+        }
+
+        return toResponseDto(reservation);
+    }
+
 
 
     // transaction 아닌 애들
@@ -206,6 +254,78 @@ public class ReservationService {
             }
         }
         return false;
+    }
+
+    private void validatePending(Reservation reservation) {
+        if (!reservation.isPending()) {
+            throw new BusinessException(CommonErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+        }
+    }
+
+    /*
+CONFIRMED 예약 시간 충돌 검사
+같은 시터의 CONFIRMED 예약 중 시간이 겹치는 건이 있으면 차단
+ */
+    private void validateNoConfirmedConflict(Reservation reservation) {
+        List<Reservation> confirmedReservations = reservationRepository
+                .findAllBySitterProfileIdAndStatus(reservation.getSitterProfileId(), ReservationStatus.CONFIRMED);
+
+        List<ReservationTimeSlot> newTimeSlots = reservationTimeSlotRepository
+                .findAllByReservationIdOrderByTimeSlotInfoSequence(reservation.getId());
+
+        for (Reservation existing : confirmedReservations) {
+            List<ReservationTimeSlot> existingTimeSlots = reservationTimeSlotRepository
+                    .findAllByReservationIdOrderByTimeSlotInfoSequence(existing.getId());
+
+            if (hasTimeConflict(newTimeSlots, existingTimeSlots)) {
+                throw new BusinessException(CommonErrorCode.RESERVATION_CONFLICT);
+            }
+        }
+    }
+    /*
+    두 TimeSlot 리스트 간 시간 겹침 여부 확인
+    겹침 조건: 같은 날짜 AND 시작 < 기존종료 AND 종료 > 기존시작
+     */
+    private boolean hasTimeConflict(List<ReservationTimeSlot> slotsA, List<ReservationTimeSlot> slotsB) {
+        for (ReservationTimeSlot a : slotsA) {
+            TimeSlotInfo infoA = a.getTimeSlotInfo();
+            for (ReservationTimeSlot b : slotsB) {
+                TimeSlotInfo infoB = b.getTimeSlotInfo();
+
+                if (infoA.getCareDate().equals(infoB.getCareDate())
+                        && infoA.getStartTime().isBefore(infoB.getEndTime())
+                        && infoA.getEndTime().isAfter(infoB.getStartTime())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /*
+    CONFIRMED 후속 처리
+    - Proposal 출처: 같은 공고의 나머지 PENDING 제안 → REJECTED, 공고 → CLOSED
+    - 같은 시터의 겹치는 시간대 Proposal → WITHDRAWN
+     */
+    private void handlePostConfirmation(Reservation reservation) {
+        if (reservation.getSource() == ReservationSource.PROPOSAL) {
+            // Proposal 출처: 같은 공고의 나머지 PENDING 제안 REJECTED + 공고 CLOSED
+            Proposal acceptedProposal = proposalRepository.findById(reservation.getSourceId()).orElse(null);
+            if (acceptedProposal != null) {
+                Long postId = acceptedProposal.getPostId();
+
+                // 나머지 PENDING 제안 → REJECTED
+                proposalRepository.findAllByPostIdAndStatus(postId, ProposalStatus.PENDING).stream()
+                        .filter(p -> !p.getId().equals(acceptedProposal.getId()))
+                        .forEach(Proposal::reject);
+
+                // 공고 → CLOSED
+                postRepository.findById(postId).ifPresent(Post::close);
+            }
+        }
+
+        // TODO: 같은 시터의 겹치는 시간대 Proposal → WITHDRAWN
+        // 겹치는 CareRequest → PENDING 유지 (수락 시 충돌 검증에서 차단)
     }
 
 }
