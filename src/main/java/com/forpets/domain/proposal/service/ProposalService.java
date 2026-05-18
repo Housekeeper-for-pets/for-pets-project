@@ -53,9 +53,7 @@ public class ProposalService {
 
         SitterProfile sitter = sitterService.findByMemberId(memberId);
         validateNoDuplicate(postId, sitter.getId());
-        // 현재 Sitter 의 CONFIRMED 된 예약과 중복되는지 확인
-        // 중복이면 등록 못 함
-        validateNoReservationConflict(sitter.getId(), postId);
+        // 정책 수정으로 CONFIRMED 예약이 있어도 Proposal 은 언제든 받을 수 있음
 
         Proposal proposal = proposalRepository.save(Proposal.builder()
                 .postId(postId)
@@ -260,19 +258,6 @@ public class ProposalService {
         if (!proposal.isOwnedBySitter(sitterProfileId)) {
             throw new BusinessException(CommonErrorCode.NOT_PROPOSAL_PARTY);
         }
-    }
-
-    /*
-    시터의 CONFIRMED 예약과 시간 충돌 검증
-    시터의 CONFIRMED 예약 시간과 공고의 TimeSlot이 겹치는지 확인
-
-    Reservation 도메인 구현 후 연동시키기
-     */
-    private void validateNoReservationConflict(Long sitterProfileId, Long postId) {
-        // List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(postId);
-        // if (reservationService.hasConflict(sitterProfileId, postTimeSlots)) {
-        //     throw new BusinessException(CommonErrorCode.RESERVATION_CONFLICT);
-        // }
     }
 
     /*
