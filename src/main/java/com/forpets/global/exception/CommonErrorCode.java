@@ -32,6 +32,7 @@ public enum CommonErrorCode implements ErrorCode {
     CONFLICT(HttpStatus.CONFLICT, "CONFLICT", "이미 처리되었거나 충돌이 발생한 요청입니다."),
 
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 내부 오류가 발생했습니다."),
+    INVALID_PARAMETER(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", "요청 파라미터 값이 올바르지 않습니다."),
 
     // ----------- PET ------------
 

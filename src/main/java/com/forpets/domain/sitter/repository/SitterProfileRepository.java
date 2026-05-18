@@ -7,7 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
-public interface SitterProfileRepository extends JpaRepository<SitterProfile, Long> {
+public interface SitterProfileRepository extends JpaRepository<SitterProfile, Long>, SitterProfileRepositoryCustom {
 
     @Query(value =
             "SELECT COUNT(*) FROM sitter_profile WHERE member_id = :memberId",

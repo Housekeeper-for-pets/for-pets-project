@@ -3,6 +3,7 @@ package com.forpets.global.exception;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.forpets.domain.member.entity.MemberGender;
 import com.forpets.domain.member.exception.MemberErrorCode;
+import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.global.common.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -17,7 +18,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 /**
  * 컨트롤러 전역에서 발생한 예외를 공통 응답 형식으로 변환합니다.
  * 예상 가능한 예외는 warn 로그로 남기고, 예상하지 못한 예외는 error 로그로 남깁니다.
@@ -81,6 +82,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(ApiResponse.fail(ErrorResponse.of(CommonErrorCode.VALIDATION_FAILED, message, request.getRequestURI())));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request
+    ) {
+        log.warn("[MethodArgumentTypeMismatchException] paramName={}, value={}, path={}",
+                exception.getName(), exception.getValue(), request.getRequestURI());
+
+        // 시터 검색 API면 INVALID_SEARCH_CONDITION
+        if (request.getRequestURI().startsWith("/api/sitters")) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(ApiResponse.fail(ErrorResponse.of(SitterErrorCode.INVALID_SEARCH_CONDITION, request.getRequestURI())));
+        }
+
+        // 그 외 API는 공통 에러코드
+        return ResponseEntity
+                .badRequest()
+                .body(ApiResponse.fail(ErrorResponse.of(CommonErrorCode.INVALID_PARAMETER, request.getRequestURI())));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

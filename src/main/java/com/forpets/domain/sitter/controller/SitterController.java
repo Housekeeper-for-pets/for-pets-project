@@ -1,15 +1,21 @@
 package com.forpets.domain.sitter.controller;
 
+import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.dto.profile.CreateSitterRequest;
+import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
+import com.forpets.domain.sitter.dto.profile.SitterSearchCondition;
 import com.forpets.domain.sitter.dto.profile.UpdateSitterRequest;
 import com.forpets.domain.sitter.dto.profile.UpdateSitterStatusRequest;
+import com.forpets.domain.sitter.entity.PossiblePetSize;
+import com.forpets.domain.sitter.entity.PossiblePetType;
 import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,12 +42,34 @@ public class SitterController {
     }
 
     /*
-    2. 시터 목록 조회
-    시터 스케줄이 참고용으로 수정되며 어디에 사용하면 좋을지 생각해보다가 ㅎㅎ
-    목록조회 때 원하는 시간을 입력하면 비슷한 시간대를 등록한 시터를 우선적으로 추천하는 시나리오가
-    생각났습니다... 완벽 일치가 아니고 포함이 아니기 때문에 번거로울 것 같긴 한데
-    경안님은 뭔가 좋아하실 것 같아서 ^^.... 적어둡니닷
+    2. 시터 목록 조회 (GET /api/sitters)
+    [구현 정보]
+    - 인증 불필요 (공개 API)
+    - 캐시 전략: Cache-Control public, max-age=3600
+    - 캐시 Key: sitters:{region}:{possiblePetType}:{possiblePetSize}:{minPrice}:{maxPrice}:{page}:{size}:{sort}
+    - 정렬 화이트리스트: createdAt(기본), pricePerHour, experienceYears
      */
+    @GetMapping
+    public ResponseEntity<ApiResponse<SitterPageResponse>> search(
+            @RequestParam(required = false) Region region,
+            @RequestParam(required = false) PossiblePetType possiblePetType,
+            @RequestParam(required = false) PossiblePetSize possiblePetSize,
+            @RequestParam(required = false) Integer minPrice,
+            @RequestParam(required = false) Integer maxPrice,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sort
+    ) {
+        SitterSearchCondition condition = new SitterSearchCondition(
+                region, possiblePetType, possiblePetSize, minPrice, maxPrice
+        );
+
+        SitterPageResponse response = sitterService.searchSitters(condition, page,size,sort);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
+                .body(ApiResponse.success(response));
+    }
 
 
     /*
