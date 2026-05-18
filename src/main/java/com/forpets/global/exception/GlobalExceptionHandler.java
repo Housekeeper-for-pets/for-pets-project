@@ -5,6 +5,7 @@ import com.forpets.domain.member.entity.MemberGender;
 import com.forpets.domain.member.exception.MemberErrorCode;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.global.common.ApiResponse;
+import com.forpets.global.common.CareType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -48,13 +49,19 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         Throwable cause = exception.getCause();
+
         if (cause instanceof InvalidFormatException ife
                 && ife.getTargetType() != null
-                && ife.getTargetType() == MemberGender.class) {
-            log.warn("[InvalidGenderException] path={}", request.getRequestURI());
+                && ife.getTargetType().isEnum()) {
+
+            String fieldName = ife.getPath().get(0).getFieldName();
+
+            // enum 공통 처리
+            String message = String.format("올바르지 않은 %s 값입니다", fieldName);
+            log.warn("[InvalidEnumException] fieldName={}, path={}", fieldName, request.getRequestURI());
             return ResponseEntity
                     .badRequest()
-                    .body(ApiResponse.fail(ErrorResponse.of(MemberErrorCode.INVALID_GENDER, request.getRequestURI())));
+                    .body(ApiResponse.fail(ErrorResponse.of(CommonErrorCode.VALIDATION_FAILED, message, request.getRequestURI())));
         }
 
         String message = "요청 데이터 형식이 올바르지 않습니다.";

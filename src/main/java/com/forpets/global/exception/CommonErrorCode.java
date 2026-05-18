@@ -2,7 +2,6 @@ package com.forpets.global.exception;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.graphql.GraphQlProperties;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -96,6 +95,7 @@ public enum CommonErrorCode implements ErrorCode {
     INVALID_RESERVATION_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "R004", "변경 가능한 예약 상태가 아닙니다."),
     NOT_RESERVATION_SITTER(HttpStatus.FORBIDDEN, "R005", "해당 예약의 시터가 아닙니다."),
     CARE_NOT_COMPLETED_YET(HttpStatus.BAD_REQUEST, "R006", "아직 돌봄이 끝나지 않았습니다."),
+    ALREADY_PAID(HttpStatus.BAD_REQUEST, "R007", "중복 결제입니다."),
 
 
 

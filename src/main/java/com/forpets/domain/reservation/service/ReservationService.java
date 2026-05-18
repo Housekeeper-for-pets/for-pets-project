@@ -175,6 +175,7 @@ public class ReservationService {
         if (reservation.isGuardian(memberId)) {
             if (payment.isGuardianPaid()) {
                 log.info("[ReservationService] 보호자 결제 완료 멱등 처리: 중복 요청 무시");
+                throw new BusinessException(CommonErrorCode.ALREADY_PAID);
             } else {
                 payment.guardianConfirm();
                 log.info("[예약 확정] reservationId={}, 보호자(memberId={}) 결제 확인", reservationId, memberId);
@@ -182,6 +183,7 @@ public class ReservationService {
         } else {
             if (payment.isSitterPaid()) {
                 log.info("[ReservationService] 시터 결제 완료 멱등 처리: 중복 요청 무시");
+                throw new BusinessException(CommonErrorCode.ALREADY_PAID);
             } else {
                 payment.sitterConfirm();
                 log.info("[예약 확정] reservationId={}, 시터(memberId={}) 결제 확인", reservationId, memberId);
