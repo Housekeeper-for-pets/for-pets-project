@@ -156,6 +156,11 @@ public class ReservationService {
      */
     @Transactional
     public ReservationResponseDto confirm(Long memberId, Long reservationId) {
+
+        /*
+        V2 에서는 여기 결제 로직이 추가되어야합니다!!!!!!!!
+         */
+
         Reservation reservation = findById(reservationId);
         validateParty(memberId, reservation);
         validatePending(reservation);
