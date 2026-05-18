@@ -1,5 +1,6 @@
 package com.forpets.domain.reservation.entity;
 
+import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.entity.CreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -14,7 +15,7 @@ import java.time.LocalTime;
 @Entity
 @Table(name = "reservation_time_slot")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ReservationTimeSlot extends CreatedEntity {
+public class ReservationTimeSlot {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,25 +24,13 @@ public class ReservationTimeSlot extends CreatedEntity {
     @Column(name = "reservation_id", nullable = false)
     private Long reservationId;
 
-    @Column(nullable = false)
-    private LocalDate careDate;
+    @Embedded
+    private TimeSlotInfo timeSlotInfo;
 
-    @Column(nullable = false)
-    private LocalTime startTime;
-
-    @Column(nullable = false)
-    private LocalTime endTime;
-
-    @Column(nullable = false)
-    private int sequence;
-
-    @Builder
-    private ReservationTimeSlot(Long reservationId, LocalDate careDate,
-                                LocalTime startTime, LocalTime endTime, int sequence) {
-        this.reservationId = reservationId;
-        this.careDate = careDate;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.sequence = sequence;
+    public static ReservationTimeSlot create(Long reservationId, TimeSlotInfo timeSlotInfo) {
+        ReservationTimeSlot slot = new ReservationTimeSlot();
+        slot.reservationId = reservationId;
+        slot.timeSlotInfo = timeSlotInfo;
+        return slot;
     }
 }
