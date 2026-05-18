@@ -170,11 +170,19 @@ public class ReservationService {
 
         // 보호자/시터 결제 확인 처리
         if (reservation.isGuardian(memberId)) {
-            payment.guardianConfirm();
-            log.info("[예약 확정] reservationId={}, 보호자(memberId={}) 결제 확인", reservationId, memberId);
+            if (payment.isGuardianPaid()) {
+                log.info("[ReservationService] 보호자 결제 완료 멱등 처리: 중복 요청 무시");
+            } else {
+                payment.guardianConfirm();
+                log.info("[예약 확정] reservationId={}, 보호자(memberId={}) 결제 확인", reservationId, memberId);
+            }
         } else {
-            payment.sitterConfirm();
-            log.info("[예약 확정] reservationId={}, 시터(memberId={}) 결제 확인", reservationId, memberId);
+            if (payment.isSitterPaid()) {
+                log.info("[ReservationService] 시터 결제 완료 멱등 처리: 중복 요청 무시");
+            } else {
+                payment.sitterConfirm();
+                log.info("[예약 확정] reservationId={}, 시터(memberId={}) 결제 확인", reservationId, memberId);
+            }
         }
 
         // 양쪽 다 결제 완료 시 CONFIRMED 전환
