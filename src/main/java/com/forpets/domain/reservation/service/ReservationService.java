@@ -8,6 +8,7 @@ import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.repository.PostRepository;
+import com.forpets.domain.post.repository.PostTimeSlotRepository;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
@@ -48,6 +49,7 @@ public class ReservationService {
 
     private final PostRepository postRepository;
     private final ProposalRepository proposalRepository;
+    private final PostTimeSlotRepository postTimeSlotRepository;
 
     /*
     예약 생성 1: 순방향로직에서 Reservation 생성 (트리거: CareRequest 수락)
@@ -407,8 +409,47 @@ CONFIRMED 예약 시간 충돌 검사
             }
         }
 
-        // TODO: 같은 시터의 겹치는 시간대 Proposal → WITHDRAWN
-        // 겹치는 CareRequest → PENDING 유지 (수락 시 충돌 검증에서 차단)
+        withdrawConflictingProposals(reservation);
+        // 겹치는 CareRequest 는 따로 reject 처리 하지 않음
+        // PENDING 유지 (수락 시 충돌 검증에서 차단)
+    }
+
+    /*
+    같은 시터의 다른 공고에 보낸 PENDING Proposal 중
+    CONFIRMED된 예약 시간과 겹치는 건 자동 WITHDRAWN
+     */
+    private void withdrawConflictingProposals(Reservation reservation) {
+        List<ReservationTimeSlot> confirmedSlots = reservationTimeSlotRepository
+                .findAllByReservationIdOrderByTimeSlotInfoSequence(reservation.getId());
+
+        List<Proposal> pendingProposals = proposalRepository
+                .findAllBySitterProfileIdAndStatus(reservation.getSitterProfileId(), ProposalStatus.PENDING);
+
+        for (Proposal proposal : pendingProposals) {
+            List<PostTimeSlot> postSlots = postTimeSlotRepository
+                    .findAllByPostIdOrderByTimeSlotInfoSequence(proposal.getPostId());
+
+            if (hasTimeConflictBetween(confirmedSlots, postSlots)) {
+                proposal.withdraw();
+            }
+        }
+    }
+
+    private boolean hasTimeConflictBetween(List<ReservationTimeSlot> reservationSlots,
+                                           List<PostTimeSlot> postSlots) {
+        for (ReservationTimeSlot rs : reservationSlots) {
+            TimeSlotInfo ri = rs.getTimeSlotInfo();
+            for (PostTimeSlot ps : postSlots) {
+                TimeSlotInfo pi = ps.getTimeSlotInfo();
+
+                if (ri.getCareDate().equals(pi.getCareDate())
+                        && ri.getStartTime().isBefore(pi.getEndTime())
+                        && ri.getEndTime().isAfter(pi.getStartTime())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
 
@@ -418,10 +459,7 @@ CONFIRMED 예약 시간 충돌 검사
      */
     private void handlePostCancellation(Reservation reservation) {
         if (reservation.getSource() == ReservationSource.PROPOSAL) {
-            proposalRepository.findById(reservation.getSourceId()).ifPresent(proposal -> {
-                // TODO: Proposal에 restoreToPending() 메서드 추가 필요
-                // proposal.restoreToPending();
-            });
+            proposalRepository.findById(reservation.getSourceId()).ifPresent(Proposal::restoreToPending);
         }
     }
 
