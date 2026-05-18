@@ -57,7 +57,6 @@ public class PostService {
                 .memberId(memberId)
                 .title(request.title())
                 .content(request.content())
-                .region(request.region())
                 .careType(request.careType())
                 .budgetAmount(request.budgetAmount())
                 .build());
@@ -91,7 +90,6 @@ public class PostService {
         post.update(
                 request.title(),
                 request.content(),
-                request.region(),
                 request.careType(),
                 request.budgetAmount()
         );

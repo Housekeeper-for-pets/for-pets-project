@@ -35,7 +35,6 @@ public class SitterService {
 
         SitterProfile sitter = SitterProfile.builder()
                 .memberId(memberId)
-                .region(request.region())
                 .introduction(request.introduction())
                 .experienceYears(request.experienceYears())
                 .possiblePetType(request.possiblePetType())
@@ -67,7 +66,6 @@ public class SitterService {
         SitterProfile sitter = findByMemberId(memberId);
 
         sitter.update(
-                request.region(),
                 request.introduction(),
                 request.experienceYears(),
                 request.possiblePetType(),
