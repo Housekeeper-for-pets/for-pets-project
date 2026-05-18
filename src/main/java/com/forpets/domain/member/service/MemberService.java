@@ -39,7 +39,7 @@ public class MemberService {
             throw new MemberException(MemberErrorCode.NICKNAME_DUPLICATED);
         }
 
-        member.updateProfile(request.nickname(), request.phone(), request.gender());
+        member.updateProfile(request.nickname(), request.phone(), request.gender(), request.region());
         return UpdateMemberResponse.from(member);
     }
 
