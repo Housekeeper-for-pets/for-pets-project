@@ -74,6 +74,7 @@ public class CareRequestService {
                 .sitterProfileId(sitter.getId())
                 .careType(request.careType())
                 .message(request.message())
+                .requestPrice(request.requestPrice())
                 .build());
 
         List<CareRequestPet> careRequestPets = saveCareRequestPets(careRequest.getId(), pets);
