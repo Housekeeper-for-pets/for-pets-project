@@ -5,7 +5,6 @@ import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
-import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.repository.PostTimeSlotRepository;
@@ -20,6 +19,7 @@ import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
 import com.forpets.global.embed.HasTimeSlotInfo;
+import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
@@ -27,8 +27,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -50,6 +48,8 @@ public class ReservationService {
     private final PostRepository postRepository;
     private final ProposalRepository proposalRepository;
     private final PostTimeSlotRepository postTimeSlotRepository;
+
+    private final TimeSlotValidator timeSlotValidator;
 
     /*
     예약 생성 1: 순방향로직에서 Reservation 생성 (트리거: CareRequest 수락)
@@ -313,17 +313,8 @@ public class ReservationService {
             List<ReservationTimeSlot> existingSlots = reservationTimeSlotRepository
                     .findAllByReservationIdOrderByTimeSlotInfoSequence(existing.getId());
 
-            for (ReservationTimeSlot es : existingSlots) {
-                TimeSlotInfo ei = es.getTimeSlotInfo();
-                for (HasTimeSlotInfo ns : newSlots) {
-                    TimeSlotInfo ni = ns.getTimeSlotInfo();
-
-                    if (ei.getCareDate().equals(ni.getCareDate())
-                            && ei.getStartTime().isBefore(ni.getEndTime())
-                            && ei.getEndTime().isAfter(ni.getStartTime())) {
-                        return true;
-                    }
-                }
+            if (timeSlotValidator.hasTimeConflict(existingSlots, newSlots)) {
+                return true;
             }
         }
         return false;
@@ -348,9 +339,9 @@ public class ReservationService {
     }
 
     /*
-CONFIRMED 예약 시간 충돌 검사
-같은 시터의 CONFIRMED 예약 중 시간이 겹치는 건이 있으면 차단
- */
+    CONFIRMED 예약 시간 충돌 검사
+    같은 시터의 CONFIRMED 예약 중 시간이 겹치는 건이 있으면 차단
+     */
     private void validateNoConfirmedConflict(Reservation reservation) {
         List<Reservation> confirmedReservations = reservationRepository
                 .findAllBySitterProfileIdAndStatus(reservation.getSitterProfileId(), ReservationStatus.CONFIRMED);
@@ -362,29 +353,10 @@ CONFIRMED 예약 시간 충돌 검사
             List<ReservationTimeSlot> existingTimeSlots = reservationTimeSlotRepository
                     .findAllByReservationIdOrderByTimeSlotInfoSequence(existing.getId());
 
-            if (hasTimeConflict(newTimeSlots, existingTimeSlots)) {
+            if (timeSlotValidator.hasTimeConflict(newTimeSlots, existingTimeSlots)) {
                 throw new BusinessException(CommonErrorCode.RESERVATION_CONFLICT);
             }
         }
-    }
-    /*
-    두 TimeSlot 리스트 간 시간 겹침 여부 확인
-    겹침 조건: 같은 날짜 AND 시작 < 기존종료 AND 종료 > 기존시작
-     */
-    private boolean hasTimeConflict(List<ReservationTimeSlot> slotsA, List<ReservationTimeSlot> slotsB) {
-        for (ReservationTimeSlot a : slotsA) {
-            TimeSlotInfo infoA = a.getTimeSlotInfo();
-            for (ReservationTimeSlot b : slotsB) {
-                TimeSlotInfo infoB = b.getTimeSlotInfo();
-
-                if (infoA.getCareDate().equals(infoB.getCareDate())
-                        && infoA.getStartTime().isBefore(infoB.getEndTime())
-                        && infoA.getEndTime().isAfter(infoB.getStartTime())) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /*
@@ -471,7 +443,7 @@ CONFIRMED 예약 시간 충돌 검사
             throw new BusinessException(CommonErrorCode.RESERVATION_NOT_FOUND);
         }
 
-        ReservationTimeSlot lastSlot = timeSlots.get(timeSlots.size() - 1);
+        ReservationTimeSlot lastSlot = timeSlots.getLast();
         TimeSlotInfo info = lastSlot.getTimeSlotInfo();
         LocalDateTime careEndDateTime = LocalDateTime.of(info.getCareDate(), info.getEndTime());
 
