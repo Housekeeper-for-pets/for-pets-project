@@ -35,7 +35,7 @@ public class MemberService {
                 .orElseThrow(() -> new MemberException(MemberErrorCode.MEMBER_NOT_FOUND));
 
         if (!member.getNickname().equals(request.nickname())
-                && memberRepository.existsByNickname(request.nickname())) {
+                && memberRepository.existsByNicknameIncludingDeleted(request.nickname())) {
             throw new MemberException(MemberErrorCode.NICKNAME_DUPLICATED);
         }
 

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Getter
 @Entity
 @Table(name = "member")
-@SQLRestriction("deleted = false")  // 추가
+@SQLRestriction("deleted = false")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member extends BaseEntity {
 
@@ -50,7 +50,7 @@ public class Member extends BaseEntity {
     private MemberStatus status;
 
     @Column(nullable = false)
-    private boolean deleted = false;  // 추가
+    private boolean deleted = false;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -107,6 +107,6 @@ public class Member extends BaseEntity {
     }
 
     public boolean isActive() {
-        return this.status == MemberStatus.ACTIVE && !this.deleted;  // deletedAt → !this.deleted
+        return this.status == MemberStatus.ACTIVE && !this.deleted;
     }
 }
