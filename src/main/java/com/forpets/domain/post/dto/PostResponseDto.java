@@ -1,5 +1,6 @@
 package com.forpets.domain.post.dto;
 
+import com.forpets.domain.member.entity.Region;
 import com.forpets.global.embed.dto.PetSnapshotResponseDto;
 import com.forpets.global.embed.dto.TimeSlotResponseDto;
 import com.forpets.domain.post.entity.Post;
@@ -16,7 +17,7 @@ public record PostResponseDto(
         Long memberId,
         String title,
         String content,
-        String region,
+        Region region,
         CareType careType,
         Integer budgetAmount,
         PostStatus status,
@@ -30,15 +31,13 @@ public record PostResponseDto(
     - OPEN: pets, timeSlots 전체 노출
     - CLOSED, DELETED: pets, timeSlots 빈 리스트로 반환
      */
-    public static PostResponseDto from(Post post, List<PostPet> pets, List<PostTimeSlot> timeSlots) {
-        boolean showDetails = post.isOpen();
-
+    public static PostResponseDto from(Post post, Region region, List<PostPet> pets, List<PostTimeSlot> timeSlots) {
         return new PostResponseDto(
                 post.getId(),
                 post.getMemberId(),
                 post.getTitle(),
                 post.getContent(),
-                post.getRegion(),
+                region,
                 post.getCareType(),
                 post.getBudgetAmount(),
                 post.getStatus(),

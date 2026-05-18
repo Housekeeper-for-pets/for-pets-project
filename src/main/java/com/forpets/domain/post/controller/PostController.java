@@ -84,8 +84,8 @@ public class PostController {
     /*
     test 용 공고 목록 조회
      */
-    @GetMapping("/test")
-    public ResponseEntity<ApiResponse<List<PostResponseDto>>> getTest(){
-        return ResponseEntity.ok(ApiResponse.success(postService.getTest()));
-    }
+//    @GetMapping("/test")
+//    public ResponseEntity<ApiResponse<List<PostResponseDto>>> getTest(){
+//        return ResponseEntity.ok(ApiResponse.success(postService.getTest()));
+//    }
 }

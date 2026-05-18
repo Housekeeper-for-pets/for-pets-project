@@ -1,9 +1,6 @@
 package com.forpets.domain.member.dto;
 
-import com.forpets.domain.member.entity.Member;
-import com.forpets.domain.member.entity.MemberGender;
-import com.forpets.domain.member.entity.MemberRole;
-import com.forpets.domain.member.entity.MemberStatus;
+import com.forpets.domain.member.entity.*;
 
 import java.time.LocalDateTime;
 
@@ -13,6 +10,7 @@ public record MemberResponse(
         String nickname,
         String phone,
         MemberGender gender,
+        Region region,
         MemberRole role,
         MemberStatus status,
         LocalDateTime createdAt,
@@ -26,6 +24,7 @@ public record MemberResponse(
                 member.getNickname(),
                 member.getPhone(),
                 member.getGender(),
+                member.getRegion(),
                 member.getRole(),
                 member.getStatus(),
                 member.getCreatedAt(),

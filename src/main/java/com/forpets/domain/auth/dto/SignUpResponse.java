@@ -13,6 +13,7 @@ public record SignUpResponse(
         String nickname,
         MemberRole role,
         MemberStatus status,
+        Region region,
         LocalDateTime createdAt
 ) {
 
@@ -23,6 +24,7 @@ public record SignUpResponse(
                 member.getNickname(),
                 member.getRole(),
                 member.getStatus(),
+                member.getRegion(),
                 member.getCreatedAt()
         );
     }

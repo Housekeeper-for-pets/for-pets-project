@@ -33,9 +33,6 @@ public class Post extends BaseEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @Column(nullable = false, length = 100)
-    private String region;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private CareType careType;
@@ -60,22 +57,19 @@ public class Post extends BaseEntity {
     }
 
     @Builder
-    private Post(Long memberId, String title, String content,
-                 String region, CareType careType, Integer budgetAmount) {
+    private Post(Long memberId, String title, String content,CareType careType, Integer budgetAmount) {
         this.memberId = memberId;
         this.title = title;
         this.content = content;
-        this.region = region;
         this.careType = careType;
         this.budgetAmount = budgetAmount;
         this.status = PostStatus.OPEN;
     }
 
-    public void update(String title, String content, String region,
+    public void update(String title, String content,
                        CareType careType, Integer budgetAmount) {
         this.title = title;
         this.content = content;
-        this.region = region;
         this.careType = careType;
         this.budgetAmount = budgetAmount;
     }

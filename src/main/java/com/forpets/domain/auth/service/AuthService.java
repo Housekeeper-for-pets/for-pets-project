@@ -37,6 +37,7 @@ public class AuthService {
                 .nickname(request.nickname())
                 .phone(request.phone())
                 .gender(request.gender())
+                .region(request.region())
                 .build();
 
         Member savedMember = memberRepository.save(member);
