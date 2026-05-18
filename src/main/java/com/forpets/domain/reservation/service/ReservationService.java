@@ -31,6 +31,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReservationService {
+    private static final int DEPOSIT_RATIO = 20;
+
     private final ReservationRepository reservationRepository;
     private final ReservationPetRepository reservationPetRepository;
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
@@ -40,7 +42,7 @@ public class ReservationService {
     예약 생성 1: 순방향로직에서 Reservation 생성 (트리거: CareRequest 수락)
      */
     @Transactional
-    public Reservation createFromCareRequest(CareRequest careRequest, Long sitterMemberId,
+    public void createFromCareRequest(CareRequest careRequest, Long sitterMemberId,
                                              List<CareRequestPet> crPets,
                                              List<CareRequestTimeSlot> crTimeSlots) {
         Reservation reservation = reservationRepository.save(Reservation.builder()
@@ -61,9 +63,13 @@ public class ReservationService {
                 ReservationTimeSlot.create(reservation.getId(), crSlot.getTimeSlotInfo())));
 
         // Payment 생성
-        reservationPaymentRepository.save(ReservationPayment.create(reservation.getId(), careRequest.));
+        reservationPaymentRepository.save(ReservationPayment.create(
+                reservation.getId(),
+                careRequest.getRequestPrice(),
+                (careRequest.getRequestPrice() * DEPOSIT_RATIO) / 100 ));
 
-        return reservation;
+        // 나중에 return 값 써야하면 쓰기 .... Kafka 같은 곳에서!
+//        return reservation;
     }
 
 
