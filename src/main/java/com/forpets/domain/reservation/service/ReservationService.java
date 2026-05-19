@@ -259,6 +259,7 @@ public class ReservationService {
 
     private void validateParty(Long memberId, Reservation reservation) {
         if (!reservation.isParty(memberId)) {
+            log.info("현재 로그인 한 멤버 Id: {}, reservation 연관 memberId: {}, {}", memberId, reservation.getGuardianId(), reservation.getSitterMemberId());
             throw new BusinessException(CommonErrorCode.NOT_RESERVATION_PARTY);
         }
     }
