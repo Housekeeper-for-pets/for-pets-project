@@ -22,6 +22,7 @@ import com.forpets.global.security.jwt.BearerTokenResolver;
 import com.forpets.global.security.jwt.JwtTokenProvider;
 import com.forpets.global.security.jwt.TokenRedisService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -88,7 +89,7 @@ public class MemberService {
         Member member = findById(memberId);
 
         // 진행 중 예약 체크
-        if (reservationRepository.existsByMemberIdAndStatusIn(
+        if (reservationRepository.existsByGuardianIdAndStatusIn(
                 memberId,
                 List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED))) {
             throw new MemberException(MemberErrorCode.HAS_ACTIVE_RESERVATION);

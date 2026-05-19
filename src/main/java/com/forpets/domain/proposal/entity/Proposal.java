@@ -61,6 +61,8 @@ public class Proposal extends BaseEntity {
         this.status = ProposalStatus.WITHDRAWN;
     }
 
+    public void restoreToPending() { this.status = ProposalStatus.PENDING; }
+
     public boolean isPending() {
         return this.status == ProposalStatus.PENDING;
     }

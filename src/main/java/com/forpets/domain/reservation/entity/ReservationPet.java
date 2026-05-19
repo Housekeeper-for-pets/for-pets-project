@@ -1,5 +1,6 @@
 package com.forpets.domain.reservation.entity;
 
+import com.forpets.global.embed.entity.PetSnapshot;
 import com.forpets.global.entity.CreatedEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -11,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "reservation_pet")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ReservationPet extends CreatedEntity {
+public class ReservationPet {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,9 +24,14 @@ public class ReservationPet extends CreatedEntity {
     @Column(name = "pet_id", nullable = false)
     private Long petId;
 
-    @Builder
-    private ReservationPet(Long reservationId, Long petId) {
-        this.reservationId = reservationId;
-        this.petId = petId;
+    @Embedded
+    private PetSnapshot petSnapshot;
+
+    public static ReservationPet createFrom(Long reservationId, Long petId, PetSnapshot snapshot) {
+        ReservationPet rp = new ReservationPet();
+        rp.reservationId = reservationId;
+        rp.petId = petId;
+        rp.petSnapshot = snapshot;
+        return rp;
     }
 }
