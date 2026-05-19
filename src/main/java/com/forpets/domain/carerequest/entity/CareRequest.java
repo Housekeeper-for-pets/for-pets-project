@@ -31,18 +31,22 @@ public class CareRequest extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String message;
 
+    @Column(columnDefinition = "TEXT")
+    private int requestPrice;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private CareRequestStatus status;
 
     @Builder
     private CareRequest(Long memberId, Long sitterProfileId,
-                        CareType careType, String message) {
+                        CareType careType, String message, int requestPrice) {
         this.memberId = memberId;
         this.sitterProfileId = sitterProfileId;
         this.careType = careType;
         this.message = message;
         this.status = CareRequestStatus.PENDING;
+        this.requestPrice = requestPrice;
     }
 
     public void accept() {

@@ -1,6 +1,7 @@
 package com.forpets.global.embed;
 
 import com.forpets.global.embed.dto.TimeSlotRequest;
+import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import org.springframework.stereotype.Component;
@@ -82,5 +83,26 @@ public class TimeSlotValidator {
                 }
             }
         }
+    }
+
+    /*
+    두 TimeSlot 리스트 간 시간 겹침 여부 확인
+    겹침 조건: 같은 날짜 AND 시작 < 기존종료 AND 종료 > 기존시작
+     */
+    public boolean hasTimeConflict(List<? extends HasTimeSlotInfo> slotsA,
+                                   List<? extends HasTimeSlotInfo> slotsB) {
+        for (HasTimeSlotInfo a : slotsA) {
+            TimeSlotInfo infoA = a.getTimeSlotInfo();
+            for (HasTimeSlotInfo b : slotsB) {
+                TimeSlotInfo infoB = b.getTimeSlotInfo();
+
+                if (infoA.getCareDate().equals(infoB.getCareDate())
+                        && infoA.getStartTime().isBefore(infoB.getEndTime())
+                        && infoA.getEndTime().isAfter(infoB.getStartTime())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

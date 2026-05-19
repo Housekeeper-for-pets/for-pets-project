@@ -3,21 +3,30 @@ package com.forpets.domain.sitter.service;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.service.MemberService;
+import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.dto.profile.CreateSitterRequest;
+import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
+import com.forpets.domain.sitter.dto.profile.SitterSearchCondition;
 import com.forpets.domain.sitter.dto.profile.UpdateSitterRequest;
 import com.forpets.domain.sitter.dto.profile.UpdateSitterStatusRequest;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.entity.SitterSchedule;
+import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
+import com.forpets.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +35,7 @@ public class SitterService {
     private final MemberService memberService;
     private final SitterProfileRepository sitterProfileRepository;
     private final SitterScheduleRepository sitterScheduleRepository;
+    private final ReservationService reservationService;
 
     @Transactional
     public SitterResponseDto create(Long memberId, CreateSitterRequest request) {
@@ -46,6 +56,23 @@ public class SitterService {
         member.changeRoleToSitter();
 
         return SitterResponseDto.from(sitter, member.getRegion());
+    }
+
+    /**
+     * 시터 목록 검색 (GET /api/sitters)
+     * - 정렬 필드 화이트리스트 검증 (createdAt / pricePerHour / experienceYears)
+     * - 페이지 크기 최대 50 제한
+     * - 페이지 번호 음수 불가
+     * 캐시 무효화: 시터 프로필 수정(update), 상태 변경(updateStatus) 시 sitters:* 패턴 전체 무효화 필요
+     */
+    public SitterPageResponse searchSitters(SitterSearchCondition condition, int page, int size, String sort) {
+        validatePageRequest(page, size);
+        validateSortField(sort);
+        validatePriceRange(condition);
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sort));
+
+        return sitterProfileRepository.searchSitters(condition, pageable);
     }
 
     public SitterResponseDto getMyProfile(Long memberId) {
@@ -110,6 +137,37 @@ public class SitterService {
 
     // -------------Transaction 아닌 method 들------------------
 
+    /**
+     * 정렬 필드 화이트리스트 검증
+     * API 명세 허용 필드: createdAt(기본), pricePerHour, experienceYears
+     */
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "createdAt", "pricePerHour", "experienceYears"
+    );
+
+    private void validateSortField(String sort) {
+        if (!ALLOWED_SORT_FIELDS.contains(sort)) {
+            throw new BusinessException(SitterErrorCode.INVALID_SORT_FIELD);
+        }
+
+    }
+
+    private void validatePageRequest(int page, int size) {
+        if (page < 0) {
+            throw new BusinessException(SitterErrorCode.INVALID_PAGE_REQUEST);
+        }
+        if (size< 1 || size > 50) {
+            throw new BusinessException(SitterErrorCode.INVALID_PAGE_REQUEST);
+        }
+    }
+
+    private void validatePriceRange(SitterSearchCondition condition) {
+        if (condition.minPrice() != null && condition.maxPrice() != null
+                && condition.minPrice() > condition.maxPrice()) {
+            throw new BusinessException(SitterErrorCode.INVALID_SEARCH_CONDITION);
+        }
+    }
+
     public SitterProfile findByMemberId(Long memberId){
         return sitterProfileRepository.findByMemberId(memberId).orElseThrow(
                 ()->new BusinessException(CommonErrorCode.SITTER_NOT_FOUND)
@@ -153,8 +211,8 @@ public class SitterService {
     시터에게 진행 중인 예약(PENDING/CONFIRMED)이 있는지 확인
      */
     private void validateNoActiveReservation(Long sitterId) {
-        // if (reservationService.existsInProgressBySitterId(sitterId)) {
-        //     throw new CustomException(ErrorCode.HAS_ACTIVE_RESERVATION);
-        // }
+         if (reservationService.existsInProgressBySitterId(sitterId)) {
+             throw new BusinessException(CommonErrorCode.HAS_ACTIVE_RESERVATION);
+         }
     }
 }
