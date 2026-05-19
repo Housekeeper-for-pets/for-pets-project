@@ -4,6 +4,8 @@ package com.forpets.domain.post.service;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.pet.entity.Pet;
+import com.forpets.domain.pet.exception.PetErrorCode;
+import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.post.dto.CreatePostRequest;
 import com.forpets.domain.post.dto.PostResponseDto;
@@ -179,7 +181,7 @@ public class PostService {
                 .map(petId -> {
                     Pet pet = petService.findById(petId);
                     if (!pet.getMemberId().equals(memberId)) {
-                        throw new BusinessException(CommonErrorCode.NOT_PET_OWNER);
+                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
                     }
                     return pet;
                 })

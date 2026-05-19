@@ -12,6 +12,8 @@ import com.forpets.domain.carerequest.repository.CareRequestPetRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
 import com.forpets.domain.pet.entity.Pet;
+import com.forpets.domain.pet.exception.PetErrorCode;
+import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.proposal.entity.Proposal;
@@ -233,7 +235,7 @@ public class CareRequestService {
                 .map(petId -> {
                     Pet pet = petService.findById(petId);
                     if (!pet.getMemberId().equals(memberId)) {
-                        throw new BusinessException(CommonErrorCode.NOT_PET_OWNER);
+                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
                     }
                     return pet;
                 })
