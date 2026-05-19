@@ -8,6 +8,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.entity.MemberGender;
 import com.forpets.domain.member.entity.Region;
+import com.forpets.domain.pet.entity.Pet;
+import com.forpets.domain.post.entity.Post;
+import com.forpets.domain.reservation.entity.Reservation;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -21,15 +24,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 시나리오 통합 테스트
- *
- * 사전 조건 (DB에 미리 세팅되어 있어야 함):
- * - member1 (jiwon@test.com / test1234!) : 보호자, petId 보유
- * - member2 (sitter1@test.com / test1234!) : 시터 등록 완료 (sitterProfileId: 1)
- * - member3 (sitter2@test.com / test1234!) : 시터 등록 완료 (sitterProfileId: 2)
- * - member4 (sitter3@test.com / test1234!) : 시터 등록 완료 (sitterProfileId: 3)
- *
- * ⚠️ 테스트 계정 정보는 실제 환경에 맞게 수정하세요.
- * ⚠️ 각 시나리오는 독립적으로 실행 가능하도록 @TestMethodOrder로 순서를 보장합니다.
+    단위테스트는 따로 진행할 예정이고,
+    가장 오류가 빈번히 발생할 것 같다고 예상한 시나리오들에 대해서 테스트를 진행
+
+     ============================================================
+     시나리오 1: 다중 Proposal 수락 및 결제 경쟁 테스트
+     목표: Post → 여러 Proposal → 여러 Pending Reservation → 결제 경쟁 → 자동 취소 확인
+     추가: Pet 삭제 불가, 회원 탈퇴 불가, 시터 프로필 삭제 불가 확인
+     ============================================================
+     시나리오 2: Complete 시간 검증 테스트
+     목표: CONFIRMED 상태에서 케어 시간 전 Complete 시도 → 실패
+     시간 경과 후 Complete 시도 → 성공
+     ============================================================
+     시나리오 3: PENDING/CONFIRMED 상태별 Proposal 제한 테스트
+     목표: PENDING 상태 → Proposal 가능
+     CONFIRMED 상태 → Proposal 불가
+     취소 시 Post 자동 닫힘 및 재개방 안 됨 확인
+     ============================================================
+
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -178,6 +190,8 @@ class ScenarioIntegrationTest {
 
     // ============================================================
     // 시나리오 1: 다중 Proposal 수락 및 결제 경쟁 테스트
+    // 목표: Post → 여러 Proposal → 여러 Pending Reservation → 결제 경쟁 → 자동 취소 확인
+    // 추가: Pet 삭제 불가, 회원 탈퇴 불가, 시터 프로필 삭제 불가 확인
     // ============================================================
 
     @Test
@@ -290,6 +304,8 @@ class ScenarioIntegrationTest {
 
     // ============================================================
     // 시나리오 2: Complete 시간 검증 테스트
+    // 목표: CONFIRMED 상태에서 케어 시간 전 Complete 시도 → 실패
+    //      시간 경과 후 Complete 시도 → 성공
     // ============================================================
 
     @Test
@@ -367,6 +383,9 @@ class ScenarioIntegrationTest {
 
     // ============================================================
     // 시나리오 3: PENDING/CONFIRMED 상태별 Proposal 제한 테스트
+//    목표: PENDING 상태 → Proposal 가능
+//    CONFIRMED 상태 → Proposal 불가
+//    취소 시 Post 자동 닫힘 및 재개방 안 됨 확인
     // ============================================================
 
     @Test
