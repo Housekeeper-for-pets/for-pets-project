@@ -276,20 +276,26 @@ public class DataInit implements CommandLineRunner {
         saveReservationPet(reservation1.getId(), pet14);
         saveReservationPet(reservation1.getId(), pet15);
         saveReservationPet(reservation1.getId(), pet16);
-        saveReservationTimeSlot(reservation1.getId(), "2026-06-07", "13:00", "17:00", 1);
-        saveReservationTimeSlot(reservation1.getId(), "2026-06-08", "13:00", "17:00", 2);
+        saveReservationTimeSlot(reservation1.getId(), "2026-05-07", "13:00", "17:00", 1);
+        saveReservationTimeSlot(reservation1.getId(), "2026-05-08", "13:00", "17:00", 2);
         reservation1.confirm();
-        saveReservationPayment(reservation1.getId(), 60000);
+        reservation1.complete();
+        ReservationPayment rp1 = saveReservationPayment(reservation1.getId(), 60000);
+        rp1.sitterConfirm();
+        rp1.guardianConfirm();
+        reservation1.confirm();
 
         // post7 → proposal71 수락
         Reservation reservation2 = saveReservation(member3.getId(), member2.getId(), sitter1.getId(),
                 CareType.VISIT, ReservationSource.PROPOSAL, post7.getId(), 1000);
         saveReservationPet(reservation2.getId(), pet12);
-        saveReservationTimeSlot(reservation2.getId(), "2026-06-21", "09:00", "20:00", 1);
-        saveReservationTimeSlot(reservation2.getId(), "2026-06-22", "09:00", "20:00", 2);
+        saveReservationTimeSlot(reservation2.getId(), "2026-05-18", "09:00", "20:00", 1);
+        saveReservationTimeSlot(reservation2.getId(), "2026-05-19", "09:00", "20:00", 2);
         reservation2.confirm();
-        reservation2.complete();
-        saveReservationPayment(reservation2.getId(), 1000);
+        ReservationPayment rp2 = saveReservationPayment(reservation2.getId(), 1000);
+        rp2.sitterConfirm();
+        rp2.guardianConfirm();
+        reservation2.confirm();
 
         // post10 → proposal103 수락
         Reservation reservation3 = saveReservation(member1.getId(), member4.getId(), sitter3.getId(),
@@ -298,8 +304,12 @@ public class DataInit implements CommandLineRunner {
         saveReservationPet(reservation3.getId(), pet4);
         saveReservationPet(reservation3.getId(), pet5);
         saveReservationTimeSlot(reservation3.getId(), "2026-06-12", "14:00", "17:00", 1);
+        ReservationPayment rp3 = saveReservationPayment(reservation3.getId(), 24000);
+        rp3.sitterConfirm();
+        rp3.guardianConfirm();
         reservation3.confirm();
-        saveReservationPayment(reservation3.getId(), 24000);
+
+
 
         // request2 수락
         Reservation reservation4 = saveReservation(member5.getId(), member2.getId(), sitter1.getId(),
@@ -307,7 +317,6 @@ public class DataInit implements CommandLineRunner {
         saveReservationPet(reservation4.getId(), pet16);
         saveReservationTimeSlot(reservation4.getId(), "2026-06-20", "00:00", "23:59", 1);
         saveReservationTimeSlot(reservation4.getId(), "2026-06-21", "00:00", "23:59", 2);
-        reservation4.confirm();
         saveReservationPayment(reservation4.getId(), 90000);
 
         // request4 수락

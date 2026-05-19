@@ -6,14 +6,20 @@ import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestStatus;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
+import com.forpets.domain.carerequest.exception.CareRequestErrorCode;
+import com.forpets.domain.carerequest.exception.CareRequestException;
 import com.forpets.domain.carerequest.repository.CareRequestPetRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
 import com.forpets.domain.pet.entity.Pet;
+import com.forpets.domain.pet.exception.PetErrorCode;
+import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.reservation.entity.Reservation;
+import com.forpets.domain.reservation.exception.ReservationErrorCode;
+import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
@@ -151,7 +157,7 @@ public class CareRequestService {
          List<CareRequestTimeSlot> timeSlots =
              careRequestTimeSlotRepository.findAllByCareRequestIdOrderByTimeSlotInfoSequence(request.getId());
          if (reservationService.hasConfirmedConflict(sitter.getId(), timeSlots)) {
-             throw new BusinessException(CommonErrorCode.RESERVATION_CONFLICT);
+             throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
          }
          //if (rservationService.hasPendingConflict(sitter.getId, timeSlots)) { }
          // V2: 경고 메시지 띄우기 근데 수락이 가능하긴 함 한 번 더 물어보기
@@ -187,42 +193,42 @@ public class CareRequestService {
 
     public CareRequest findById(Long requestId) {
         return careRequestRepository.findById(requestId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.CARE_REQUEST_NOT_FOUND));
+                .orElseThrow(() -> new CareRequestException(CareRequestErrorCode.CARE_REQUEST_NOT_FOUND));
     }
 
     private void validateParty(Long memberId, CareRequest careRequest) {
         if (!careRequest.isOwnedBy(memberId) && !careRequest.getSitterProfileId().equals(memberId)) {
-            throw new BusinessException(CommonErrorCode.NOT_CARE_REQUEST_PARTY);
+            throw new CareRequestException(CareRequestErrorCode.NOT_CARE_REQUEST_PARTY);
         }
     }
 
     private void validateReservable(SitterProfile sitter) {
         if (!sitter.isReservable()) {
-            throw new BusinessException(CommonErrorCode.SITTER_NOT_RESERVABLE);
+            throw new CareRequestException(CareRequestErrorCode.SITTER_NOT_RESERVABLE);
         }
     }
 
     private void validateNotSelf(Long memberId, Long targetSitterId) {
         if (targetSitterId.equals(memberId)) {
-            throw new BusinessException(CommonErrorCode.CANNOT_REQUEST_TO_SELF);
+            throw new CareRequestException(CareRequestErrorCode.CANNOT_REQUEST_TO_SELF);
         }
     }
 
     private void validateOwner(Long memberId, CareRequest request) {
         if (!request.isOwnedBy(memberId)) {
-            throw new BusinessException(CommonErrorCode.NOT_CARE_REQUEST_OWNER);
+            throw new CareRequestException(CareRequestErrorCode.NOT_CARE_REQUEST_OWNER);
         }
     }
 
     private void validateTargetSitter(Long sitterProfileId, CareRequest request) {
         if (!request.isTargetSitter(sitterProfileId)) {
-            throw new BusinessException(CommonErrorCode.NOT_TARGET_SITTER);
+            throw new CareRequestException(CareRequestErrorCode.NOT_TARGET_SITTER);
         }
     }
 
     private void validatePending(CareRequest request) {
         if (!request.isPending()) {
-            throw new BusinessException(CommonErrorCode.NOT_PENDING_CARE_REQUEST);
+            throw new CareRequestException(CareRequestErrorCode.NOT_PENDING_CARE_REQUEST);
         }
     }
 
@@ -231,7 +237,7 @@ public class CareRequestService {
                 .map(petId -> {
                     Pet pet = petService.findById(petId);
                     if (!pet.getMemberId().equals(memberId)) {
-                        throw new BusinessException(CommonErrorCode.NOT_PET_OWNER);
+                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
                     }
                     return pet;
                 })
@@ -255,7 +261,7 @@ public class CareRequestService {
                     .toList();
 
             if (existingPetIds.equals(sortedNewPetIds)) {
-                throw new BusinessException(CommonErrorCode.DUPLICATE_PENDING_REQUEST);
+                throw new CareRequestException(CareRequestErrorCode.DUPLICATE_PENDING_REQUEST);
             }
         }
     }

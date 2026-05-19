@@ -14,6 +14,8 @@ import com.forpets.domain.proposal.repository.ProposalRepository;
 import com.forpets.domain.reservation.dto.CancelReservationRequest;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.entity.*;
+import com.forpets.domain.reservation.exception.ReservationErrorCode;
+import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
@@ -175,7 +177,9 @@ public class ReservationService {
         if (reservation.isGuardian(memberId)) {
             if (payment.isGuardianPaid()) {
                 log.info("[ReservationService] 보호자 결제 완료 멱등 처리: 중복 요청 무시");
-                throw new BusinessException(CommonErrorCode.ALREADY_PAID);
+                // 이 부분 결제할 때 PaymentException 으로 바꾸는게 좋아보이긴 합니다!
+                // 아래도 마찬가지. . .
+                throw new ReservationException(ReservationErrorCode.ALREADY_PAID);
             } else {
                 payment.guardianConfirm();
                 log.info("[예약 확정] reservationId={}, 보호자(memberId={}) 결제 확인", reservationId, memberId);
@@ -183,7 +187,7 @@ public class ReservationService {
         } else {
             if (payment.isSitterPaid()) {
                 log.info("[ReservationService] 시터 결제 완료 멱등 처리: 중복 요청 무시");
-                throw new BusinessException(CommonErrorCode.ALREADY_PAID);
+                throw new ReservationException(ReservationErrorCode.ALREADY_PAID);
             } else {
                 payment.sitterConfirm();
                 log.info("[예약 확정] reservationId={}, 시터(memberId={}) 결제 확인", reservationId, memberId);
@@ -260,19 +264,19 @@ public class ReservationService {
     private void validateParty(Long memberId, Reservation reservation) {
         if (!reservation.isParty(memberId)) {
             log.info("현재 로그인 한 멤버 Id: {}, reservation 연관 memberId: {}, {}", memberId, reservation.getGuardianId(), reservation.getSitterMemberId());
-            throw new BusinessException(CommonErrorCode.NOT_RESERVATION_PARTY);
+            throw new ReservationException(ReservationErrorCode.NOT_RESERVATION_PARTY);
         }
     }
 
     private void validateSitter(Long memberId, Reservation reservation) {
         if (!reservation.isSitter(memberId)) {
-            throw new BusinessException(CommonErrorCode.NOT_RESERVATION_SITTER);
+            throw new ReservationException(ReservationErrorCode.NOT_RESERVATION_SITTER);
         }
     }
 
     public Reservation findById(Long reservationId) {
         return reservationRepository.findById(reservationId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.RESERVATION_NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
     }
 
     // reservation 을 ResponseDto 로 변환하는 메서드
@@ -288,7 +292,7 @@ public class ReservationService {
     // payment 찾기
     private ReservationPayment findPayment(Long reservationId) {
         return reservationPaymentRepository.findByReservationId(reservationId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.RESERVATION_NOT_FOUND));
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
     }
 
     public boolean hasConfirmedConflict(Long sitterProfileId, List<? extends HasTimeSlotInfo> timeSlots) {
@@ -325,19 +329,19 @@ public class ReservationService {
 
     private void validatePending(Reservation reservation) {
         if (!reservation.isPending()) {
-            throw new BusinessException(CommonErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+            throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
         }
     }
 
     private void validateCancelable(Reservation reservation) {
         if (!reservation.isCancelable()) {
-            throw new BusinessException(CommonErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+            throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
         }
     }
 
     private void validateConfirmed(Reservation reservation) {
         if (!reservation.isConfirmed()) {
-            throw new BusinessException(CommonErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+            throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
         }
     }
 
@@ -357,7 +361,7 @@ public class ReservationService {
                     .findAllByReservationIdOrderByTimeSlotInfoSequence(existing.getId());
 
             if (timeSlotValidator.hasTimeConflict(newTimeSlots, existingTimeSlots)) {
-                throw new BusinessException(CommonErrorCode.RESERVATION_CONFLICT);
+                throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
             }
         }
     }
@@ -443,7 +447,7 @@ public class ReservationService {
                 .findAllByReservationIdOrderByTimeSlotInfoSequence(reservationId);
 
         if (timeSlots.isEmpty()) {
-            throw new BusinessException(CommonErrorCode.RESERVATION_NOT_FOUND);
+            throw new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND);
         }
 
         ReservationTimeSlot lastSlot = timeSlots.getLast();
@@ -451,7 +455,7 @@ public class ReservationService {
         LocalDateTime careEndDateTime = LocalDateTime.of(info.getCareDate(), info.getEndTime());
 
         if (LocalDateTime.now().isBefore(careEndDateTime)) {
-            throw new BusinessException(CommonErrorCode.CARE_NOT_COMPLETED_YET);
+            throw new ReservationException(ReservationErrorCode.CARE_NOT_COMPLETED_YET);
         }
     }
 

@@ -4,6 +4,8 @@ import com.forpets.domain.pet.dto.CreatePetRequest;
 import com.forpets.domain.pet.dto.PetResponseDto;
 import com.forpets.domain.pet.dto.UpdatePetRequest;
 import com.forpets.domain.pet.entity.Pet;
+import com.forpets.domain.pet.exception.PetErrorCode;
+import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.repository.PetRepository;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.global.exception.BusinessException;
@@ -89,19 +91,19 @@ public class PetService {
 
     public Pet findById(Long petId) {
         return petRepository.findById(petId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.PET_NOT_FOUND));
+                .orElseThrow(() -> new PetException(PetErrorCode.PET_NOT_FOUND));
     }
 
     private void validateOwner(Long memberId, Pet pet) {
         if (!pet.getMemberId().equals(memberId)) {
-            throw new BusinessException(CommonErrorCode.NOT_PET_OWNER);
+            throw new PetException(PetErrorCode.NOT_PET_OWNER);
         }
     }
 
     private void validatePetLimit(Long memberId) {
         long count = petRepository.countByMemberId(memberId);
         if (count >= MAX_PET_COUNT) {
-            throw new BusinessException(CommonErrorCode.PET_LIMIT_EXCEEDED);
+            throw new PetException(PetErrorCode.PET_LIMIT_EXCEEDED);
         }
     }
 
@@ -111,13 +113,13 @@ public class PetService {
 
     private void validateCoreFieldNotChanged(Pet pet, UpdatePetRequest request) {
         if (pet.getSpecies() != request.species() || pet.getSize() != request.size()) {
-            throw new BusinessException(CommonErrorCode.PET_CORE_FIELD_CHANGE_RESTRICTED);
+            throw new PetException(PetErrorCode.PET_CORE_FIELD_CHANGE_RESTRICTED);
         }
     }
 
     private void validateDeletable(Long petId) {
         if (reservationService.existsActiveReservationByPetId(petId)) {
-            throw new BusinessException(CommonErrorCode.PET_USED_IN_ACTIVE_RESERVATION);
+            throw new PetException(PetErrorCode.PET_USED_IN_ACTIVE_RESERVATION);
         }
     }
 }

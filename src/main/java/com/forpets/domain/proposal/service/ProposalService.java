@@ -4,12 +4,16 @@ import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.post.entity.PostTimeSlot;
+import com.forpets.domain.post.exception.PostErrorCode;
+import com.forpets.domain.post.exception.PostException;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.service.PostService;
 import com.forpets.domain.proposal.dto.CreateProposalRequest;
 import com.forpets.domain.proposal.dto.ProposalResponseDto;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
+import com.forpets.domain.proposal.exception.ProposalErrorCode;
+import com.forpets.domain.proposal.exception.ProposalException;
 import com.forpets.domain.proposal.repository.ProposalRepository;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
@@ -195,7 +199,7 @@ public class ProposalService {
 
     public Proposal findById(Long proposalId) {
         return proposalRepository.findById(proposalId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.PROPOSAL_NOT_FOUND));
+                .orElseThrow(() -> new ProposalException(ProposalErrorCode.PROPOSAL_NOT_FOUND));
     }
 
     /*
@@ -208,13 +212,13 @@ public class ProposalService {
 
     private void validatePostOpen(Post post) {
         if (!post.isOpen()) {
-            throw new BusinessException(CommonErrorCode.POST_NOT_OPEN);
+            throw new PostException(PostErrorCode.POST_NOT_OPEN);
         }
     }
 
     private void validateNotOwnPost(Long memberId, Post post) {
         if (post.isOwnedBy(memberId)) {
-            throw new BusinessException(CommonErrorCode.CANNOT_PROPOSE_OWN_POST);
+            throw new ProposalException(ProposalErrorCode.CANNOT_PROPOSE_OWN_POST);
         }
     }
 
@@ -224,19 +228,19 @@ public class ProposalService {
      */
     private void validateNoDuplicate(Long postId, Long sitterProfileId) {
         if (proposalRepository.existsByPostIdAndSitterProfileId(postId, sitterProfileId)) {
-            throw new BusinessException(CommonErrorCode.DUPLICATE_PROPOSAL);
+            throw new ProposalException(ProposalErrorCode.DUPLICATE_PROPOSAL);
         }
     }
 
     private void validatePending(Proposal proposal) {
         if (!proposal.isPending()) {
-            throw new BusinessException(CommonErrorCode.NOT_PENDING_PROPOSAL);
+            throw new ProposalException(ProposalErrorCode.NOT_PENDING_PROPOSAL);
         }
     }
 
     private void validatePostAuthor(Long memberId, Post post) {
         if (!post.isOwnedBy(memberId)) {
-            throw new BusinessException(CommonErrorCode.NOT_POST_AUTHOR);
+            throw new PostException(PostErrorCode.NOT_POST_AUTHOR);
         }
     }
 
@@ -250,13 +254,13 @@ public class ProposalService {
 
 
         if (!post.isOwnedBy(memberId) && !proposal.getMemberId().equals(memberId)) {
-            throw new BusinessException(CommonErrorCode.NOT_PROPOSAL_PARTY);
+            throw new ProposalException(ProposalErrorCode.NOT_PROPOSAL_PARTY);
         }
     }
 
     private void validateProposalOwner(Long sitterProfileId, Proposal proposal) {
         if (!proposal.isOwnedBySitter(sitterProfileId)) {
-            throw new BusinessException(CommonErrorCode.NOT_PROPOSAL_PARTY);
+            throw new ProposalException(ProposalErrorCode.NOT_PROPOSAL_PARTY);
         }
     }
 
