@@ -3,14 +3,31 @@ name: CI
 on:
   push:
     branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'         # 마크다운 변경은 CI 스킵
+      - 'docs/**'
+      - '.gitignore'
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:  # 수동 실행 가능
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+
+# 중복 실행 최소화 (concurrency): 같은 브랜치 연속 push 시 이전 실행 자동 취소
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     name: Build & Test
     runs-on: ubuntu-latest
+    # draft PR은 CI 스킵
+    if: github.event.pull_request.draft != true
 
     steps:
       - name: 소스 체크아웃
