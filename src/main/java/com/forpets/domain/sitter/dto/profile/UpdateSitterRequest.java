@@ -7,9 +7,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 public record UpdateSitterRequest(
-        @NotBlank(message = "활동 지역은 필수입니다")
-        String region,
-
         String introduction,
 
         @NotNull(message = "경력 연수는 필수입니다")

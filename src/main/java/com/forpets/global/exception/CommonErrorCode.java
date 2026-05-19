@@ -97,9 +97,6 @@ public enum CommonErrorCode implements ErrorCode {
 //    NOT_RESERVATION_SITTER(HttpStatus.FORBIDDEN, "R005", "해당 예약의 시터가 아닙니다."),
 //    CARE_NOT_COMPLETED_YET(HttpStatus.BAD_REQUEST, "R006", "아직 돌봄이 끝나지 않았습니다."),
 //    ALREADY_PAID(HttpStatus.BAD_REQUEST, "R007", "중복 결제입니다."),
-
-
-
     ;
 
     private final HttpStatus status;
