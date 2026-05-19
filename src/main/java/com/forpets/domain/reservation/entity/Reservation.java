@@ -2,6 +2,8 @@ package com.forpets.domain.reservation.entity;
 
 import com.forpets.global.common.CareType;
 import com.forpets.global.entity.BaseEntity;
+import com.forpets.global.exception.BusinessException;
+import com.forpets.global.exception.CommonErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -85,6 +87,7 @@ public class Reservation extends BaseEntity {
     }
 
     public void complete() {
+        if (this.status != ReservationStatus.CONFIRMED) throw new BusinessException(CommonErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
         this.status = ReservationStatus.COMPLETED;
         this.completedAt = LocalDateTime.now();
     }
