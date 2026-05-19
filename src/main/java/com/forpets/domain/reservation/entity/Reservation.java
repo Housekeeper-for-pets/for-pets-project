@@ -1,5 +1,7 @@
 package com.forpets.domain.reservation.entity;
 
+import com.forpets.domain.reservation.exception.ReservationErrorCode;
+import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.global.common.CareType;
 import com.forpets.global.entity.BaseEntity;
 import com.forpets.global.exception.BusinessException;
@@ -87,7 +89,7 @@ public class Reservation extends BaseEntity {
     }
 
     public void complete() {
-        if (this.status != ReservationStatus.CONFIRMED) throw new BusinessException(CommonErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+        if (this.status != ReservationStatus.CONFIRMED) throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
         this.status = ReservationStatus.COMPLETED;
         this.completedAt = LocalDateTime.now();
     }

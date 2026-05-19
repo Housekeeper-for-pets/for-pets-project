@@ -18,6 +18,8 @@ import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.reservation.entity.Reservation;
+import com.forpets.domain.reservation.exception.ReservationErrorCode;
+import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
@@ -155,7 +157,7 @@ public class CareRequestService {
          List<CareRequestTimeSlot> timeSlots =
              careRequestTimeSlotRepository.findAllByCareRequestIdOrderByTimeSlotInfoSequence(request.getId());
          if (reservationService.hasConfirmedConflict(sitter.getId(), timeSlots)) {
-             throw new BusinessException(CommonErrorCode.RESERVATION_CONFLICT);
+             throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
          }
          //if (rservationService.hasPendingConflict(sitter.getId, timeSlots)) { }
          // V2: 경고 메시지 띄우기 근데 수락이 가능하긴 함 한 번 더 물어보기
