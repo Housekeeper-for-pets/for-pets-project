@@ -75,6 +75,13 @@ public class SitterService {
         return sitterProfileRepository.searchSitters(condition, pageable);
     }
 
+    public SitterResponseDto getSitterById(Long sitterId) {
+        SitterProfile sitter = findById(sitterId);
+        Member member = memberService.findById(sitter.getMemberId());
+        List<SitterSchedule> schedules = sitterScheduleRepository.findAllBySitterProfileId(sitter.getId());
+        return SitterResponseDto.from(sitter, member.getRegion(), schedules);
+    }
+
     public SitterResponseDto getMyProfile(Long memberId) {
         SitterProfile sitter = findByMemberId(memberId);
         Member member = memberService.findById(memberId);
