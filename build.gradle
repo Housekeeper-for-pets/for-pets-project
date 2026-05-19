@@ -60,6 +60,7 @@ tasks.named('test') {
     useJUnitPlatform()
     jvmArgs '-Dfile.encoding=UTF-8'
     environment 'JAVA_TOOL_OPTIONS', '-Dfile.encoding=UTF-8'
+    systemProperty 'spring.profiles.active', 'test'
 
     doFirst {
         def tmp = new File(System.getProperty('java.io.tmpdir'), 'forpets-build')
