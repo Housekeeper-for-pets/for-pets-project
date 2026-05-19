@@ -1,7 +1,11 @@
 package com.forpets.global.embed;
 
+import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.global.embed.dto.TimeSlotRequest;
 import com.forpets.global.embed.entity.TimeSlotInfo;
+import com.forpets.global.embed.exception.TimeSlotErrorCode;
+import com.forpets.global.embed.exception.TimeSlotException;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import org.springframework.stereotype.Component;
@@ -39,13 +43,13 @@ public class TimeSlotValidator {
 
     private void validateNotEmpty(List<TimeSlotRequest> timeSlots) {
         if (timeSlots == null || timeSlots.isEmpty()) {
-            throw new BusinessException(CommonErrorCode.TIME_SLOT_REQUIRED);
+            throw new TimeSlotException(TimeSlotErrorCode.TIME_SLOT_REQUIRED);
         }
     }
 
     private void validateMaxCount(List<TimeSlotRequest> timeSlots) {
         if (timeSlots.size() > MAX_TIME_SLOT_COUNT) {
-            throw new BusinessException(CommonErrorCode.TIMESLOT_LIMIT_EXCEEDED);
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_LIMIT_EXCEEDED);
         }
     }
 
@@ -54,10 +58,10 @@ public class TimeSlotValidator {
 
         for (TimeSlotRequest slot : timeSlots) {
             if (slot.careDate().isBefore(today)) {
-                throw new BusinessException(CommonErrorCode.PAST_DATE_NOT_ALLOWED);
+                throw new TimeSlotException(TimeSlotErrorCode.PAST_DATE_NOT_ALLOWED);
             }
             if (!slot.startTime().isBefore(slot.endTime())) {
-                throw new BusinessException(CommonErrorCode.INVALID_TIME_RANGE);
+                throw new TimeSlotException(TimeSlotErrorCode.INVALID_TIME_RANGE);
             }
         }
     }
@@ -79,7 +83,7 @@ public class TimeSlotValidator {
 
                 // 앞 슬롯 종료 시간 > 뒤 슬롯 시작 시간 이면 예외처리
                 if (prev.endTime().isAfter(curr.startTime())) {
-                    throw new BusinessException(CommonErrorCode.DUPLICATE_TIME_SLOT);
+                    throw new TimeSlotException(TimeSlotErrorCode.DUPLICATE_TIME_SLOT);
                 }
             }
         }

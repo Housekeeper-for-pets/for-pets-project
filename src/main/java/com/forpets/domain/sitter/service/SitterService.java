@@ -13,6 +13,7 @@ import com.forpets.domain.sitter.dto.profile.UpdateSitterStatusRequest;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.entity.SitterSchedule;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
 import com.forpets.global.exception.BusinessException;
@@ -154,36 +155,36 @@ public class SitterService {
 
     private void validateSortField(String sort) {
         if (!ALLOWED_SORT_FIELDS.contains(sort)) {
-            throw new BusinessException(SitterErrorCode.INVALID_SORT_FIELD);
+            throw new SitterException(SitterErrorCode.INVALID_SORT_FIELD);
         }
 
     }
 
     private void validatePageRequest(int page, int size) {
         if (page < 0) {
-            throw new BusinessException(SitterErrorCode.INVALID_PAGE_REQUEST);
+            throw new SitterException(SitterErrorCode.INVALID_PAGE_REQUEST);
         }
         if (size< 1 || size > 50) {
-            throw new BusinessException(SitterErrorCode.INVALID_PAGE_REQUEST);
+            throw new SitterException(SitterErrorCode.INVALID_PAGE_REQUEST);
         }
     }
 
     private void validatePriceRange(SitterSearchCondition condition) {
         if (condition.minPrice() != null && condition.maxPrice() != null
                 && condition.minPrice() > condition.maxPrice()) {
-            throw new BusinessException(SitterErrorCode.INVALID_SEARCH_CONDITION);
+            throw new SitterException(SitterErrorCode.INVALID_SEARCH_CONDITION);
         }
     }
 
     public SitterProfile findByMemberId(Long memberId){
         return sitterProfileRepository.findByMemberId(memberId).orElseThrow(
-                ()->new BusinessException(CommonErrorCode.SITTER_NOT_FOUND)
+                ()->new SitterException(SitterErrorCode.SITTER_NOT_FOUND)
         );
     }
 
     public SitterProfile findById(Long sitterId){
         return sitterProfileRepository.findById(sitterId).orElseThrow(
-                ()->new BusinessException(CommonErrorCode.SITTER_NOT_FOUND)
+                ()->new SitterException(SitterErrorCode.SITTER_NOT_FOUND)
         );
     }
 
@@ -193,7 +194,7 @@ public class SitterService {
      */
     private void validateNotAdmin(Member member) {
         if (member.getRole() == MemberRole.ADMIN) {
-            throw new BusinessException(CommonErrorCode.ADMIN_CANNOT_REGISTER_SITTER);
+            throw new SitterException(SitterErrorCode.ADMIN_CANNOT_REGISTER_SITTER);
         }
     }
 
@@ -207,10 +208,10 @@ public class SitterService {
      */
     private void validateProfileNotExists(Long memberId) {
         if (sitterProfileRepository.existsByMemberId(memberId)){
-            throw new BusinessException(CommonErrorCode.SITTER_PROFILE_EXISTS);
+            throw new SitterException(SitterErrorCode.SITTER_PROFILE_EXISTS);
         }
         if (sitterProfileRepository.countByMemberIdIncludingDeleted(memberId) > 0) {
-            throw new BusinessException(CommonErrorCode.SITTER_PROFILE_ALREADY_REGISTERED);
+            throw new SitterException(SitterErrorCode.SITTER_PROFILE_ALREADY_REGISTERED);
         }
     }
 
@@ -219,7 +220,7 @@ public class SitterService {
      */
     private void validateNoActiveReservation(Long sitterId) {
          if (reservationService.existsInProgressBySitterId(sitterId)) {
-             throw new BusinessException(CommonErrorCode.HAS_ACTIVE_RESERVATION);
+             throw new SitterException(SitterErrorCode.HAS_ACTIVE_RESERVATION);
          }
     }
 }

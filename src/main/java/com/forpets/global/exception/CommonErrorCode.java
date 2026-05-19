@@ -48,22 +48,22 @@ public enum CommonErrorCode implements ErrorCode {
 
     // ------------- SITTER -------------
 
-    ADMIN_CANNOT_REGISTER_SITTER(HttpStatus.FORBIDDEN, "S001", "관리자는 시터 프로필을 등록할 수 없습니다."),
-    SITTER_PROFILE_EXISTS(HttpStatus.BAD_REQUEST, "S002", "이미 시터 프로필이 존재합니다."),
-    SITTER_PROFILE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST, "S003", "시터 프로필을 삭제 한 이후 다시 생성할 수 없습니다."),
-    SITTER_NOT_FOUND(HttpStatus.NOT_FOUND, "S004", "존재하지 않는 시터입니다."),
-
-    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "S005", "시작 시간은 종료 시간보다 빨라야합니다."),
-    DUPLICATE_SCHEDULE(HttpStatus.CONFLICT, "S006", "요일별 1개 시간대만 등록 가능합니다."),
-    NOT_SCHEDULE_OWNER(HttpStatus.FORBIDDEN, "S007", "본인의 스케줄이 아닙니다."),
-    HAS_ACTIVE_RESERVATION(HttpStatus.BAD_REQUEST, "S008", "CONFIRMED 상태의 예약이 있습니다."),
+//    ADMIN_CANNOT_REGISTER_SITTER(HttpStatus.FORBIDDEN, "S001", "관리자는 시터 프로필을 등록할 수 없습니다."),
+//    SITTER_PROFILE_EXISTS(HttpStatus.BAD_REQUEST, "S002", "이미 시터 프로필이 존재합니다."),
+//    SITTER_PROFILE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST, "S003", "시터 프로필을 삭제 한 이후 다시 생성할 수 없습니다."),
+//    SITTER_NOT_FOUND(HttpStatus.NOT_FOUND, "S004", "존재하지 않는 시터입니다."),
+//
+//    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "S005", "시작 시간은 종료 시간보다 빨라야합니다."),
+//    DUPLICATE_SCHEDULE(HttpStatus.CONFLICT, "S006", "요일별 1개 시간대만 등록 가능합니다."),
+//    NOT_SCHEDULE_OWNER(HttpStatus.FORBIDDEN, "S007", "본인의 스케줄이 아닙니다."),
+//    HAS_ACTIVE_RESERVATION(HttpStatus.BAD_REQUEST, "S008", "CONFIRMED 상태의 예약이 있습니다."),
 
     // ------------ TIME SLOT ----------------
 
-    TIME_SLOT_REQUIRED(HttpStatus.BAD_REQUEST, "T001", "TimeSlot 은 최소 하나 등록이 필요합니다."),
-    TIMESLOT_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "T002", "TimeSlot 은 공고, 요청 당 30개만 가능합니다."),
-    PAST_DATE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "T003", "과거 날짜를 추가할 수 없습니다."),
-    DUPLICATE_TIME_SLOT(HttpStatus.BAD_REQUEST, "T004", "TimeSlot 이 중복됩니다."),
+//    TIME_SLOT_REQUIRED(HttpStatus.BAD_REQUEST, "T001", "TimeSlot 은 최소 하나 등록이 필요합니다."),
+//    TIMESLOT_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "T002", "TimeSlot 은 공고, 요청 당 30개만 가능합니다."),
+//    PAST_DATE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "T003", "과거 날짜를 추가할 수 없습니다."),
+//    DUPLICATE_TIME_SLOT(HttpStatus.BAD_REQUEST, "T004", "TimeSlot 이 중복됩니다."),
 
     // -------- POST & PROPOSAL ---------
 //    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "존재하지 않는 공고입니다."),
