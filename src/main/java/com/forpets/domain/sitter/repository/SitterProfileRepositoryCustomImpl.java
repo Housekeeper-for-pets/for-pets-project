@@ -32,9 +32,10 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
     @Override
     public SitterPageResponse searchSitters(SitterSearchCondition condition, Pageable pageable) {
 
-        // ── 데이터 쿼리 ──────────────────────────────────────────────────────
-        List<SitterProfile> sitters = queryFactory
-                .selectFrom(sitter)
+        // ── 데이터 쿼리 (Tuple로 sitter와 member.region을 한 번에 JOIN 조회하여 N+1 방지) ────────────────
+        List<com.querydsl.core.Tuple> results = queryFactory
+                .select(sitter, member.region)
+                .from(sitter)
                 .join(member).on(member.id.eq(sitter.memberId))
                 .where(
                         regionEq(condition),
@@ -67,17 +68,15 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
                 ? 0
                 : (int) Math.ceil((double) totalElements / pageable.getPageSize());
 
-        // ── SitterResponseDto 변환 ─────────────────────────────────────────
-        // region 을 member 에서 가져와야 하므로, sitter ID → member region 을 별도 조회 후 매핑
-        List<SitterResponseDto> content = sitters.stream()
-                .map(s -> {
-                    com.forpets.domain.member.entity.Member m = queryFactory
-                            .selectFrom(member)
-                            .where(member.id.eq(s.getMemberId()))
-                            .fetchOne();
-                    com.forpets.domain.member.entity.Region region =
-                            m != null ? m.getRegion() : com.forpets.domain.member.entity.Region.UNKNOWN;
-                    return SitterResponseDto.from(s, region);
+        // ── SitterResponseDto 변환 (N+1 쿼리 제거 및 메모리 매핑) ─────────────────────────
+        List<SitterResponseDto> content = results.stream()
+                .map(tuple -> {
+                    SitterProfile s = tuple.get(sitter);
+                    com.forpets.domain.member.entity.Region region = tuple.get(member.region);
+                    return SitterResponseDto.from(
+                            s, 
+                            region != null ? region : com.forpets.domain.member.entity.Region.UNKNOWN
+                    );
                 })
                 .toList();
 

@@ -84,6 +84,14 @@ public class SitterController {
      */
 
 
+    // 3. 시터 상세 조회 (로그인 필수)
+    @GetMapping("/{sitterId}")
+    public ResponseEntity<ApiResponse<SitterResponseDto>> getSitter(@PathVariable Long sitterId) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
+                .body(ApiResponse.success(sitterService.getSitterById(sitterId)));
+    }
+
     // 4. 내 시터 프로필 조회
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<SitterResponseDto>> getMyProfile(
