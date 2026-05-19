@@ -11,6 +11,12 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:  # 수동 실행 가능
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+
 # 중복 실행 최소화 (concurrency): 같은 브랜치 연속 push 시 이전 실행 자동 취소
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -48,11 +54,3 @@ jobs:
 
       - name: 빌드 + 테스트
         run: ./gradlew build
-
-      - name: 테스트 결과 리포트 (실패해도 실행)
-        uses: dorny/test-reporter@v1
-        if: success() || failure()  # 빌드 실패해도 리포트는 보여줘
-        with:
-          name: Test Results
-          path: '**/build/test-results/test/TEST-*.xml'
-          reporter: java-junit
