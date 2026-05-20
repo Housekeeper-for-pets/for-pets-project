@@ -307,4 +307,11 @@ public class PostService {
 //                ))
 //                .toList();
 //    }
+
+    public boolean existsActivePostByPetId(Long petId) {
+        return postRepository.existsByPetIdAndStatusIn(
+                petId,
+                List.of(PostStatus.OPEN)
+        );
+    }
 }
