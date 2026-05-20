@@ -8,7 +8,9 @@ import com.forpets.domain.pet.exception.PetErrorCode;
 import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.post.dto.CreatePostRequest;
+import com.forpets.domain.post.dto.PostPageResponse;
 import com.forpets.domain.post.dto.PostResponseDto;
+import com.forpets.domain.post.dto.PostSearchCondition;
 import com.forpets.domain.post.dto.UpdatePostRequest;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
@@ -24,18 +26,23 @@ import com.forpets.domain.proposal.exception.ProposalErrorCode;
 import com.forpets.domain.proposal.exception.ProposalException;
 import com.forpets.domain.proposal.repository.ProposalRepository;
 import com.forpets.domain.proposal.service.ProposalService;
+import com.forpets.domain.post.exception.PostErrorCode;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.dto.TimeSlotRequest;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -166,6 +173,40 @@ public class PostService {
     public Post findById(Long postId) {
         return postRepository.findById(postId)
                 .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
+    }
+
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "createdAt", "updatedAt", "budgetAmount"
+    );
+
+    private void validateSortField(String sort) {
+        if (!ALLOWED_SORT_FIELDS.contains(sort)) {
+            throw new BusinessException(PostErrorCode.INVALID_SORT_FIELD);
+        }
+    }
+
+    private void validatePageRequest(int page, int size) {
+        if (page < 0) {
+            throw new BusinessException(PostErrorCode.INVALID_PAGE_REQUEST);
+        }
+        if (size < 1 || size > 50) {
+            throw new BusinessException(PostErrorCode.INVALID_PAGE_REQUEST);
+        }
+    }
+
+    /*
+    공고 목록 검색 (GET /api/posts)
+    - 정렬 필드 화이트리스트 검증 (createdAt / updatedAt / budgetAmount)
+    - 페이지 크기 최대 50 제한
+    - 페이지 번호 음수 불가
+     */
+    public PostPageResponse searchPosts(PostSearchCondition condition, int page, int size, String sort) {
+        validatePageRequest(page, size);
+        validateSortField(sort);
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sort));
+
+        return postRepository.searchPosts(condition, pageable);
     }
 
     public List<PostTimeSlot> findTimeSlotsByPostId(Long postId) {

@@ -10,4 +10,6 @@ public interface PostPetRepository extends JpaRepository<PostPet, Long> {
     List<PostPet> findAllByPostId(Long postId);
 
     void deleteAllByPostId(Long postId);
+
+    List<PostPet> findAllByPostIdIn(List<Long> postIds);
 }
