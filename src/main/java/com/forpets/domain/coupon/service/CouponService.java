@@ -2,6 +2,8 @@ package com.forpets.domain.coupon.service;
 
 import com.forpets.domain.coupon.dto.CouponResponse;
 import com.forpets.domain.coupon.dto.CreateCouponRequest;
+import com.forpets.domain.coupon.dto.CouponApplyResult;
+import com.forpets.domain.coupon.dto.IssueCouponResponse;
 import com.forpets.domain.coupon.dto.RevokeCouponResponse;
 import com.forpets.domain.coupon.entity.Coupon;
 import com.forpets.domain.coupon.entity.UserCoupon;
@@ -49,6 +51,66 @@ public class CouponService {
         return RevokeCouponResponse.from(userCoupon);
     }
 
+    // 로그인한 회원에게 쿠폰을 발급하고 잔여 수량을 차감합니다.
+    @Transactional
+    public IssueCouponResponse issueCoupon(Long userId, Long couponId) {
+        Coupon coupon = findCouponById(couponId);
+
+        if (coupon.getRemainingQuantity() <= 0) {
+            throw new CouponException(CouponErrorCode.COUPON_QUANTITY_EXHAUSTED);
+        }
+
+        if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
+            throw new CouponException(CouponErrorCode.COUPON_ALREADY_ISSUED);
+        }
+
+        coupon.decreaseRemainingQuantity();
+
+        UserCoupon userCoupon = UserCoupon.builder()
+                .userId(userId)
+                .couponId(couponId)
+                .build();
+
+        return IssueCouponResponse.of(userCouponRepository.save(userCoupon), coupon);
+    }
+
+    // 결제 전 쿠폰 유효성 검증과 할인 금액 계산만 수행
+    public CouponApplyResult applyCoupon(Long userId, Long userCouponId, Long originalPrice) {
+        UserCoupon userCoupon = findUserCouponById(userCouponId);
+
+        validateCouponOwner(userCoupon, userId);
+        validateCouponActive(userCoupon);
+
+        Coupon coupon = findCouponById(userCoupon.getCouponId());
+        long discountAmount = originalPrice * coupon.getDiscountRate() / 100;
+        long finalPrice = originalPrice - discountAmount;
+
+        return new CouponApplyResult(discountAmount, finalPrice, coupon.getName());
+    }
+
+
+     // 결제 성공 후 쿠폰 상태를 USED로 변경
+    @Transactional
+    public void markCouponAsUsed(Long userId, Long userCouponId) {
+        UserCoupon userCoupon = findUserCouponById(userCouponId);
+
+        validateCouponOwner(userCoupon, userId);
+        validateCouponActive(userCoupon);
+
+        userCoupon.markAsUsed();
+    }
+
+
+     // 결제 실패 / 환불 쿠폰 상태를 ACTIVE로 복원
+    @Transactional
+    public void restoreCoupon(Long userId, Long userCouponId) {
+        UserCoupon userCoupon = findUserCouponById(userCouponId);
+
+        validateCouponOwner(userCoupon, userId);
+
+        userCoupon.restore();
+    }
+
     // 쿠폰 ID 조회
     public Coupon findCouponById(Long couponId) {
         return couponRepository.findById(couponId)
@@ -59,5 +121,17 @@ public class CouponService {
     public UserCoupon findUserCouponById(Long userCouponId) {
         return userCouponRepository.findById(userCouponId)
                 .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_NOT_FOUND));
+    }
+
+    private void validateCouponOwner(UserCoupon userCoupon, Long userId) {
+        if (!userCoupon.getUserId().equals(userId)) {
+            throw new CouponException(CouponErrorCode.COUPON_NOT_OWNED);
+        }
+    }
+
+    private void validateCouponActive(UserCoupon userCoupon) {
+        if (userCoupon.getStatus() != UserCouponStatus.ACTIVE) {
+            throw new CouponException(CouponErrorCode.COUPON_ALREADY_USED);
+        }
     }
 }
