@@ -69,6 +69,10 @@ public class PostController {
     /*
     3. 공고 상세 조회
      */
+    @GetMapping("/{postId}")
+    public ResponseEntity<ApiResponse<PostResponseDto>> getPost(@PathVariable Long postId) {
+        return ResponseEntity.ok(ApiResponse.success(postService.getPost(postId)));
+    }
 
     /*
     4. 공고 업데이트
