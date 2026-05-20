@@ -1,5 +1,7 @@
 package com.forpets.domain.coupon.dto;
 
+import com.forpets.domain.coupon.entity.Coupon;
+
 public record CouponResponse(
         Long couponId,
         String name,

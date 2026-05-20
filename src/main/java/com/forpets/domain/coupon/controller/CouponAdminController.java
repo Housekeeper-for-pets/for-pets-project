@@ -22,7 +22,7 @@ public class CouponAdminController {
 
     private final CouponService couponService;
 
-    // 관리자만 쿠폰을 생성할 수 있으며, 생성 성공 시 201 Created로 응답합니다.
+    // 관리자 쿠폰 생성
     @PostMapping("/coupons")
     public ResponseEntity<ApiResponse<CouponResponse>> createCoupon(
             @RequestBody @Valid CreateCouponRequest request
