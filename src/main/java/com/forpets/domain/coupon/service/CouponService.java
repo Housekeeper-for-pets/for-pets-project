@@ -2,8 +2,10 @@ package com.forpets.domain.coupon.service;
 
 import com.forpets.domain.coupon.dto.CouponResponse;
 import com.forpets.domain.coupon.dto.CreateCouponRequest;
+import com.forpets.domain.coupon.dto.RevokeCouponResponse;
 import com.forpets.domain.coupon.entity.Coupon;
 import com.forpets.domain.coupon.entity.UserCoupon;
+import com.forpets.domain.coupon.entity.UserCouponStatus;
 import com.forpets.domain.coupon.exception.CouponErrorCode;
 import com.forpets.domain.coupon.exception.CouponException;
 import com.forpets.domain.coupon.repository.CouponRepository;
@@ -32,6 +34,19 @@ public class CouponService {
                 .build();
 
         return CouponResponse.from(couponRepository.save(coupon));
+    }
+
+    // 관리자가 사용 전 쿠폰을 회수 처리
+    @Transactional
+    public RevokeCouponResponse revokeCoupon(Long userCouponId) {
+        UserCoupon userCoupon = findUserCouponById(userCouponId);
+
+        if (userCoupon.getStatus() == UserCouponStatus.USED) {
+            throw new CouponException(CouponErrorCode.COUPON_ALREADY_USED);
+        }
+
+        userCoupon.revoke();
+        return RevokeCouponResponse.from(userCoupon);
     }
 
     // 쿠폰 ID 조회
