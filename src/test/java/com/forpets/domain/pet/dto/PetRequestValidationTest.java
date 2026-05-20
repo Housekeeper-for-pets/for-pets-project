@@ -27,8 +27,8 @@ class PetRequestValidationTest {
 
     private CreatePetRequest validRequest() {
         return new CreatePetRequest(
-                "초코", PetSpecies.DOG, "푸들", null,
-                3, null, null, null
+                "타코", PetSpecies.CAT, "코리안숏헤어", null,
+                4, null, null, null
         );
     }
 
@@ -41,7 +41,7 @@ class PetRequestValidationTest {
         void pet_validation_01() {
             // given
             CreatePetRequest request = new CreatePetRequest(
-                    null, PetSpecies.DOG, null, null,
+                    null, PetSpecies.CAT, null, null,
                     null, null, null, null
             );
 
@@ -58,7 +58,7 @@ class PetRequestValidationTest {
         void pet_validation_02() {
             // given
             CreatePetRequest request = new CreatePetRequest(
-                    "   ", PetSpecies.DOG, null, null,
+                    "   ", PetSpecies.CAT, null, null,
                     null, null, null, null
             );
 
