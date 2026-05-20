@@ -4,12 +4,13 @@ on:
   push:
     branches: [ main, develop ]
     paths-ignore:
-      - '**.md'         # 마크다운 변경은 CI 스킵
+      - '**.md'
       - 'docs/**'
-      - '.gitignore'
   pull_request:
     branches: [ main, develop ]
-  workflow_dispatch:  # 수동 실행 가능
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 permissions:
   contents: read
@@ -23,11 +24,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  # ========== Job 1: 빌드 + 테스트 (항상 실행) ==========
+  test:
     name: Build & Test
     runs-on: ubuntu-latest
-    # draft PR은 CI 스킵
-    if: github.event.pull_request.draft != true
 
     steps:
       - name: 소스 체크아웃
@@ -54,3 +54,36 @@ jobs:
 
       - name: 빌드 + 테스트
         run: ./gradlew build
+
+  # ========== Job 2: Docker 빌드 + ECR 푸시 (머지 후에만) ==========
+  push-image:
+    name: Push to ECR
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: AWS 자격증명 설정
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: ECR 로그인
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker 빌드 & ECR 푸시
+        env:
+          REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          REPO: forpets-backend
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$REPO:$TAG -t $REGISTRY/$REPO:latest .
+          docker push $REGISTRY/$REPO:$TAG
+          docker push $REGISTRY/$REPO:latest
+          echo "✅ 이미지 푸시 완료: $REGISTRY/$REPO:$TAG"
