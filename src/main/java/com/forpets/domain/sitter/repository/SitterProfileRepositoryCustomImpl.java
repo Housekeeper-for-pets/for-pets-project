@@ -1,11 +1,13 @@
 package com.forpets.domain.sitter.repository;
 
 import com.forpets.domain.member.entity.QMember;
+import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
 import com.forpets.domain.sitter.dto.profile.SitterSearchCondition;
 import com.forpets.domain.sitter.entity.QSitterProfile;
 import com.forpets.domain.sitter.entity.SitterProfile;
+import com.forpets.domain.sitter.entity.SitterSchedule;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -14,6 +16,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 시터 목록 동적 검색 QueryDSL 구현체입니다.
@@ -25,6 +29,7 @@ import java.util.List;
 public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
+    private final SitterScheduleRepository sitterScheduleRepository;
 
     private static final QSitterProfile sitter = QSitterProfile.sitterProfile;
     private static final QMember member = QMember.member;//member쪽 region을 join하기위함
@@ -68,14 +73,33 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
                 ? 0
                 : (int) Math.ceil((double) totalElements / pageable.getPageSize());
 
-        // ── SitterResponseDto 변환 (N+1 쿼리 제거 및 메모리 매핑) ─────────────────────────
+        // sitterProfileId 목록 추출
+        List<Long> sitterIds = results.stream()
+                .map(t -> t.get(sitter).getId())
+                .toList();
+
+        // 스케쥴이 비었을 경우 early return
+        if (sitterIds.isEmpty()) {
+            return SitterPageResponse.of(List.of(), totalElements, totalPages,
+                    pageable.getPageNumber(), pageable.getPageSize());
+        }
+
+        // 스케줄 IN절로 한 번에 조회
+        Map<Long, List<SitterSchedule>> schedulesMap = sitterScheduleRepository
+                .findAllBySitterProfileIdIn(sitterIds)
+                .stream()
+                .collect(Collectors.groupingBy(SitterSchedule::getSitterProfileId));
+
+        // DTO 변환 시 스케줄 주입
         List<SitterResponseDto> content = results.stream()
                 .map(tuple -> {
                     SitterProfile s = tuple.get(sitter);
-                    com.forpets.domain.member.entity.Region region = tuple.get(member.region);
+                    Region region = tuple.get(member.region);
+                    List<SitterSchedule> schedules = schedulesMap.getOrDefault(s.getId(), List.of());
                     return SitterResponseDto.from(
-                            s, 
-                            region != null ? region : com.forpets.domain.member.entity.Region.UNKNOWN
+                            s,
+                            region != null ? region : Region.UNKNOWN,
+                            schedules
                     );
                 })
                 .toList();
