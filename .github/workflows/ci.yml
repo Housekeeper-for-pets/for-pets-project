@@ -79,7 +79,7 @@ jobs:
 
       - name: Docker 빌드 & ECR 푸시
         env:
-          REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           REPO: forpets-backend
           TAG: ${{ github.sha }}
         run: |
