@@ -4,6 +4,8 @@ package com.forpets.domain.post.service;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.pet.entity.Pet;
+import com.forpets.domain.pet.exception.PetErrorCode;
+import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.post.dto.CreatePostRequest;
 import com.forpets.domain.post.dto.PostResponseDto;
@@ -12,10 +14,14 @@ import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.post.entity.PostTimeSlot;
+import com.forpets.domain.post.exception.PostErrorCode;
+import com.forpets.domain.post.exception.PostException;
 import com.forpets.domain.post.repository.PostPetRepository;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.repository.PostTimeSlotRepository;
 import com.forpets.domain.proposal.entity.ProposalStatus;
+import com.forpets.domain.proposal.exception.ProposalErrorCode;
+import com.forpets.domain.proposal.exception.ProposalException;
 import com.forpets.domain.proposal.repository.ProposalRepository;
 import com.forpets.domain.proposal.service.ProposalService;
 import com.forpets.global.embed.TimeSlotValidator;
@@ -159,7 +165,7 @@ public class PostService {
 
     public Post findById(Long postId) {
         return postRepository.findById(postId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.POST_NOT_FOUND));
+                .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
     }
 
     public List<PostTimeSlot> findTimeSlotsByPostId(Long postId) {
@@ -179,7 +185,7 @@ public class PostService {
                 .map(petId -> {
                     Pet pet = petService.findById(petId);
                     if (!pet.getMemberId().equals(memberId)) {
-                        throw new BusinessException(CommonErrorCode.NOT_PET_OWNER);
+                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
                     }
                     return pet;
                 })
@@ -188,13 +194,13 @@ public class PostService {
 
     private void validateAuthor(Long memberId, Post post) {
         if (!post.isOwnedBy(memberId)) {
-            throw new BusinessException(CommonErrorCode.NOT_POST_AUTHOR);
+            throw new PostException(PostErrorCode.NOT_POST_AUTHOR);
         }
     }
 
     private void validateOpen(Post post) {
         if (!post.isOpen()) {
-            throw new BusinessException(CommonErrorCode.POST_NOT_OPEN);
+            throw new PostException(PostErrorCode.POST_NOT_OPEN);
         }
     }
 
@@ -214,7 +220,7 @@ public class PostService {
     private void validateNoActiveProposal(Long postId) {
         if (proposalRepository.existsByPostIdAndStatusIn(
                 postId, List.of(ProposalStatus.PENDING, ProposalStatus.ACCEPTED))) {
-            throw new BusinessException(CommonErrorCode.HAS_ACTIVE_PROPOSAL);
+            throw new ProposalException(ProposalErrorCode.HAS_ACTIVE_PROPOSAL);
         }
     }
 

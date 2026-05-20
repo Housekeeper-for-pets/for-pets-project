@@ -7,7 +7,11 @@ import com.forpets.domain.sitter.dto.schedule.ScheduleResponseDto;
 import com.forpets.domain.sitter.dto.schedule.UpdateScheduleRequest;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.entity.SitterSchedule;
+import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
+import com.forpets.global.embed.exception.TimeSlotErrorCode;
+import com.forpets.global.embed.exception.TimeSlotException;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -72,11 +76,11 @@ public class SitterScheduleService {
 
         for (ScheduleItemRequest item : items) {
             if (!item.startTime().isBefore(item.endTime())) {
-                throw new BusinessException(CommonErrorCode.INVALID_TIME_RANGE);
+                throw new TimeSlotException(TimeSlotErrorCode.INVALID_TIME_RANGE);
             }
 
             if (!days.add(item.dayOfWeek())) {
-                throw new BusinessException(CommonErrorCode.DUPLICATE_SCHEDULE);
+                throw new SitterException(SitterErrorCode.DUPLICATE_SCHEDULE);
             }
         }
     }

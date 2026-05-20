@@ -1,5 +1,7 @@
 package com.forpets.domain.post.entity;
 
+import com.forpets.domain.post.exception.PostErrorCode;
+import com.forpets.domain.post.exception.PostException;
 import com.forpets.global.common.CareType;
 import com.forpets.global.entity.BaseEntity;
 import com.forpets.global.exception.BusinessException;
@@ -75,7 +77,7 @@ public class Post extends BaseEntity {
     }
 
     public void close() {
-        if (!isOpen()) throw new BusinessException(CommonErrorCode.INVALID_STATUS_TRANSITION);
+        if (!isOpen()) throw new PostException(PostErrorCode.INVALID_STATUS_TRANSITION);
         this.status = PostStatus.CLOSED;
     }
 
