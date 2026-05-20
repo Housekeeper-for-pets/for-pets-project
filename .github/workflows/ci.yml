@@ -55,7 +55,7 @@ jobs:
       - name: 빌드 + 테스트
         run: ./gradlew build
 
-  # ========== Job 2: Docker 빌드 + ECR 푸시 (머지 후에만) ==========
+  # ========== Job 2: Docker 빌드 + ECR 푸시 (머지 후에만) =========
   push-image:
     name: Push to ECR
     needs: test
