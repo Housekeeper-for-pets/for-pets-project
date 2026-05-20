@@ -16,9 +16,9 @@ public enum PetErrorCode implements ErrorCode {
     PET_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "PET_LIMIT_EXCEEDED", "최대 10마리까지만 등록 가능합니다"),
     NOT_PET_OWNER(HttpStatus.FORBIDDEN, "NOT_PET_OWNER", "본인의 반려동물이 아닙니다."),
     PET_NOT_FOUND(HttpStatus.NOT_FOUND, "PET_NOT_FOUND", "존재하지 않는 반려동물입니다."),
-    PET_USED_IN_ACTIVE_RESERVATION(HttpStatus.BAD_REQUEST, "PET_USED_IN_ACTIVE_RESERVATION", "진행 중인 예약에 포함된 반려동물은 수정 및 삭제가 불가합니다."),
-    PET_USED_IN_OPEN_POST(HttpStatus.BAD_REQUEST, "PET_USED_IN_OPEN_POST", "열려있는 공고에 포함된 반려동물은 삭제가 불가능합니다."),
-    PET_USED_IN_PENDING_REQUEST(HttpStatus.BAD_REQUEST, "PET_USED_IN_PENDING_REQUEST", "수락 대기중인 요청에 포함된 반려동물은 삭제가 불가능합니다.")
+//    PET_USED_IN_ACTIVE_RESERVATION(HttpStatus.BAD_REQUEST, "PET_USED_IN_ACTIVE_RESERVATION", "진행 중인 예약에 포함된 반려동물은 수정 및 삭제가 불가합니다."),
+//    PET_USED_IN_OPEN_POST(HttpStatus.BAD_REQUEST, "PET_USED_IN_OPEN_POST", "열려있는 공고에 포함된 반려동물은 삭제가 불가능합니다."),
+    PET_USED_IN_ACTIVE_PROCESS(HttpStatus.BAD_REQUEST, "PET_USED_IN_ACTIVE_PROCESS", "활성상태의 공고, 예약 또는 돌봄 요청에 포함된 반려동물은 삭제가 불가능합니다.")
     ;
 
     private final HttpStatus status;

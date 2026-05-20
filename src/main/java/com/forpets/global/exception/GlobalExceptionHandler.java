@@ -1,11 +1,9 @@
 package com.forpets.global.exception;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import com.forpets.domain.member.entity.MemberGender;
-import com.forpets.domain.member.exception.MemberErrorCode;
+import com.forpets.domain.post.exception.PostErrorCode;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.global.common.ApiResponse;
-import com.forpets.global.common.CareType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -106,10 +104,19 @@ public class GlobalExceptionHandler {
                     .body(ApiResponse.fail(ErrorResponse.of(SitterErrorCode.INVALID_SEARCH_CONDITION, request.getRequestURI())));
         }
 
+        // 공고 API 파라미터별 에러코드 분기 추가
+        String paramName = exception.getName();
+        ErrorCode errorCode = switch (paramName) {
+            case "careType" -> PostErrorCode.INVALID_CARE_TYPE;
+            case "status" -> PostErrorCode.INVALID_POST_STATUS;
+            case "region" -> PostErrorCode.INVALID_SEARCH_CONDITION;  // 또는 CommonErrorCode
+            default -> CommonErrorCode.INVALID_PARAMETER;
+        };
+
         // 그 외 API는 공통 에러코드
         return ResponseEntity
                 .badRequest()
-                .body(ApiResponse.fail(ErrorResponse.of(CommonErrorCode.INVALID_PARAMETER, request.getRequestURI())));
+                .body(ApiResponse.fail(ErrorResponse.of(errorCode , request.getRequestURI())));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

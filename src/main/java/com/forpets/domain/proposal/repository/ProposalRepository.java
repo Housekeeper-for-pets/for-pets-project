@@ -1,5 +1,6 @@
 package com.forpets.domain.proposal.repository;
 
+import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,5 +24,7 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
     List<Proposal> findAllByMemberIdAndStatus(Long memberId, ProposalStatus status);
 
     List<Proposal> findAllBySitterProfileIdAndStatus(Long sitterProfileId, ProposalStatus status);
+
+    boolean existsBySitterProfileIdAndStatusIn(Long sitterProfileId, List<ProposalStatus> statuses);
 
 }

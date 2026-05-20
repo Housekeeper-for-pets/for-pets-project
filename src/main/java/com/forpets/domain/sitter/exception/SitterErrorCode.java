@@ -26,6 +26,8 @@ public enum SitterErrorCode implements ErrorCode {
     NOT_SCHEDULE_OWNER(HttpStatus.FORBIDDEN, "NOT_SCHEDULE_OWNER", "본인의 스케줄이 아닙니다."),
     HAS_ACTIVE_RESERVATION(HttpStatus.BAD_REQUEST, "HAS_ACTIVE_RESERVATION", "CONFIRMED 상태의 예약이 있습니다."),
 
+    SITTER_USED_IN_ACTIVE_PROCESS(HttpStatus.BAD_REQUEST, "SITTER_USED_IN_ACTIVE_PROCESS", "활성상태의 제안, 예약 또는 돌봄 요청이 존재하는 시터프로필은 삭제가 불가능합니다.")
+
     ;
 
     private final HttpStatus status;

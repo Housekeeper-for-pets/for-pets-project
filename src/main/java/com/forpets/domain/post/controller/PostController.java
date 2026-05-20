@@ -1,15 +1,21 @@
 package com.forpets.domain.post.controller;
 
+import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.post.dto.CreatePostRequest;
+import com.forpets.domain.post.dto.PostPageResponse;
 import com.forpets.domain.post.dto.PostResponseDto;
+import com.forpets.domain.post.dto.PostSearchCondition;
 import com.forpets.domain.post.dto.UpdatePostRequest;
 import com.forpets.domain.post.entity.Post;
+import com.forpets.domain.post.entity.PostStatus;
+import com.forpets.global.common.CareType;
 import com.forpets.domain.post.service.PostService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,10 +42,37 @@ public class PostController {
 
     /*
     2. 공고 목록 조회
-     - 공고 전체 조회
-     - 내가 쓴 공고 목록 조회
+    - 캐시 전략: Cache-Control public, max-age=300
+    - 정렬 화이트리스트: createdAt(기본), updatedAt, budgetAmount
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponse<PostPageResponse>> search(
+            @RequestParam(required = false) Region region,
+            @RequestParam(required = false) CareType careType,
+            @RequestParam(required = false) PostStatus status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sort
+    ) {
+        PostSearchCondition condition = new PostSearchCondition(
+                region, careType, status, keyword
+        );
+
+        PostPageResponse response = postService.searchPosts(condition, page, size, sort);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=300")
+                .body(ApiResponse.success(response));
+    }
+
+    /*
     3. 공고 상세 조회
      */
+    @GetMapping("/{postId}")
+    public ResponseEntity<ApiResponse<PostResponseDto>> getPost(@PathVariable Long postId) {
+        return ResponseEntity.ok(ApiResponse.success(postService.getPost(postId)));
+    }
 
     /*
     4. 공고 업데이트

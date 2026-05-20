@@ -16,6 +16,7 @@ import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
+import com.forpets.global.common.AssociationChecker;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import com.forpets.global.exception.ErrorCode;
@@ -36,7 +37,7 @@ public class SitterService {
     private final MemberService memberService;
     private final SitterProfileRepository sitterProfileRepository;
     private final SitterScheduleRepository sitterScheduleRepository;
-    private final ReservationService reservationService;
+    private final AssociationChecker associationChecker;
 
     @Transactional
     public SitterResponseDto create(Long memberId, CreateSitterRequest request) {
@@ -135,7 +136,9 @@ public class SitterService {
     @Transactional
     public void delete(Long memberId) {
         SitterProfile sitter = findByMemberId(memberId);
-        validateNoActiveReservation(sitter.getId());
+        if (associationChecker.hasSitterActiveAssociation(sitter.getId())){
+            throw new SitterException(SitterErrorCode.SITTER_USED_IN_ACTIVE_PROCESS);
+        }
 
         sitter.delete();
 
@@ -218,9 +221,9 @@ public class SitterService {
     /*
     시터에게 진행 중인 예약(PENDING/CONFIRMED)이 있는지 확인
      */
-    private void validateNoActiveReservation(Long sitterId) {
-         if (reservationService.existsInProgressBySitterId(sitterId)) {
-             throw new SitterException(SitterErrorCode.HAS_ACTIVE_RESERVATION);
-         }
-    }
+//    private void validateNoActiveReservation(Long sitterId) {
+//         if (reservationService.existsInProgressBySitterId(sitterId)) {
+//             throw new SitterException(SitterErrorCode.HAS_ACTIVE_RESERVATION);
+//         }
+//    }
 }
