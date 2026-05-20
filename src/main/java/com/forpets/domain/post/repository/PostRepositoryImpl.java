@@ -67,7 +67,8 @@ public class PostRepositoryImpl implements PostRepositoryCustom {
                         containsKeyword(condition)
                 );
 
-        long totalElements = countQuery.fetchOne() != null ? countQuery.fetchOne() : 0L;
+        Long count = countQuery.fetchOne();
+        long totalElements = count != null ? count : 0L;
         int totalPages = (int) Math.ceil((double) totalElements / pageable.getPageSize());
 
         // 3. postId 목록 추출
