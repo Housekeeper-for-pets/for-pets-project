@@ -62,10 +62,6 @@ public class PetService {
         Pet pet = findById(petId);
         validateOwner(memberId, pet);
 
-        if (hasActiveReservation(petId)) {
-            validateCoreFieldNotChanged(pet, request);
-        }
-
         pet.update(
                 request.name(),
                 request.species(),
@@ -107,15 +103,15 @@ public class PetService {
         }
     }
 
-    private boolean hasActiveReservation(Long petId) {
-        return reservationService.existsActiveReservationByPetId(petId);
-    }
-
-    private void validateCoreFieldNotChanged(Pet pet, UpdatePetRequest request) {
-        if (pet.getSpecies() != request.species() || pet.getSize() != request.size()) {
-            throw new PetException(PetErrorCode.PET_CORE_FIELD_CHANGE_RESTRICTED);
-        }
-    }
+//    private boolean hasActiveReservation(Long petId) {
+//        return reservationService.existsActiveReservationByPetId(petId);
+//    }
+//
+//    private void validateCoreFieldNotChanged(Pet pet, UpdatePetRequest request) {
+//        if (pet.getSpecies() != request.species() || pet.getSize() != request.size()) {
+//            throw new PetException(PetErrorCode.PET_CORE_FIELD_CHANGE_RESTRICTED);
+//        }
+//    }
 
     private void validateDeletable(Long petId) {
         if (reservationService.existsActiveReservationByPetId(petId)) {

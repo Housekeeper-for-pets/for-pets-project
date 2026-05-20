@@ -304,4 +304,11 @@ public class CareRequestService {
                 careRequestTimeSlotRepository.findAllByCareRequestIdOrderByTimeSlotInfoSequence(request.getId());
         return CareRequestResponseDto.from(request, pets, timeSlots);
     }
+
+    public boolean existsActiveCareRequestByPetId(Long petId) {
+        return careRequestRepository.existsByPetIdAndStatusIn(
+                petId,
+                List.of(CareRequestStatus.PENDING, CareRequestStatus.ACCEPTED)
+        );
+    }
 }
