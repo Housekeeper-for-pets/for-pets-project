@@ -9,5 +9,7 @@ public interface PostTimeSlotRepository extends JpaRepository<PostTimeSlot, Long
 
     List<PostTimeSlot> findAllByPostIdOrderByTimeSlotInfoSequence(Long postId);
 
+    List<PostTimeSlot> findAllByPostIdInOrderByTimeSlotInfoSequence(List<Long> postIds);
+
     void deleteAllByPostId(Long postId);
 }
