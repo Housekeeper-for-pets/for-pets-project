@@ -83,7 +83,7 @@ public class PetService {
         validateOwner(memberId, pet);
         if (associationChecker.hasPetActiveAssociation(petId)){
             throw new PetException(PetErrorCode.PET_USED_IN_ACTIVE_PROCESS);
-        };
+        }
 
         pet.delete();
     }

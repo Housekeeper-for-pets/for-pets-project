@@ -136,7 +136,9 @@ public class SitterService {
     @Transactional
     public void delete(Long memberId) {
         SitterProfile sitter = findByMemberId(memberId);
-        associationChecker.hasSitterActiveAssociation(sitter.getId());
+        if (!associationChecker.hasSitterActiveAssociation(sitter.getId())){
+            throw new SitterException(SitterErrorCode.SITTER_USED_IN_ACTIVE_PROCESS);
+        }
 
         sitter.delete();
 
