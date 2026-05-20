@@ -8,6 +8,7 @@ import com.forpets.domain.pet.exception.PetErrorCode;
 import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.repository.PetRepository;
 import com.forpets.domain.reservation.service.ReservationService;
+import com.forpets.global.common.AssociationChecker;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +25,7 @@ public class PetService {
     private static final int MAX_PET_COUNT = 10;
 
     private final PetRepository petRepository;
-    private final ReservationService reservationService;
+    private final AssociationChecker associationChecker;
 
     @Transactional
     public PetResponseDto create(Long memberId, CreatePetRequest request) {
@@ -80,7 +81,9 @@ public class PetService {
     public void delete(Long memberId, Long petId) {
         Pet pet = findById(petId);
         validateOwner(memberId, pet);
-        validateDeletable(petId);
+        if (associationChecker.hasPetActiveAssociation(petId)){
+            throw new PetException(PetErrorCode.PET_USED_IN_ACTIVE_PROCESS);
+        };
 
         pet.delete();
     }
@@ -113,9 +116,9 @@ public class PetService {
 //        }
 //    }
 
-    private void validateDeletable(Long petId) {
-        if (reservationService.existsActiveReservationByPetId(petId)) {
-            throw new PetException(PetErrorCode.PET_USED_IN_ACTIVE_RESERVATION);
-        }
-    }
+//    private void validateDeletable(Long petId) {
+//        if (reservationService.existsActiveReservationByPetId(petId)) {
+//            throw new PetException(PetErrorCode.PET_USED_IN_ACTIVE_RESERVATION);
+//        }
+//    }
 }

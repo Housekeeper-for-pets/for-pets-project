@@ -461,12 +461,12 @@ public class ReservationService {
 
     // ----- pet service 에서 쓸 ... method  -----
 
-    public boolean existsActiveReservationByPetId(Long petId) {
-        return reservationRepository.existsByPetIdAndStatusIn(
-                petId,
-                List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED)
-        );
-    }
+//    public boolean existsActiveReservationByPetId(Long petId) {
+//        return reservationRepository.existsByPetIdAndStatusIn(
+//                petId,
+//                List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED)
+//        );
+//    }
 
     public boolean existsInProgressBySitterId(Long sitterId) {
         return reservationRepository.existsBySitterProfileIdAndStatus(sitterId, ReservationStatus.CONFIRMED);
