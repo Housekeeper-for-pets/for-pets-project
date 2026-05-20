@@ -1,20 +1,17 @@
 package com.forpets.domain.post.entity;
 
-import com.forpets.global.entity.CreatedEntity;
+import com.forpets.global.embed.HasTimeSlotInfo;
+import com.forpets.global.embed.entity.TimeSlotInfo;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDate;
-import java.time.LocalTime;
 
 @Getter
 @Entity
 @Table(name = "post_time_slot")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PostTimeSlot extends CreatedEntity {
+public class PostTimeSlot implements HasTimeSlotInfo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,24 +20,13 @@ public class PostTimeSlot extends CreatedEntity {
     @Column(name = "post_id", nullable = false)
     private Long postId;
 
-    @Column(nullable = false)
-    private LocalDate careDate;
+    @Embedded
+    private TimeSlotInfo timeSlotInfo;
 
-    @Column(nullable = false)
-    private LocalTime startTime;
-
-    @Column(nullable = false)
-    private LocalTime endTime;
-
-    @Column(nullable = false)
-    private int sequence;
-
-    @Builder
-    private PostTimeSlot(Long postId, LocalDate careDate, LocalTime startTime, LocalTime endTime, int sequence) {
-        this.postId = postId;
-        this.careDate = careDate;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.sequence = sequence;
+    public static PostTimeSlot create(Long postId, TimeSlotInfo timeSlotInfo) {
+        PostTimeSlot slot = new PostTimeSlot();
+        slot.postId = postId;
+        slot.timeSlotInfo = timeSlotInfo;
+        return slot;
     }
 }

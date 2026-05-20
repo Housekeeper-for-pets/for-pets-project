@@ -1,4 +1,4 @@
-package com.forpets.domain.care.entity;
+package com.forpets.domain.carerequest.entity;
 
 import com.forpets.global.common.CareType;
 import com.forpets.global.entity.BaseEntity;
@@ -31,17 +31,22 @@ public class CareRequest extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String message;
 
+    @Column(columnDefinition = "TEXT")
+    private int requestPrice;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private CareRequestStatus status;
 
     @Builder
-    private CareRequest(Long memberId, Long sitterProfileId, CareType careType, String message) {
+    private CareRequest(Long memberId, Long sitterProfileId,
+                        CareType careType, String message, int requestPrice) {
         this.memberId = memberId;
         this.sitterProfileId = sitterProfileId;
         this.careType = careType;
         this.message = message;
         this.status = CareRequestStatus.PENDING;
+        this.requestPrice = requestPrice;
     }
 
     public void accept() {
@@ -54,5 +59,17 @@ public class CareRequest extends BaseEntity {
 
     public void cancel() {
         this.status = CareRequestStatus.CANCELED;
+    }
+
+    public boolean isPending() {
+        return this.status == CareRequestStatus.PENDING;
+    }
+
+    public boolean isOwnedBy(Long memberId) {
+        return this.memberId.equals(memberId);
+    }
+
+    public boolean isTargetSitter(Long sitterProfileId) {
+        return this.sitterProfileId.equals(sitterProfileId);
     }
 }

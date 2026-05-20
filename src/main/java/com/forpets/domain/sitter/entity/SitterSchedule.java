@@ -47,9 +47,4 @@ public class SitterSchedule extends BaseEntity {
         this.startTime = startTime;
         this.endTime = endTime;
     }
-
-    public void update(LocalTime startTime, LocalTime endTime) {
-        this.startTime = startTime;
-        this.endTime = endTime;
-    }
 }

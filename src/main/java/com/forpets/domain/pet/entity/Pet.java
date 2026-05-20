@@ -6,11 +6,15 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
-@Getter
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "pet")
+@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLRestriction("deleted = false")
 public class Pet extends BaseEntity {
 
     @Id
@@ -28,12 +32,13 @@ public class Pet extends BaseEntity {
     private PetSpecies species;
 
     @Column(length = 50)
-    private String breed;
+    private String breed; // 품종
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private PetSize size;
 
+    @Column
     private Integer age;
 
     @Enumerated(EnumType.STRING)
@@ -46,28 +51,41 @@ public class Pet extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String note;
 
+    @Column(nullable = false)
+    private boolean deleted = false;
+
+    @Column
+    private LocalDateTime deletedAt;
+
+    public void delete() {
+        this.deleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
     @Builder
-    private Pet(Long memberId, String name, PetSpecies species, String breed,
-                PetSize size, Integer age, PetGender gender, String profileImageUrl, String note) {
+    public Pet(Long memberId, String name, PetSpecies species, String breed,
+               PetSize size, Integer age, PetGender gender,
+               String profileImageUrl, String note) {
         this.memberId = memberId;
         this.name = name;
         this.species = species;
         this.breed = breed;
         this.size = size;
         this.age = age;
-        this.gender = gender;
+        this.gender = (gender != null) ? gender : PetGender.UNKNOWN;
         this.profileImageUrl = profileImageUrl;
         this.note = note;
     }
 
-    public void update(String name, PetSpecies species, String breed, PetSize size,
-                       Integer age, PetGender gender, String profileImageUrl, String note) {
+    public void update(String name, PetSpecies species, String breed,
+                       PetSize size, Integer age, PetGender gender,
+                       String profileImageUrl, String note) {
         this.name = name;
         this.species = species;
         this.breed = breed;
         this.size = size;
         this.age = age;
-        this.gender = gender;
+        this.gender = (gender != null) ? gender : PetGender.UNKNOWN;
         this.profileImageUrl = profileImageUrl;
         this.note = note;
     }

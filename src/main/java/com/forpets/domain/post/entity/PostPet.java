@@ -1,9 +1,9 @@
 package com.forpets.domain.post.entity;
 
-import com.forpets.global.entity.CreatedEntity;
+import com.forpets.domain.pet.entity.Pet;
+import com.forpets.global.embed.entity.PetSnapshot;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "post_pet")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PostPet extends CreatedEntity {
+public class PostPet {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,9 +23,14 @@ public class PostPet extends CreatedEntity {
     @Column(name = "pet_id", nullable = false)
     private Long petId;
 
-    @Builder
-    private PostPet(Long postId, Long petId) {
-        this.postId = postId;
-        this.petId = petId;
+    @Embedded
+    private PetSnapshot petSnapshot;
+
+    public static PostPet createFrom(Long postId, Pet pet) {
+        PostPet postPet = new PostPet();
+        postPet.postId = postId;
+        postPet.petId = pet.getId();
+        postPet.petSnapshot = PetSnapshot.from(pet);
+        return postPet;
     }
 }

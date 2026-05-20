@@ -6,6 +6,7 @@ import com.forpets.global.common.ApiResponse;
 import com.forpets.global.common.MessageResponse;
 import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -51,9 +52,10 @@ public class MemberController {
     @DeleteMapping("/me")
     @PreAuthorize("hasAnyRole('MEMBER', 'SITTER')")
     public ResponseEntity<ApiResponse<MessageResponse>> deleteAccount(
-            @LoginUser CurrentMember currentMember
+            @LoginUser CurrentMember currentMember,
+            HttpServletRequest request
     ) {
-        memberService.deleteAccount(currentMember.id());
+        memberService.deleteAccount(currentMember.id(), request);
         return ResponseEntity.ok(ApiResponse.success(MessageResponse.of("회원 탈퇴가 완료되었습니다.")));
     }
 }

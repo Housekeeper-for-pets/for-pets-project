@@ -37,6 +37,7 @@ public class AuthService {
                 .nickname(request.nickname())
                 .phone(request.phone())
                 .gender(request.gender())
+                .region(request.region())
                 .build();
 
         Member savedMember = memberRepository.save(member);
@@ -124,11 +125,11 @@ public class AuthService {
     }
 
     private void validateSignUpDuplicate(SignUpRequest request) {
-        if (memberRepository.existsByEmail(request.email())) {
+        if (memberRepository.countByEmailIncludingDeleted(request.email()) > 0) {
             throw new MemberException(MemberErrorCode.EMAIL_DUPLICATED);
         }
 
-        if (memberRepository.existsByNickname(request.nickname())) {
+        if (memberRepository.countByNicknameIncludingDeleted(request.nickname()) > 0) {
             throw new MemberException(MemberErrorCode.NICKNAME_DUPLICATED);
         }
     }

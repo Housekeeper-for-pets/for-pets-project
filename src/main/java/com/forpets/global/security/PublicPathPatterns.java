@@ -21,8 +21,8 @@ public final class PublicPathPatterns {
 
     public static final String[] PUBLIC_GET = {
             "/api/sitters",
-            "/api/sitters/*",
-            "/api/sitters/*/schedules",
+//            "/api/sitters/*",
+//            "/api/sitters/*/schedules",
             "/api/posts",
             "/api/posts/*"
     };

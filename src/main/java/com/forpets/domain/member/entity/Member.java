@@ -6,12 +6,14 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
 @Getter
 @Entity
 @Table(name = "member")
+@SQLRestriction("deleted = false")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member extends BaseEntity {
 
@@ -33,6 +35,10 @@ public class Member extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    private Region region;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private MemberGender gender;
 
     @Enumerated(EnumType.STRING)
@@ -43,6 +49,9 @@ public class Member extends BaseEntity {
     @Column(nullable = false, length = 20)
     private MemberStatus status;
 
+    @Column(nullable = false)
+    private boolean deleted = false;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -52,13 +61,15 @@ public class Member extends BaseEntity {
             String password,
             String nickname,
             String phone,
-            MemberGender gender
+            MemberGender gender,
+            Region region
     ) {
         this.email = email;
         this.password = password;
         this.nickname = nickname;
         this.phone = phone;
         this.gender = gender == null ? MemberGender.UNKNOWN : gender;
+        this.region = region == null ? Region.UNKNOWN : region;
         this.role = MemberRole.MEMBER;
         this.status = MemberStatus.ACTIVE;
     }
@@ -71,10 +82,11 @@ public class Member extends BaseEntity {
         this.role = MemberRole.MEMBER;
     }
 
-    public void updateProfile(String nickname, String phone, MemberGender gender) {
+    public void updateProfile(String nickname, String phone, MemberGender gender, Region region) {
         this.nickname = nickname;
         this.phone = phone;
         this.gender = gender == null ? MemberGender.UNKNOWN : gender;
+        this.region = region == null ? Region.UNKNOWN : region;
     }
 
     public void changePassword(String encodedPassword) {
@@ -82,11 +94,12 @@ public class Member extends BaseEntity {
     }
 
     public void delete() {
+        this.deleted = true;
         this.deletedAt = LocalDateTime.now();
     }
 
     public boolean isDeleted() {
-        return this.deletedAt != null;
+        return this.deleted;
     }
 
     public boolean isSuspended() {
@@ -94,6 +107,6 @@ public class Member extends BaseEntity {
     }
 
     public boolean isActive() {
-        return this.status == MemberStatus.ACTIVE && this.deletedAt == null;
+        return this.status == MemberStatus.ACTIVE && !this.deleted;
     }
 }

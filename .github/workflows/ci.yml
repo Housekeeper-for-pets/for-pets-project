@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+
+# 중복 실행 최소화 (concurrency): 같은 브랜치 연속 push 시 이전 실행 자동 취소
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ========== Job 1: 빌드 + 테스트 (항상 실행) ==========
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: JDK 21 셋업
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Gradle 캐시 설정
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: gradlew 실행 권한 부여
+        run: chmod +x ./gradlew
+
+      - name: 빌드 + 테스트
+        run: ./gradlew build
+
+  # ========== Job 2: Docker 빌드 + ECR 푸시 (머지 후에만) =========
+  push-image:
+    name: Push to ECR
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: AWS 자격증명 설정
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: ECR 로그인
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker 빌드 & ECR 푸시
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPO: forpets-backend
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$REPO:$TAG -t $REGISTRY/$REPO:latest .
+          docker push $REGISTRY/$REPO:$TAG
+          docker push $REGISTRY/$REPO:latest
+          echo "✅ 이미지 푸시 완료: $REGISTRY/$REPO:$TAG"
+
+  # ========== Job 3: EC2 배포 (main 머지 후에만) ==========
+  deploy:
+    name: Deploy to EC2
+    needs: push-image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: EC2에 배포
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # ECR 로그인
+            aws ecr get-login-password --region ap-northeast-2 \
+              | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+            # 새 이미지 가져오기
+            docker pull ${{ secrets.ECR_REGISTRY }}/forpets-backend:latest
+
+            # 기존 컨테이너 중지 & 삭제
+            docker stop forpets || true
+            docker rm forpets || true
+
+            # 새 컨테이너 실행
+            docker run -d --name forpets \
+              -p 8080:8080 \
+              -e DB_URL="${{ secrets.DB_URL }}" \
+              -e DB_USERNAME="${{ secrets.DB_USERNAME }}" \
+              -e DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              ${{ secrets.ECR_REGISTRY }}/forpets-backend:latest
+
+            # 헬스체크 (10초 대기 후 확인)
+            sleep 10
+            curl -f http://localhost:8080/health || echo "⚠️ 헬스체크 실패"
