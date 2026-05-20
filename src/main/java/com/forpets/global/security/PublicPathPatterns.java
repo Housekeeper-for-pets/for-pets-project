@@ -24,7 +24,7 @@ public final class PublicPathPatterns {
 //            "/api/sitters/*",
 //            "/api/sitters/*/schedules",
             "/api/posts",
-//            "/api/posts/*"
+            "/api/posts/*"
     };
 
     private PublicPathPatterns() {

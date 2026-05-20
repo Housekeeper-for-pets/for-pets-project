@@ -175,6 +175,15 @@ public class PostService {
                 .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
     }
 
+    public PostResponseDto getPost(Long postId) {
+        Post post = findById(postId);
+        Member member = memberService.findById(post.getMemberId());
+        List<PostPet> pets = postPetRepository.findAllByPostId(postId);
+        List<PostTimeSlot> timeSlots = postTimeSlotRepository
+                .findAllByPostIdOrderByTimeSlotInfoSequence(postId);
+        return PostResponseDto.from(post, member.getRegion(), pets, timeSlots);
+    }
+
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
             "createdAt", "updatedAt", "budgetAmount"
     );
