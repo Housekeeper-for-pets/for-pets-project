@@ -6,7 +6,9 @@ import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.sitter.dto.profile.CreateSitterRequest;
+import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
+import com.forpets.domain.sitter.dto.profile.SitterSearchCondition;
 import com.forpets.domain.sitter.dto.profile.UpdateSitterRequest;
 import com.forpets.domain.sitter.dto.profile.UpdateSitterStatusRequest;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
@@ -469,6 +471,192 @@ class SitterServiceTest {
 
             // when & then
             assertThatThrownBy(() -> sitterService.delete(member2Id))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+        }
+    }
+
+    @Nested
+    @DisplayName("시터 목록 조회 — GET /api/sitters")
+    class SearchSittersTest {
+
+        @Test
+        @DisplayName("[성공] 기본 조회 요청은 페이지 기본값과 createdAt 정렬로 repository에 위임된다")
+        void search_sitters_test_01() {
+            // given
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            SitterPageResponse response = SitterPageResponse.of(List.of(), 0, 0, 0, 10);
+            given(sitterProfileRepository.searchSitters(eq(condition), any())).willReturn(response);
+
+            // when
+            SitterPageResponse result = sitterService.searchSitters(condition, 0, 10, "createdAt");
+
+            // then
+            assertThat(result).isEqualTo(response);
+            then(sitterProfileRepository).should().searchSitters(eq(condition), any());
+        }
+
+        @Test
+        @DisplayName("[성공] 허용된 정렬 필드 pricePerHour, experienceYears는 조회 가능하다")
+        void search_sitters_test_02() {
+            // given
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            given(sitterProfileRepository.searchSitters(eq(condition), any()))
+                    .willReturn(SitterPageResponse.of(List.of(), 0, 0, 0, 10));
+
+            // when
+            sitterService.searchSitters(condition, 0, 10, "pricePerHour");
+            sitterService.searchSitters(condition, 0, 10, "experienceYears");
+
+            // then
+            then(sitterProfileRepository).should(times(2)).searchSitters(eq(condition), any());
+        }
+
+        @Test
+        @DisplayName("[실패] 허용되지 않은 sort 필드는 INVALID_SORT_FIELD를 반환한다")
+        void search_sitters_test_03() {
+            // given
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+
+            // when & then
+            assertThatThrownBy(() -> sitterService.searchSitters(condition, 0, 10, "hacked"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_SORT_FIELD));
+            then(sitterProfileRepository).shouldHaveNoInteractions();
+        }
+
+        @Test
+        @DisplayName("[실패] page가 음수이면 INVALID_PAGE_REQUEST를 반환한다")
+        void search_sitters_test_04() {
+            // given
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+
+            // when & then
+            assertThatThrownBy(() -> sitterService.searchSitters(condition, -1, 10, "createdAt"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+            then(sitterProfileRepository).shouldHaveNoInteractions();
+        }
+
+        @Test
+        @DisplayName("[실패] size가 0이면 INVALID_PAGE_REQUEST를 반환한다")
+        void search_sitters_test_05() {
+            // given
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+
+            // when & then
+            assertThatThrownBy(() -> sitterService.searchSitters(condition, 0, 0, "createdAt"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+            then(sitterProfileRepository).shouldHaveNoInteractions();
+        }
+
+        @Test
+        @DisplayName("[실패] size가 최대값을 초과하면 INVALID_PAGE_REQUEST를 반환한다")
+        void search_sitters_test_06() {
+            // given
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+
+            // when & then
+            assertThatThrownBy(() -> sitterService.searchSitters(condition, 0, 51, "createdAt"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+            then(sitterProfileRepository).shouldHaveNoInteractions();
+        }
+
+        @Test
+        @DisplayName("[실패] minPrice가 maxPrice보다 크면 INVALID_SEARCH_CONDITION을 반환한다")
+        void search_sitters_test_07() {
+            // given
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, 50000, 10000);
+
+            // when & then
+            assertThatThrownBy(() -> sitterService.searchSitters(condition, 0, 10, "createdAt"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_SEARCH_CONDITION));
+            then(sitterProfileRepository).shouldHaveNoInteractions();
+        }
+    }
+
+    @Nested
+    @DisplayName("시터 상세 조회 — GET /api/sitters/{sitterId}")
+    class GetSitterByIdTest {
+
+        @Test
+        @DisplayName("[성공] 존재하는 sitterId로 상세 조회하면 프로필 정보를 반환한다")
+        void get_sitter_by_id_test_01() {
+            // given
+            given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of());
+
+            // when
+            SitterResponseDto result = sitterService.getSitterById(sitterProfileId);
+
+            // then
+            assertThat(result.id()).isEqualTo(sitterProfileId);
+            assertThat(result.memberId()).isEqualTo(member1Id);
+            assertThat(result.region()).isEqualTo(Region.SEOCHO);
+            assertThat(result.introduction()).isEqualTo("반려동물을 사랑하는 시터입니다");
+            assertThat(result.experienceYears()).isEqualTo(3);
+            assertThat(result.possiblePetType()).isEqualTo(PossiblePetType.ALL);
+            assertThat(result.possiblePetSize()).isEqualTo(PossiblePetSize.ALL);
+            assertThat(result.pricePerHour()).isEqualTo(15000);
+            assertThat(result.status()).isEqualTo(SitterProfileStatus.RESERVABLE);
+        }
+
+        @Test
+        @DisplayName("[성공] schedules가 있는 시터 상세 조회 시 schedules를 포함한다")
+        void get_sitter_by_id_test_02() {
+            // given
+            SitterSchedule schedule = SitterSchedule.builder()
+                    .sitterProfileId(sitterProfileId)
+                    .dayOfWeek(DayOfWeek.MONDAY)
+                    .startTime(LocalTime.of(9, 0))
+                    .endTime(LocalTime.of(18, 0))
+                    .build();
+            ReflectionTestUtils.setField(schedule, "id", 1L);
+
+            given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of(schedule));
+
+            // when
+            SitterResponseDto result = sitterService.getSitterById(sitterProfileId);
+
+            // then
+            assertThat(result.schedules()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("[성공] schedules가 없는 시터 상세 조회 시 빈 schedules를 반환한다")
+        void get_sitter_by_id_test_03() {
+            // given
+            given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of());
+
+            // when
+            SitterResponseDto result = sitterService.getSitterById(sitterProfileId);
+
+            // then
+            assertThat(result.schedules()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("[실패] 존재하지 않는 sitterId는 SITTER_NOT_FOUND를 반환한다")
+        void get_sitter_by_id_test_04() {
+            // given
+            given(sitterProfileRepository.findById(99999L)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> sitterService.getSitterById(99999L))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
                             .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
