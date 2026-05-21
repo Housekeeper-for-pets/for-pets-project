@@ -44,6 +44,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PublicPathPatterns.ANY_METHOD).permitAll()
                         .requestMatchers(HttpMethod.POST, PublicPathPatterns.PUBLIC_POST).permitAll()
+                        .requestMatchers(HttpMethod.GET, PublicPathPatterns.AUTHENTICATED_GET).authenticated()
                         .requestMatchers(HttpMethod.GET, PublicPathPatterns.PUBLIC_GET).permitAll()
                         .anyRequest().authenticated()
                 )

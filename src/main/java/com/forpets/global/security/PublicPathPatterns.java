@@ -27,6 +27,10 @@ public final class PublicPathPatterns {
             "/api/posts/*"
     };
 
+    public static final String[] AUTHENTICATED_GET = {
+            "/api/posts/me"
+    };
+
     private PublicPathPatterns() {
     }
 }

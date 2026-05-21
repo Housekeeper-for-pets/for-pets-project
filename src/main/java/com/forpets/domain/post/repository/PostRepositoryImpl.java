@@ -1,14 +1,13 @@
 package com.forpets.domain.post.repository;
 
-import com.forpets.domain.member.entity.QMember;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.post.dto.PostPageResponse;
 import com.forpets.domain.post.dto.PostResponseDto;
 import com.forpets.domain.post.dto.PostSearchCondition;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
+import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.post.entity.PostTimeSlot;
-import com.forpets.domain.post.entity.QPost;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
@@ -116,6 +115,76 @@ public class PostRepositoryImpl implements PostRepositoryCustom {
         );
     }
 
+    @Override
+    public PostPageResponse searchMyPosts(Long memberId, PostStatus status, Pageable pageable) {
+        List<Tuple> tuples = queryFactory
+                .select(post, member.region)
+                .from(post)
+                .leftJoin(member).on(post.memberId.eq(member.id))
+                .where(
+                        post.memberId.eq(memberId),
+                        eqStatus(status)
+                )
+                .orderBy(getOrderSpecifiers(pageable))
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        JPAQuery<Long> countQuery = queryFactory
+                .select(post.count())
+                .from(post)
+                .leftJoin(member).on(post.memberId.eq(member.id))//where절에 member관련 조건 추가 될경우 main과 불일치 방지
+                .where(
+                        post.memberId.eq(memberId),
+                        eqStatus(status)
+                );
+
+        Long count = countQuery.fetchOne();
+        long totalElements = count != null ? count : 0L;
+        int totalPages = (int) Math.ceil((double) totalElements / pageable.getPageSize());
+
+        List<Long> postIds = tuples.stream()
+                .map(t -> t.get(post).getId())
+                .toList();
+
+        if (postIds.isEmpty()) {
+            return PostPageResponse.of(
+                    List.of(),
+                    totalElements,
+                    totalPages,
+                    pageable.getPageNumber(),
+                    pageable.getPageSize()
+            );
+        }
+
+        Map<Long, List<PostPet>> petsMap = postPetRepository.findAllByPostIdIn(postIds)
+                .stream()
+                .collect(Collectors.groupingBy(PostPet::getPostId));
+
+        Map<Long, List<PostTimeSlot>> timeSlotsMap = postTimeSlotRepository
+                .findAllByPostIdInOrderByTimeSlotInfoSequence(postIds)
+                .stream()
+                .collect(Collectors.groupingBy(PostTimeSlot::getPostId));
+
+        List<PostResponseDto> content = tuples.stream()
+                .map(t -> {
+                    Post p = t.get(post);
+                    Region memberRegion = t.get(member.region);
+                    List<PostPet> pets = petsMap.getOrDefault(p.getId(), List.of());
+                    List<PostTimeSlot> timeSlots = timeSlotsMap.getOrDefault(p.getId(), List.of());
+                    return PostResponseDto.from(p, memberRegion, pets, timeSlots);
+                })
+                .toList();
+
+        return PostPageResponse.of(
+                content,
+                totalElements,
+                totalPages,
+                pageable.getPageNumber(),
+                pageable.getPageSize()
+        );
+    }
+
     private BooleanExpression eqRegion(PostSearchCondition condition) {
         if (condition.region() == null) return null;
         return member.region.eq(condition.region());
@@ -129,6 +198,11 @@ public class PostRepositoryImpl implements PostRepositoryCustom {
     private BooleanExpression eqStatus(PostSearchCondition condition) {
         if (condition.status() == null) return null;
         return post.status.eq(condition.status());
+    }
+
+    private BooleanExpression eqStatus(PostStatus status) {
+        if (status == null) return null;
+        return post.status.eq(status);
     }
 
     private BooleanExpression containsKeyword(PostSearchCondition condition) {

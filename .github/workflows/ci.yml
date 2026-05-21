@@ -117,13 +117,17 @@ jobs:
             # 새 컨테이너 실행
             docker run -d --name forpets \
               -p 8080:8080 \
+              -v /home/ec2-user/config/application-prod.yml:/app/config/application-prod.yml \
               -e DB_URL="${{ secrets.DB_URL }}" \
               -e DB_USERNAME="${{ secrets.DB_USERNAME }}" \
               -e DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
-              -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+              -e JWT_SECRET_KEY="${{ secrets.JWT_SECRET_KEY }}" \
+              -e JWT_ACCESS_TOKEN_VALIDITY_TIME="${{ secrets.JWT_ACCESS_TOKEN_VALIDITY_TIME }}" \
+              -e JWT_REFRESH_TOKEN_VALIDITY_TIME="${{ secrets.JWT_REFRESH_TOKEN_VALIDITY_TIME }}" \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/ \
               ${{ secrets.ECR_REGISTRY }}/forpets-backend:latest
-
+ 
             # 헬스체크 (10초 대기 후 확인)
             sleep 10
             curl -f http://localhost:8080/health || echo "⚠️ 헬스체크 실패"
