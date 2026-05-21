@@ -108,4 +108,15 @@ public class Payment extends BaseEntity {
     public boolean isReady() {
         return this.status == PaymentStatus.READY;
     }
+
+    public boolean isConfirmable() {
+        return this.status == PaymentStatus.READY || this.status == PaymentStatus.PENDING;
+    }
+
+    public void approve(String portonePaymentId, String rawResponse) {
+        this.status = PaymentStatus.PAID;
+        this.portonePaymentId = portonePaymentId;
+        this.rawResponse = rawResponse;
+        this.approvedAt = LocalDateTime.now();
+    }
 }
