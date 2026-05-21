@@ -62,6 +62,7 @@ public class ProposalService {
         Proposal proposal = proposalRepository.save(Proposal.builder()
                 .postId(postId)
                 .sitterProfileId(sitter.getId())
+                .sitterMemberId(sitter.getMemberId())
                 .memberId(memberId)
                 .proposedPrice(request.proposedPrice())
                 .message(request.message())
@@ -253,7 +254,7 @@ public class ProposalService {
         Post post = postService.findById(proposal.getPostId());
 
 
-        if (!post.isOwnedBy(memberId) && !proposal.getMemberId().equals(memberId)) {
+        if (!post.isOwnedBy(memberId) && !proposal.getSitterMemberId().equals(memberId)) {
             throw new ProposalException(ProposalErrorCode.NOT_PROPOSAL_PARTY);
         }
     }

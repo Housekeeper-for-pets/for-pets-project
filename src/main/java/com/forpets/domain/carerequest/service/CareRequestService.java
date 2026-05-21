@@ -53,7 +53,6 @@ public class CareRequestService {
     private final SitterService sitterService;
     private final TimeSlotValidator timeSlotValidator;
     private final ReservationService reservationService;
-    private final MemberService memberService;
 
     /*
     케어 요청 등록
@@ -81,6 +80,7 @@ public class CareRequestService {
         CareRequest careRequest = careRequestRepository.save(CareRequest.builder()
                 .memberId(memberId)
                 .sitterProfileId(sitter.getId())
+                .sitterMemberId(sitter.getMemberId())
                 .careType(request.careType())
                 .message(request.message())
                 .requestPrice(request.requestPrice())
@@ -200,7 +200,7 @@ public class CareRequestService {
     }
 
     private void validateParty(Long memberId, CareRequest careRequest) {
-        if (!careRequest.isOwnedBy(memberId) && !careRequest.getSitterProfileId().equals(sitterService.findByMemberId(memberId).getId())) {
+        if (!careRequest.isOwnedBy(memberId) && !careRequest.getSitterMemberId().equals(memberId)) {
             throw new CareRequestException(CareRequestErrorCode.NOT_CARE_REQUEST_PARTY);
         }
     }
