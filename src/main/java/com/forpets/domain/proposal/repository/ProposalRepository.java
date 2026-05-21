@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface ProposalRepository extends JpaRepository<Proposal, Long> {
 
-    boolean existsByPostIdAndSitterProfileId(Long postId, Long sitterProfileId);
+    boolean existsByPostIdAndSitterProfileIdAndStatus(Long postId, Long sitterProfileId, ProposalStatus status);
 
     List<Proposal> findAllByPostId(Long postId);
 
