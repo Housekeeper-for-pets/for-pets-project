@@ -87,7 +87,7 @@ public class PaymentService {
     }
 
     private void validatePaymentParty(Long memberId, Reservation reservation, PaymentRole paymentRole) {
-        if (paymentRole == PaymentRole.OWNER && !reservation.isGuardian(memberId)) {
+        if (paymentRole == PaymentRole.GUARDIAN && !reservation.isGuardian(memberId)) {
             throw new PaymentException(PaymentErrorCode.NOT_PAYMENT_PARTY);
         }
 
@@ -97,7 +97,7 @@ public class PaymentService {
     }
 
     private void validateNotAlreadyPaid(ReservationPayment reservationPayment, PaymentRole paymentRole) {
-        if (paymentRole == PaymentRole.OWNER && reservationPayment.isGuardianPaid()) {
+        if (paymentRole == PaymentRole.GUARDIAN && reservationPayment.isGuardianPaid()) {
             throw new ReservationException(ReservationErrorCode.ALREADY_PAID);
         }
 
@@ -116,14 +116,14 @@ public class PaymentService {
     }
 
     private Long getOriginalAmount(ReservationPayment reservationPayment, PaymentRole paymentRole) {
-        if (paymentRole == PaymentRole.OWNER) {
+        if (paymentRole == PaymentRole.GUARDIAN) {
             return (long) reservationPayment.getGuardianPrice();
         }
         return (long) reservationPayment.getSitterPrice();
     }
 
     private PaymentType getPaymentType(PaymentRole paymentRole) {
-        if (paymentRole == PaymentRole.OWNER) {
+        if (paymentRole == PaymentRole.GUARDIAN) {
             return PaymentType.FULL;
         }
         return PaymentType.DEPOSIT;
