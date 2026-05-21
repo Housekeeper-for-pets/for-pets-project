@@ -15,6 +15,8 @@ import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.exception.ProposalErrorCode;
 import com.forpets.domain.proposal.exception.ProposalException;
 import com.forpets.domain.proposal.repository.ProposalRepository;
+import com.forpets.domain.reservation.exception.ReservationErrorCode;
+import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.service.SitterService;
@@ -141,17 +143,16 @@ public class ProposalService {
         validatePostAuthor(memberId, post);
         validatePostOpen(post);
 
-        // 제안 채택
+        List<PostPet> postPets = postService.findPetsByPostId(post.getId());
+        List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(post.getId());
+
+        if (reservationService.hasConfirmedConflict(sitterProfile.getId(), postTimeSlots)) {
+            throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
+        }
+
         proposal.accept();
 
-        log.info("[ProposalService] PENDING 상태의 예약 생성");
-
-        // Reservation 자동 생성
-        // 동기 처리로 구현하는게 좋을듯 나중에 주석 빼기
-
-         List<PostPet> postPets = postService.findPetsByPostId(post.getId());
-         List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(post.getId());
-         reservationService.createFromProposal(proposal, post, sitterProfile.getMemberId(), postPets, postTimeSlots);
+        reservationService.createFromProposal(proposal, post, sitterProfile.getMemberId(), postPets, postTimeSlots);
 
         // 비동기 처리 (eventListener 또는 kafka) 는 알림이나 로그.. 같은거 작성 할 때 쓰자 ~
 
@@ -227,7 +228,7 @@ public class ProposalService {
     잘못 보낸 제안이 있으면 취소하고 다시 넣을 수 있으면 좋으니까 -> 수정 안 만들어도 됨
      */
     private void validateNoDuplicate(Long postId, Long sitterProfileId) {
-        if (proposalRepository.existsByPostIdAndSitterProfileId(postId, sitterProfileId)) {
+        if (proposalRepository.existsByPostIdAndSitterProfileIdAndStatus(postId, sitterProfileId, ProposalStatus.PENDING)) {
             throw new ProposalException(ProposalErrorCode.DUPLICATE_PROPOSAL);
         }
     }
