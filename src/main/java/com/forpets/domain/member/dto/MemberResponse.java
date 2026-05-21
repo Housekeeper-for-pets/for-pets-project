@@ -13,11 +13,12 @@ public record MemberResponse(
         Region region,
         MemberRole role,
         MemberStatus status,
+        int couponCount,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
 
-    public static MemberResponse from(Member member) {
+    public static MemberResponse of(Member member, int couponCount) {
         return new MemberResponse(
                 member.getId(),
                 member.getEmail(),
@@ -27,6 +28,7 @@ public record MemberResponse(
                 member.getRegion(),
                 member.getRole(),
                 member.getStatus(),
+                couponCount,
                 member.getCreatedAt(),
                 member.getUpdatedAt()
         );

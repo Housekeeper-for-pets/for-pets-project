@@ -45,7 +45,7 @@ public class Pet extends BaseEntity {
     @Column(length = 20)
     private PetGender gender;
 
-    @Column(length = 500)
+    @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
     @Column(columnDefinition = "TEXT")
