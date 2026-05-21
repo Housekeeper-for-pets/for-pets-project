@@ -583,4 +583,83 @@ class SitterServiceTest {
             then(sitterProfileRepository).shouldHaveNoInteractions();
         }
     }
+
+    @Nested
+    @DisplayName("시터 상세 조회 — GET /api/sitters/{sitterId}")
+    class GetSitterByIdTest {
+
+        @Test
+        @DisplayName("[성공] 존재하는 sitterId로 상세 조회하면 프로필 정보를 반환한다")
+        void get_sitter_by_id_test_01() {
+            // given
+            given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of());
+
+            // when
+            SitterResponseDto result = sitterService.getSitterById(sitterProfileId);
+
+            // then
+            assertThat(result.id()).isEqualTo(sitterProfileId);
+            assertThat(result.memberId()).isEqualTo(member1Id);
+            assertThat(result.region()).isEqualTo(Region.SEOCHO);
+            assertThat(result.introduction()).isEqualTo("반려동물을 사랑하는 시터입니다");
+            assertThat(result.experienceYears()).isEqualTo(3);
+            assertThat(result.possiblePetType()).isEqualTo(PossiblePetType.ALL);
+            assertThat(result.possiblePetSize()).isEqualTo(PossiblePetSize.ALL);
+            assertThat(result.pricePerHour()).isEqualTo(15000);
+            assertThat(result.status()).isEqualTo(SitterProfileStatus.RESERVABLE);
+        }
+
+        @Test
+        @DisplayName("[성공] schedules가 있는 시터 상세 조회 시 schedules를 포함한다")
+        void get_sitter_by_id_test_02() {
+            // given
+            SitterSchedule schedule = SitterSchedule.builder()
+                    .sitterProfileId(sitterProfileId)
+                    .dayOfWeek(DayOfWeek.MONDAY)
+                    .startTime(LocalTime.of(9, 0))
+                    .endTime(LocalTime.of(18, 0))
+                    .build();
+            ReflectionTestUtils.setField(schedule, "id", 1L);
+
+            given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of(schedule));
+
+            // when
+            SitterResponseDto result = sitterService.getSitterById(sitterProfileId);
+
+            // then
+            assertThat(result.schedules()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("[성공] schedules가 없는 시터 상세 조회 시 빈 schedules를 반환한다")
+        void get_sitter_by_id_test_03() {
+            // given
+            given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of());
+
+            // when
+            SitterResponseDto result = sitterService.getSitterById(sitterProfileId);
+
+            // then
+            assertThat(result.schedules()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("[실패] 존재하지 않는 sitterId는 SITTER_NOT_FOUND를 반환한다")
+        void get_sitter_by_id_test_04() {
+            // given
+            given(sitterProfileRepository.findById(99999L)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> sitterService.getSitterById(99999L))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+        }
+    }
 }
