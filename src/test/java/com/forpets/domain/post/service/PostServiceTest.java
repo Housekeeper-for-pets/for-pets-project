@@ -8,10 +8,12 @@ import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.entity.PetGender;
 import com.forpets.domain.pet.entity.PetSize;
 import com.forpets.domain.pet.entity.PetSpecies;
+import com.forpets.domain.pet.exception.PetErrorCode;
+import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.service.PetService;
-import com.forpets.domain.post.dto.PostPageResponse;
+import com.forpets.domain.post.dto.CreatePostRequest;
 import com.forpets.domain.post.dto.PostResponseDto;
-import com.forpets.domain.post.dto.PostSearchCondition;
+import com.forpets.domain.post.dto.UpdatePostRequest;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostStatus;
@@ -21,11 +23,17 @@ import com.forpets.domain.post.exception.PostException;
 import com.forpets.domain.post.repository.PostPetRepository;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.repository.PostTimeSlotRepository;
+import com.forpets.domain.proposal.entity.ProposalStatus;
+import com.forpets.domain.proposal.exception.ProposalErrorCode;
+import com.forpets.domain.proposal.exception.ProposalException;
 import com.forpets.domain.proposal.repository.ProposalRepository;
 import com.forpets.global.common.CareType;
 import com.forpets.global.embed.TimeSlotValidator;
+import com.forpets.global.embed.dto.TimeSlotRequest;
+import com.forpets.global.embed.entity.PetSnapshot;
 import com.forpets.global.embed.entity.TimeSlotInfo;
-import com.forpets.global.exception.BusinessException;
+import com.forpets.global.embed.exception.TimeSlotErrorCode;
+import com.forpets.global.embed.exception.TimeSlotException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -41,13 +49,8 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.then;
-import static org.mockito.BDDMockito.times;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.BDDMockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PostServiceTest {
@@ -76,233 +79,442 @@ class PostServiceTest {
     @Mock
     private ProposalRepository proposalRepository;
 
-    private final Long memberId = 1L;
-    private final Long postId = 100L;
+    // ── 테스트 픽스처 ──
+    private Member member1;       // 째길중 — 공고 작성자
+    private Member member2;       // 타코맘 — 제3자
+    private Pet pet1;             // member1의 타코
+    private Post post;            // OPEN 상태 공고
 
-    private Member member;
-    private Post post;
-    private Pet pet;
+    private final Long member1Id = 1L;
+    private final Long member2Id = 2L;
+    private final Long pet1Id = 10L;
+    private final Long postId = 300L;
 
     @BeforeEach
     void setUp() {
-        member = Member.builder()
-                .email("post-writer@test.com")
+        // member1: 째길중 (SEOCHO)
+        member1 = Member.builder()
+                .email("giljung@test.com")
                 .password("password123")
-                .nickname("post-writer")
+                .nickname("째길중")
                 .phone("010-1111-1111")
-                .gender(MemberGender.UNKNOWN)
-                .region(Region.GANGNAM)
+                .gender(MemberGender.MALE)
+                .region(Region.SEOCHO)
                 .build();
-        ReflectionTestUtils.setField(member, "id", memberId);
+        ReflectionTestUtils.setField(member1, "id", member1Id);
 
+        // member2: 타코맘 (DONGJAK)
+        member2 = Member.builder()
+                .email("jiwon@test.com")
+                .password("password123")
+                .nickname("타코맘")
+                .phone("010-2222-2222")
+                .gender(MemberGender.FEMALE)
+                .region(Region.DONGJAK)
+                .build();
+        ReflectionTestUtils.setField(member2, "id", member2Id);
+
+        // member1의 반려동물
+        pet1 = Pet.builder()
+                .memberId(member1Id)
+                .name("타코")
+                .species(PetSpecies.CAT)
+                .breed("코리안숏헤어")
+                .size(PetSize.SMALL)
+                .age(4)
+                .gender(PetGender.MALE)
+                .note("길냥이에요, 많이 울어요, 귀여워요")
+                .build();
+        ReflectionTestUtils.setField(pet1, "id", pet1Id);
+
+        // OPEN 상태 공고
         post = Post.builder()
-                .memberId(memberId)
-                .title("강아지 산책 공고")
-                .content("강아지 산책을 도와주세요")
+                .memberId(member1Id)
+                .title("타코 돌봐주실 분 구합니다")
+                .content("3일간 출장이라 돌봐주실 분 찾아요")
                 .careType(CareType.VISIT)
-                .budgetAmount(50000)
+                .budgetAmount(30000)
                 .build();
         ReflectionTestUtils.setField(post, "id", postId);
-
-        pet = Pet.builder()
-                .memberId(memberId)
-                .name("초코")
-                .species(PetSpecies.DOG)
-                .breed("푸들")
-                .size(PetSize.SMALL)
-                .age(3)
-                .gender(PetGender.MALE)
-                .build();
-        ReflectionTestUtils.setField(pet, "id", 10L);
     }
 
-    @Nested
-    @DisplayName("공고 목록 조회 — GET /api/posts")
-    class SearchPostsTest {
-
-        @Test
-        @DisplayName("[성공] 기본 조회 요청은 repository에 위임된다")
-        void search_posts_test_01() {
-            PostSearchCondition condition = new PostSearchCondition(null, null, null, null);
-            PostPageResponse response = PostPageResponse.of(List.of(), 0, 0, 0, 10);
-            given(postRepository.searchPosts(eq(condition), any())).willReturn(response);
-
-            PostPageResponse result = postService.searchPosts(condition, 0, 10, "createdAt");
-
-            assertThat(result).isEqualTo(response);
-            then(postRepository).should().searchPosts(eq(condition), any());
-        }
-
-        @Test
-        @DisplayName("[성공] 허용된 정렬 필드 updatedAt, budgetAmount는 조회 가능하다")
-        void search_posts_test_02() {
-            PostSearchCondition condition = new PostSearchCondition(null, null, null, null);
-            given(postRepository.searchPosts(eq(condition), any()))
-                    .willReturn(PostPageResponse.of(List.of(), 0, 0, 0, 10));
-
-            postService.searchPosts(condition, 0, 10, "updatedAt");
-            postService.searchPosts(condition, 0, 10, "budgetAmount");
-
-            then(postRepository).should(times(2)).searchPosts(eq(condition), any());
-        }
-
-        @Test
-        @DisplayName("[실패] 허용되지 않은 sort 필드는 INVALID_SORT_FIELD를 반환한다")
-        void search_posts_test_03() {
-            PostSearchCondition condition = new PostSearchCondition(null, null, null, null);
-
-            assertThatThrownBy(() -> postService.searchPosts(condition, 0, 10, "hacked"))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
-                            .isEqualTo(PostErrorCode.INVALID_SORT_FIELD));
-        }
-
-        @Test
-        @DisplayName("[실패] page가 음수이면 INVALID_PAGE_REQUEST를 반환한다")
-        void search_posts_test_04() {
-            PostSearchCondition condition = new PostSearchCondition(null, null, null, null);
-
-            assertThatThrownBy(() -> postService.searchPosts(condition, -1, 10, "createdAt"))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
-                            .isEqualTo(PostErrorCode.INVALID_PAGE_REQUEST));
-        }
-
-        @Test
-        @DisplayName("[실패] size가 0이면 INVALID_PAGE_REQUEST를 반환한다")
-        void search_posts_test_05() {
-            PostSearchCondition condition = new PostSearchCondition(null, null, null, null);
-
-            assertThatThrownBy(() -> postService.searchPosts(condition, 0, 0, "createdAt"))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
-                            .isEqualTo(PostErrorCode.INVALID_PAGE_REQUEST));
-        }
-
-        @Test
-        @DisplayName("[실패] size가 51이면 INVALID_PAGE_REQUEST를 반환한다")
-        void search_posts_test_06() {
-            PostSearchCondition condition = new PostSearchCondition(null, null, null, null);
-
-            assertThatThrownBy(() -> postService.searchPosts(condition, 0, 51, "createdAt"))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
-                            .isEqualTo(PostErrorCode.INVALID_PAGE_REQUEST));
-        }
+    // ── 헬퍼 ──
+    private List<TimeSlotRequest> validTimeSlots() {
+        return List.of(
+                new TimeSlotRequest(
+                        LocalDate.now().plusDays(3),
+                        LocalTime.of(10, 0),
+                        LocalTime.of(14, 0)
+                )
+        );
     }
 
+    private PostPet createPostPet(Long pId, Pet pet) {
+        PostPet postPet = PostPet.createFrom(pId, pet);
+        ReflectionTestUtils.setField(postPet, "id", pet.getId() + 100);
+        return postPet;
+    }
+
+    private PostTimeSlot createPostTimeSlot(Long pId, int sequence) {
+        TimeSlotInfo info = TimeSlotInfo.of(
+                LocalDate.now().plusDays(3), LocalTime.of(10, 0), LocalTime.of(14, 0), sequence);
+        PostTimeSlot slot = PostTimeSlot.create(pId, info);
+        ReflectionTestUtils.setField(slot, "id", (long) (sequence + 400));
+        return slot;
+    }
+
+    // ========================================================
+    // 공고 등록 — POST /api/posts
+    // ========================================================
     @Nested
-    @DisplayName("공고 단건 조회 — GET /api/posts/{postId}")
-    class GetPostTest {
+    @DisplayName("공고 등록 — POST /api/posts")
+    class CreatePostTest {
 
         @Test
-        @DisplayName("[성공] 존재하는 공고 단건 조회 시 pets와 timeSlots를 포함한다")
-        void get_post_test_01() {
-            PostPet postPet = PostPet.createFrom(postId, pet);
-            PostTimeSlot timeSlot = PostTimeSlot.create(
-                    postId,
-                    TimeSlotInfo.of(LocalDate.of(2026, 6, 1), LocalTime.of(10, 0), LocalTime.of(12, 0), 1)
+        @DisplayName("[성공] 보호자가 공고 등록 성공 — 초기 상태 OPEN")
+        void post_test_01() {
+            // given
+            CreatePostRequest request = new CreatePostRequest(
+                    "타코 돌봐주실 분 구합니다", "3일간 출장이라 돌봐주실 분 찾아요",
+                    List.of(pet1Id), CareType.VISIT, 30000, validTimeSlots()
             );
-            ReflectionTestUtils.setField(timeSlot, "id", 20L);
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(petService.findById(pet1Id)).willReturn(pet1);
+            willDoNothing().given(timeSlotValidator).validate(anyList());
+            given(postRepository.save(any(Post.class))).willReturn(post);
+            given(postPetRepository.saveAll(anyList())).willReturn(List.of(createPostPet(postId, pet1)));
+            given(postTimeSlotRepository.saveAll(anyList())).willReturn(List.of(createPostTimeSlot(postId, 1)));
 
-            given(postRepository.findById(postId)).willReturn(Optional.of(post));
-            given(memberService.findById(memberId)).willReturn(member);
-            given(postPetRepository.findAllByPostId(postId)).willReturn(List.of(postPet));
-            given(postTimeSlotRepository.findAllByPostIdOrderByTimeSlotInfoSequence(postId)).willReturn(List.of(timeSlot));
+            // when
+            PostResponseDto result = postService.create(member1Id, request);
 
-            PostResponseDto result = postService.getPost(postId);
-
-            assertThat(result.id()).isEqualTo(postId);
-            assertThat(result.memberId()).isEqualTo(memberId);
-            assertThat(result.region()).isEqualTo(Region.GANGNAM);
+            // then
+            assertThat(result.memberId()).isEqualTo(member1Id);
+            assertThat(result.title()).isEqualTo("타코 돌봐주실 분 구합니다");
+            assertThat(result.content()).isEqualTo("3일간 출장이라 돌봐주실 분 찾아요");
+            assertThat(result.careType()).isEqualTo(CareType.VISIT);
+            assertThat(result.budgetAmount()).isEqualTo(30000);
+            assertThat(result.status()).isEqualTo(PostStatus.OPEN);
+            assertThat(result.region()).isEqualTo(Region.SEOCHO);
             assertThat(result.pets()).hasSize(1);
             assertThat(result.timeSlots()).hasSize(1);
+            then(postRepository).should().save(any(Post.class));
         }
 
         @Test
-        @DisplayName("[실패] 존재하지 않는 공고는 POST_NOT_FOUND를 반환한다")
-        void get_post_test_02() {
-            given(postRepository.findById(99999L)).willReturn(Optional.empty());
+        @DisplayName("[실패] 타인의 반려동물로 공고 등록 시 차단")
+        void post_test_02() {
+            // given — member2의 pet으로 member1이 등록
+            Pet otherPet = Pet.builder()
+                    .memberId(member2Id)
+                    .name("연두")
+                    .species(PetSpecies.DOG)
+                    .breed("포메라니안")
+                    .size(PetSize.SMALL)
+                    .age(1)
+                    .gender(PetGender.FEMALE)
+                    .build();
+            ReflectionTestUtils.setField(otherPet, "id", 11L);
 
-            assertThatThrownBy(() -> postService.getPost(99999L))
+            CreatePostRequest request = new CreatePostRequest(
+                    "제목", "내용", List.of(11L),
+                    CareType.VISIT, 30000, validTimeSlots()
+            );
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(petService.findById(11L)).willReturn(otherPet);
+
+            // when & then
+            assertThatThrownBy(() -> postService.create(member1Id, request))
+                    .isInstanceOf(PetException.class)
+                    .satisfies(ex -> assertThat(((PetException) ex).getErrorCode())
+                            .isEqualTo(PetErrorCode.NOT_PET_OWNER));
+        }
+
+        @Test
+        @DisplayName("[실패] 과거 날짜로 공고 등록 시 차단")
+        void post_test_03() {
+            // given
+            CreatePostRequest request = new CreatePostRequest(
+                    "제목", "내용", List.of(pet1Id),
+                    CareType.VISIT, 30000, validTimeSlots()
+            );
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(petService.findById(pet1Id)).willReturn(pet1);
+            willThrow(new TimeSlotException(TimeSlotErrorCode.PAST_DATE_NOT_ALLOWED))
+                    .given(timeSlotValidator).validate(anyList());
+
+            // when & then
+            assertThatThrownBy(() -> postService.create(member1Id, request))
+                    .isInstanceOf(TimeSlotException.class)
+                    .satisfies(ex -> assertThat(((TimeSlotException) ex).getErrorCode())
+                            .isEqualTo(TimeSlotErrorCode.PAST_DATE_NOT_ALLOWED));
+        }
+    }
+
+    // ========================================================
+    // 공고 수정 — PUT /api/posts/{postId}
+    // ========================================================
+    @Nested
+    @DisplayName("공고 수정 — PUT /api/posts/{postId}")
+    class UpdatePostTest {
+
+        @Test
+        @DisplayName("[성공] OPEN 상태 공고 수정 성공 — PostPet, PostTimeSlot 전체 교체")
+        void post_test_04() {
+            // given
+            UpdatePostRequest request = new UpdatePostRequest(
+                    "수정된 제목", "수정된 내용",
+                    List.of(pet1Id), CareType.BOARDING, 50000, validTimeSlots()
+            );
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
+            given(proposalRepository.existsByPostIdAndStatusIn(eq(postId), anyList())).willReturn(false);
+            given(petService.findById(pet1Id)).willReturn(pet1);
+            willDoNothing().given(timeSlotValidator).validate(anyList());
+            given(postPetRepository.saveAll(anyList())).willReturn(List.of(createPostPet(postId, pet1)));
+            given(postTimeSlotRepository.saveAll(anyList())).willReturn(List.of(createPostTimeSlot(postId, 1)));
+
+            // when
+            PostResponseDto result = postService.update(member1Id, postId, request);
+
+            // then
+            assertThat(result.title()).isEqualTo("수정된 제목");
+            assertThat(result.content()).isEqualTo("수정된 내용");
+            assertThat(result.careType()).isEqualTo(CareType.BOARDING);
+            assertThat(result.budgetAmount()).isEqualTo(50000);
+            then(postPetRepository).should().deleteAllByPostId(postId);
+            then(postPetRepository).should().flush();
+            then(postTimeSlotRepository).should().deleteAllByPostId(postId);
+            then(postTimeSlotRepository).should().flush();
+        }
+
+        @Test
+        @DisplayName("[실패] 본인 공고가 아닌 공고 수정 시 차단")
+        void post_test_05() {
+            // given
+            UpdatePostRequest request = new UpdatePostRequest(
+                    "수정", "내용", List.of(pet1Id),
+                    CareType.VISIT, 30000, validTimeSlots()
+            );
+            given(memberService.findById(member2Id)).willReturn(member2);
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
+
+            // when & then
+            assertThatThrownBy(() -> postService.update(member2Id, postId, request))
+                    .isInstanceOf(PostException.class)
+                    .satisfies(ex -> assertThat(((PostException) ex).getErrorCode())
+                            .isEqualTo(PostErrorCode.NOT_POST_AUTHOR));
+        }
+
+        @Test
+        @DisplayName("[실패] CLOSED 상태 공고 수정 시 차단")
+        void post_test_06() {
+            // given
+            post.close(); // CLOSED 상태로 변경
+            UpdatePostRequest request = new UpdatePostRequest(
+                    "수정", "내용", List.of(pet1Id),
+                    CareType.VISIT, 30000, validTimeSlots()
+            );
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
+
+            // when & then
+            assertThatThrownBy(() -> postService.update(member1Id, postId, request))
+                    .isInstanceOf(PostException.class)
+                    .satisfies(ex -> assertThat(((PostException) ex).getErrorCode())
+                            .isEqualTo(PostErrorCode.POST_NOT_OPEN));
+        }
+
+        @Test
+        @DisplayName("[실패] active Proposal이 있는 공고 수정 시 차단")
+        void post_test_07() {
+            // given
+            UpdatePostRequest request = new UpdatePostRequest(
+                    "수정", "내용", List.of(pet1Id),
+                    CareType.VISIT, 30000, validTimeSlots()
+            );
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
+            given(proposalRepository.existsByPostIdAndStatusIn(
+                    eq(postId), eq(List.of(ProposalStatus.PENDING, ProposalStatus.ACCEPTED))))
+                    .willReturn(true);
+
+            // when & then
+            assertThatThrownBy(() -> postService.update(member1Id, postId, request))
+                    .isInstanceOf(ProposalException.class)
+                    .satisfies(ex -> assertThat(((ProposalException) ex).getErrorCode())
+                            .isEqualTo(ProposalErrorCode.HAS_ACTIVE_PROPOSAL));
+        }
+
+        @Test
+        @DisplayName("[실패] 존재하지 않는 공고 수정 시도")
+        void post_test_08() {
+            // given
+            UpdatePostRequest request = new UpdatePostRequest(
+                    "수정", "내용", List.of(pet1Id),
+                    CareType.VISIT, 30000, validTimeSlots()
+            );
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(postRepository.findById(999L)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> postService.update(member1Id, 999L, request))
                     .isInstanceOf(PostException.class)
                     .satisfies(ex -> assertThat(((PostException) ex).getErrorCode())
                             .isEqualTo(PostErrorCode.POST_NOT_FOUND));
         }
     }
 
+    // ========================================================
+    // 공고 닫기 — PATCH /api/posts/{postId}/close
+    // ========================================================
     @Nested
-    @DisplayName("내가 작성한 공고 조회 — GET /api/posts/me")
-    class SearchMyPostsTest {
+    @DisplayName("공고 닫기 — PATCH /api/posts/{postId}/close")
+    class ClosePostTest {
 
         @Test
-        @DisplayName("[성공] 기본 조회 요청은 memberId 기준으로 repository에 위임된다")
-        void search_my_posts_test_01() {
-            PostPageResponse response = PostPageResponse.of(List.of(), 0, 0, 0, 10);
-            given(postRepository.searchMyPosts(eq(memberId), eq(null), any())).willReturn(response);
+        @DisplayName("[성공] OPEN 상태 공고 CLOSED 변경 성공")
+        void post_test_09() {
+            // given
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
+            given(proposalRepository.existsByPostIdAndStatusIn(eq(postId), anyList())).willReturn(false);
+            given(postPetRepository.findAllByPostId(postId)).willReturn(List.of(createPostPet(postId, pet1)));
+            given(postTimeSlotRepository.findAllByPostIdOrderByTimeSlotInfoSequence(postId))
+                    .willReturn(List.of(createPostTimeSlot(postId, 1)));
 
-            PostPageResponse result = postService.searchMyPosts(memberId, null, 0, 10);
+            // when
+            PostResponseDto result = postService.closePost(member1Id, postId);
 
-            assertThat(result).isEqualTo(response);
-            then(postRepository).should().searchMyPosts(eq(memberId), eq(null), any());
+            // then
+            assertThat(result.status()).isEqualTo(PostStatus.CLOSED);
         }
 
         @Test
-        @DisplayName("[성공] status=OPEN 필터 조회")
-        void search_my_posts_test_02() {
-            given(postRepository.searchMyPosts(eq(memberId), eq(PostStatus.OPEN), any()))
-                    .willReturn(PostPageResponse.of(List.of(), 0, 0, 0, 10));
+        @DisplayName("[실패] 본인 공고가 아닌 공고 닫기 시 차단")
+        void post_test_10() {
+            // given
+            given(memberService.findById(member2Id)).willReturn(member2);
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
 
-            postService.searchMyPosts(memberId, "OPEN", 0, 10);
-
-            then(postRepository).should().searchMyPosts(eq(memberId), eq(PostStatus.OPEN), any());
-        }
-
-        @Test
-        @DisplayName("[성공] status=CLOSED 필터 조회")
-        void search_my_posts_test_03() {
-            given(postRepository.searchMyPosts(eq(memberId), eq(PostStatus.CLOSED), any()))
-                    .willReturn(PostPageResponse.of(List.of(), 0, 0, 0, 10));
-
-            postService.searchMyPosts(memberId, "CLOSED", 0, 10);
-
-            then(postRepository).should().searchMyPosts(eq(memberId), eq(PostStatus.CLOSED), any());
-        }
-
-        @Test
-        @DisplayName("[실패] 잘못된 status 값은 INVALID_POST_STATUS를 반환한다")
-        void search_my_posts_test_04() {
-            assertThatThrownBy(() -> postService.searchMyPosts(memberId, "INVALID", 0, 10))
+            // when & then
+            assertThatThrownBy(() -> postService.closePost(member2Id, postId))
                     .isInstanceOf(PostException.class)
                     .satisfies(ex -> assertThat(((PostException) ex).getErrorCode())
-                            .isEqualTo(PostErrorCode.INVALID_POST_STATUS));
+                            .isEqualTo(PostErrorCode.NOT_POST_AUTHOR));
         }
 
         @Test
-        @DisplayName("[실패] page가 음수이면 INVALID_PAGE_REQUEST를 반환한다")
-        void search_my_posts_test_05() {
-            assertThatThrownBy(() -> postService.searchMyPosts(memberId, null, -1, 10))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
-                            .isEqualTo(PostErrorCode.INVALID_PAGE_REQUEST));
+        @DisplayName("[실패] active Proposal이 있는 공고 닫기 시 차단")
+        void post_test_11() {
+            // given
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
+            given(proposalRepository.existsByPostIdAndStatusIn(
+                    eq(postId), eq(List.of(ProposalStatus.PENDING, ProposalStatus.ACCEPTED))))
+                    .willReturn(true);
+
+            // when & then
+            assertThatThrownBy(() -> postService.closePost(member1Id, postId))
+                    .isInstanceOf(ProposalException.class)
+                    .satisfies(ex -> assertThat(((ProposalException) ex).getErrorCode())
+                            .isEqualTo(ProposalErrorCode.HAS_ACTIVE_PROPOSAL));
         }
 
         @Test
-        @DisplayName("[실패] size가 0이면 INVALID_PAGE_REQUEST를 반환한다")
-        void search_my_posts_test_06() {
-            assertThatThrownBy(() -> postService.searchMyPosts(memberId, null, 0, 0))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
-                            .isEqualTo(PostErrorCode.INVALID_PAGE_REQUEST));
+        @DisplayName("[실패] 이미 CLOSED 상태 공고 닫기 시 차단")
+        void post_test_12() {
+            // given
+            post.close(); // 사전에 CLOSED 상태로 변경
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
+            given(proposalRepository.existsByPostIdAndStatusIn(eq(postId), anyList())).willReturn(false);
+
+            // when & then
+            assertThatThrownBy(() -> postService.closePost(member1Id, postId))
+                    .isInstanceOf(PostException.class)
+                    .satisfies(ex -> assertThat(((PostException) ex).getErrorCode())
+                            .isEqualTo(PostErrorCode.INVALID_STATUS_TRANSITION));
         }
 
         @Test
-        @DisplayName("[실패] size가 51이면 INVALID_PAGE_REQUEST를 반환한다")
-        void search_my_posts_test_07() {
-            assertThatThrownBy(() -> postService.searchMyPosts(memberId, null, 0, 51))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
-                            .isEqualTo(PostErrorCode.INVALID_PAGE_REQUEST));
+        @DisplayName("[실패] 존재하지 않는 공고 닫기 시도")
+        void post_test_13() {
+            // given
+            given(memberService.findById(member1Id)).willReturn(member1);
+            given(postRepository.findById(999L)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> postService.closePost(member1Id, 999L))
+                    .isInstanceOf(PostException.class)
+                    .satisfies(ex -> assertThat(((PostException) ex).getErrorCode())
+                            .isEqualTo(PostErrorCode.POST_NOT_FOUND));
+        }
+    }
+
+    // ========================================================
+    // 공고 삭제 — DELETE /api/posts/{postId}
+    // ========================================================
+    @Nested
+    @DisplayName("공고 삭제 — DELETE /api/posts/{postId}")
+    class DeletePostTest {
+
+        @Test
+        @DisplayName("[성공] active Proposal 없는 공고 삭제 성공")
+        void post_test_14() {
+            // given
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
+            given(proposalRepository.existsByPostIdAndStatusIn(eq(postId), anyList())).willReturn(false);
+
+            // when
+            postService.delete(member1Id, postId);
+
+            // then
+            assertThat(post.isDeleted()).isTrue();
+            assertThat(post.getDeletedAt()).isNotNull();
+            assertThat(post.getStatus()).isEqualTo(PostStatus.CLOSED);
+        }
+
+        @Test
+        @DisplayName("[실패] 본인 공고가 아닌 공고 삭제 시 차단")
+        void post_test_15() {
+            // given
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
+
+            // when & then
+            assertThatThrownBy(() -> postService.delete(member2Id, postId))
+                    .isInstanceOf(PostException.class)
+                    .satisfies(ex -> assertThat(((PostException) ex).getErrorCode())
+                            .isEqualTo(PostErrorCode.NOT_POST_AUTHOR));
+        }
+
+        @Test
+        @DisplayName("[실패] active Proposal이 있는 공고 삭제 시 차단")
+        void post_test_16() {
+            // given
+            given(postRepository.findById(postId)).willReturn(Optional.of(post));
+            given(proposalRepository.existsByPostIdAndStatusIn(
+                    eq(postId), eq(List.of(ProposalStatus.PENDING, ProposalStatus.ACCEPTED))))
+                    .willReturn(true);
+
+            // when & then
+            assertThatThrownBy(() -> postService.delete(member1Id, postId))
+                    .isInstanceOf(ProposalException.class)
+                    .satisfies(ex -> assertThat(((ProposalException) ex).getErrorCode())
+                            .isEqualTo(ProposalErrorCode.HAS_ACTIVE_PROPOSAL));
+        }
+
+        @Test
+        @DisplayName("[실패] 존재하지 않는 공고 삭제 시도")
+        void post_test_17() {
+            // given
+            given(postRepository.findById(999L)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> postService.delete(member1Id, 999L))
+                    .isInstanceOf(PostException.class)
+                    .satisfies(ex -> assertThat(((PostException) ex).getErrorCode())
+                            .isEqualTo(PostErrorCode.POST_NOT_FOUND));
         }
     }
 }
