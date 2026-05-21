@@ -1,5 +1,9 @@
 package com.forpets.domain.payment.service;
 
+import com.forpets.domain.payment.client.PortOnePaymentClient;
+import com.forpets.domain.payment.client.PortOnePaymentResult;
+import com.forpets.domain.payment.dto.ConfirmPaymentRequest;
+import com.forpets.domain.payment.dto.ConfirmPaymentResponse;
 import com.forpets.domain.payment.dto.CreatePaymentRequest;
 import com.forpets.domain.payment.dto.PaymentResponseDto;
 import com.forpets.domain.payment.entity.*;
@@ -12,6 +16,7 @@ import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
+import com.forpets.domain.reservation.service.ReservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +37,8 @@ public class PaymentService {
     private final ReservationRepository reservationRepository;
     private final ReservationPaymentRepository reservationPaymentRepository;
     private final PaymentMerchantUidGenerator merchantUidGenerator;
+    private final PortOnePaymentClient portOnePaymentClient;
+    private final ReservationService reservationService;
 
     /*
     결제 요청 생성
@@ -70,6 +77,34 @@ public class PaymentService {
         return PaymentResponseDto.from(payment);
     }
 
+    /*
+    결제 승인 검증
+    PortOne V2에서는 merchantUid 값을 paymentId로 사용한다.
+    결제 금액은 프론트 요청값이 아니라 Payment.finalAmount와 PortOne 조회 결과를 비교한다.
+     */
+    @Transactional
+    public ConfirmPaymentResponse confirm(Long memberId, ConfirmPaymentRequest request) {
+        Payment payment = paymentRepository.findByMerchantUid(request.merchantUid())
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+        validatePaymentOwner(memberId, payment);
+        validateConfirmable(payment);
+
+        PortOnePaymentResult portOnePayment = portOnePaymentClient.getPayment(payment.getMerchantUid());
+        validatePortOnePayment(payment, portOnePayment);
+
+        payment.approve(portOnePayment.paymentId(), portOnePayment.rawResponse());
+        ReservationPayment reservationPayment = findReservationPayment(payment.getReservationId());
+        markReservationPaymentPaid(reservationPayment, payment.getPaymentRole());
+
+        var reservation = reservationService.confirmAfterPayment(payment.getReservationId());
+
+        log.info("[PaymentService] 결제 승인 완료 paymentId={}, reservationId={}, role={}",
+                payment.getId(), payment.getReservationId(), payment.getPaymentRole());
+
+        return ConfirmPaymentResponse.of(payment, reservation.status());
+    }
+
     private Reservation findReservation(Long reservationId) {
         return reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
@@ -94,6 +129,40 @@ public class PaymentService {
         if (paymentRole == PaymentRole.SITTER && !reservation.isSitter(memberId)) {
             throw new PaymentException(PaymentErrorCode.NOT_PAYMENT_PARTY);
         }
+    }
+
+    private void validatePaymentOwner(Long memberId, Payment payment) {
+        if (!payment.getMemberId().equals(memberId)) {
+            throw new PaymentException(PaymentErrorCode.NOT_PAYMENT_PARTY);
+        }
+    }
+
+    private void validateConfirmable(Payment payment) {
+        if (!payment.isConfirmable()) {
+            throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
+        }
+    }
+
+    private void validatePortOnePayment(Payment payment, PortOnePaymentResult portOnePayment) {
+        if (!payment.getMerchantUid().equals(portOnePayment.paymentId())) {
+            throw new PaymentException(PaymentErrorCode.PAYMENT_ID_MISMATCH);
+        }
+
+        if (!payment.getFinalAmount().equals(portOnePayment.totalAmount())) {
+            throw new PaymentException(PaymentErrorCode.PAYMENT_AMOUNT_MISMATCH);
+        }
+
+        if (!portOnePayment.isPaid()) {
+            throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_NOT_PAID);
+        }
+    }
+
+    private void markReservationPaymentPaid(ReservationPayment reservationPayment, PaymentRole paymentRole) {
+        if (paymentRole == PaymentRole.GUARDIAN) {
+            reservationPayment.guardianConfirm();
+            return;
+        }
+        reservationPayment.sitterConfirm();
     }
 
     private void validateNotAlreadyPaid(ReservationPayment reservationPayment, PaymentRole paymentRole) {
