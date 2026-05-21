@@ -11,6 +11,8 @@ import com.forpets.domain.carerequest.exception.CareRequestException;
 import com.forpets.domain.carerequest.repository.CareRequestPetRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
+import com.forpets.domain.member.entity.Member;
+import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.exception.PetErrorCode;
 import com.forpets.domain.pet.exception.PetException;
@@ -51,6 +53,7 @@ public class CareRequestService {
     private final SitterService sitterService;
     private final TimeSlotValidator timeSlotValidator;
     private final ReservationService reservationService;
+    private final MemberService memberService;
 
     /*
     케어 요청 등록
@@ -197,7 +200,7 @@ public class CareRequestService {
     }
 
     private void validateParty(Long memberId, CareRequest careRequest) {
-        if (!careRequest.isOwnedBy(memberId) && !careRequest.getSitterProfileId().equals(memberId)) {
+        if (!careRequest.isOwnedBy(memberId) && !careRequest.getSitterProfileId().equals(sitterService.findByMemberId(memberId).getId())) {
             throw new CareRequestException(CareRequestErrorCode.NOT_CARE_REQUEST_PARTY);
         }
     }
