@@ -219,48 +219,48 @@ public class DataInit implements CommandLineRunner {
         // =============================================
         // 6. Proposal (기존)
         // =============================================
-        saveProposal(post1.getId(), sitter1.getId(), member2.getId(), 45000, "구피 백마리도 키워봤어요");
-        saveProposal(post1.getId(), sitter2.getId(), member3.getId(), 50000, "제주도 사람입니다. 더 볼 거 있나요?");
-        saveProposal(post1.getId(), sitter3.getId(), member4.getId(), 48000, "근처에요");
+        saveProposal(post1.getId(), sitter1.getId(), member2.getId(), sitter1.getMemberId(),45000, "구피 백마리도 키워봤어요");
+        saveProposal(post1.getId(), sitter2.getId(), member3.getId(), sitter2.getMemberId(),50000, "제주도 사람입니다. 더 볼 거 있나요?");
+        saveProposal(post1.getId(), sitter3.getId(), member4.getId(), sitter3.getMemberId(),48000, "근처에요");
 
-        saveProposal(post2.getId(), sitter1.getId(), member2.getId(), 110000, "강아지 고양이 둘 다 경험 있습니다");
-        saveProposal(post2.getId(), sitter3.getId(), member4.getId(), 115000, "고양이 진짜 진짜 잘 놀아줘요!!");
+        saveProposal(post2.getId(), sitter1.getId(), member2.getId(), sitter1.getMemberId(),110000, "강아지 고양이 둘 다 경험 있습니다");
+        saveProposal(post2.getId(), sitter3.getId(), member4.getId(), sitter3.getMemberId(),115000, "고양이 진짜 진짜 잘 놀아줘요!!");
 
-        saveProposal(post3.getId(), sitter2.getId(), member3.getId(), 28000, "밥 맛있는걸로다가 주겠습니다~");
+        saveProposal(post3.getId(), sitter2.getId(), member3.getId(), sitter2.getMemberId(),28000, "밥 맛있는걸로다가 주겠습니다~");
 
-        Proposal proposal41 = saveProposal(post4.getId(), sitter1.getId(), member2.getId(), 60000, "다중 돌봄 경험 있습니다.");
-        saveProposal(post4.getId(), sitter2.getId(), member3.getId(), 70000, null);
+        Proposal proposal41 = saveProposal(post4.getId(), sitter1.getId(), member2.getId(), sitter1.getMemberId(),60000, "다중 돌봄 경험 있습니다.");
+        saveProposal(post4.getId(), sitter2.getId(), member3.getId(), sitter2.getMemberId(),70000, null);
 
-        saveProposal(post5.getId(), sitter3.getId(), member4.getId(), 55000, "고양이 전문이라 겁 많은 아이도 잘 다룹니다");
+        saveProposal(post5.getId(), sitter3.getId(), member4.getId(), sitter3.getMemberId(),55000, "고양이 전문이라 겁 많은 아이도 잘 다룹니다");
 
-        Proposal proposal71 = saveProposal(post7.getId(), sitter1.getId(), member2.getId(), 1000, "와 진짜 무료로도 해드리고 싶어요");
-        saveProposal(post7.getId(), sitter3.getId(), member4.getId(), 78000, "경마장 알바 경험 있습니다.");
+        Proposal proposal71 = saveProposal(post7.getId(), sitter1.getId(), member2.getId(), sitter1.getMemberId(),1000, "와 진짜 무료로도 해드리고 싶어요");
+        saveProposal(post7.getId(), sitter3.getId(), member4.getId(), sitter3.getMemberId(),78000, "경마장 알바 경험 있습니다.");
 
-        saveProposal(post10.getId(), sitter2.getId(), member3.getId(), 23000, "소형 반려동물 전문입니다");
-        Proposal proposal103 = saveProposal(post10.getId(), sitter3.getId(), member4.getId(), 24000, "오후 시간 괜찮아요");
+        saveProposal(post10.getId(), sitter2.getId(), member3.getId(), sitter2.getMemberId(),23000, "소형 반려동물 전문입니다");
+        Proposal proposal103 = saveProposal(post10.getId(), sitter3.getId(), member4.getId(), sitter3.getMemberId(),24000, "오후 시간 괜찮아요");
 
         // =============================================
         // 7. CareRequest (기존 4개)
         // =============================================
-        CareRequest request1 = saveCareRequest(member1.getId(), sitter3.getId(), CareType.VISIT,
+        CareRequest request1 = saveCareRequest(member1.getId(), sitter3.getId(), sitter3.getMemberId(), CareType.VISIT,
                 "구피 여러 마리 한꺼번에 봐주실 수 있나요?", 55000);
         saveCareRequestPet(request1.getId(), pet1);
         saveCareRequestPet(request1.getId(), pet2);
         saveCareRequestPet(request1.getId(), pet6);
         saveCareRequestTimeSlot(request1.getId(), "2026-06-18", "10:00", "14:00", 1);
 
-        CareRequest request2 = saveCareRequest(member5.getId(), sitter1.getId(), CareType.BOARDING,
+        CareRequest request2 = saveCareRequest(member5.getId(), sitter1.getId(), sitter1.getMemberId(), CareType.BOARDING,
                 "고양이 전문가시라고 해서 연락드려요", 90000);
         saveCareRequestPet(request2.getId(), pet16);
         saveCareRequestTimeSlot(request2.getId(), "2026-06-20", "00:00", "23:59", 1);
         saveCareRequestTimeSlot(request2.getId(), "2026-06-21", "00:00", "23:59", 2);
 
-        CareRequest request3 = saveCareRequest(member2.getId(), sitter3.getId(), CareType.VISIT,
+        CareRequest request3 = saveCareRequest(member2.getId(), sitter3.getId(), sitter3.getMemberId(), CareType.VISIT,
                 "하루종일 같이 있어주실 수 있나요?", 180000);
         saveCareRequestPet(request3.getId(), pet10);
         saveCareRequestTimeSlot(request3.getId(), "2026-06-25", "08:00", "20:00", 1);
 
-        CareRequest request4 = saveCareRequest(member3.getId(), sitter3.getId(), CareType.VISIT,
+        CareRequest request4 = saveCareRequest(member3.getId(), sitter3.getId(), sitter3.getMemberId(), CareType.VISIT,
                 "소형견인데 괜찮으실까요?", 35000);
         saveCareRequestPet(request4.getId(), pet11);
         saveCareRequestTimeSlot(request4.getId(), "2026-06-28", "15:00", "19:00", 1);
@@ -577,6 +577,7 @@ public class DataInit implements CommandLineRunner {
                         post.getId(),
                         sp.getId(),
                         sitterMemberId,
+                        post.getMemberId(),
                         proposedPrice,
                         proposalMessages[proposalCount % proposalMessages.length]
                 );
@@ -626,6 +627,7 @@ public class DataInit implements CommandLineRunner {
                 CareRequest cr = saveCareRequest(
                         requester.getId(),
                         targetSitter.getId(),
+                        targetSitter.getMemberId(),
                         careType,
                         careRequestMessages[careRequestCount % careRequestMessages.length],
                         price
@@ -762,7 +764,7 @@ public class DataInit implements CommandLineRunner {
 
                 // CareRequest를 먼저 만들고 그것의 ID를 sourceId로 사용
                 CareRequest cr = saveCareRequest(
-                        requester.getId(), sp.getId(), careType,
+                        requester.getId(), sp.getId(), sp.getMemberId(), careType,
                         "예약용 돌봄 요청", price
                 );
                 Pet firstPet = requesterPets.get(0);
@@ -940,22 +942,24 @@ public class DataInit implements CommandLineRunner {
         ));
     }
 
-    private Proposal saveProposal(Long postId, Long sitterProfileId, Long memberId,
+    private Proposal saveProposal(Long postId, Long sitterProfileId, Long memberId, Long sitterMemberId,
                                   Integer proposedPrice, String message) {
         return proposalRepository.save(Proposal.builder()
                 .postId(postId)
                 .sitterProfileId(sitterProfileId)
+                .sitterMemberId(sitterMemberId)
                 .memberId(memberId)
                 .proposedPrice(proposedPrice)
                 .message(message)
                 .build());
     }
 
-    private CareRequest saveCareRequest(Long memberId, Long sitterProfileId,
+    private CareRequest saveCareRequest(Long memberId, Long sitterProfileId, Long sitterMemberId,
                                         CareType careType, String message, int requestPrice) {
         return careRequestRepository.save(CareRequest.builder()
                 .memberId(memberId)
                 .sitterProfileId(sitterProfileId)
+                .sitterMemberId(sitterMemberId)
                 .careType(careType)
                 .message(message)
                 .requestPrice(requestPrice)
