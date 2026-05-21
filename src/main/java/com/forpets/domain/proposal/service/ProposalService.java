@@ -61,6 +61,11 @@ public class ProposalService {
         validateNoDuplicate(postId, sitter.getId());
         // 정책 수정으로 CONFIRMED 예약이 있어도 Proposal 은 언제든 받을 수 있음
 
+        List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(postId);
+        if (reservationService.hasConfirmedConflict(sitter.getId(), postTimeSlots)) {
+            throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
+        }
+
         Proposal proposal = proposalRepository.save(Proposal.builder()
                 .postId(postId)
                 .sitterProfileId(sitter.getId())
