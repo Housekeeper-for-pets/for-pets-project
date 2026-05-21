@@ -3,6 +3,8 @@ package com.forpets.domain.member.service;
 import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestStatus;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
+import com.forpets.domain.coupon.entity.UserCouponStatus;
+import com.forpets.domain.coupon.repository.UserCouponRepository;
 import com.forpets.domain.member.dto.*;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.exception.MemberErrorCode;
@@ -21,7 +23,6 @@ import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.global.security.jwt.BearerTokenResolver;
 import com.forpets.global.security.jwt.JwtTokenProvider;
 import com.forpets.global.security.jwt.TokenRedisService;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -46,11 +47,18 @@ public class MemberService {
     private final TokenRedisService tokenRedisService;
     private final JwtTokenProvider jwtTokenProvider;
     private final BearerTokenResolver bearerTokenResolver;
+    private final UserCouponRepository userCouponRepository;
 
     public MemberResponse getMyInfo(Long memberId) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new MemberException(MemberErrorCode.MEMBER_NOT_FOUND));
-        return MemberResponse.from(member);
+
+        int couponCount = (int) userCouponRepository.countByUserIdAndStatus(
+                memberId,
+                UserCouponStatus.ACTIVE
+        );
+
+        return MemberResponse.of(member, couponCount);
     }
 
     @Transactional
