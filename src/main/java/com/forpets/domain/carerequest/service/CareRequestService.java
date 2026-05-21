@@ -11,6 +11,8 @@ import com.forpets.domain.carerequest.exception.CareRequestException;
 import com.forpets.domain.carerequest.repository.CareRequestPetRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
+import com.forpets.domain.member.entity.Member;
+import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.exception.PetErrorCode;
 import com.forpets.domain.pet.exception.PetException;
@@ -78,6 +80,7 @@ public class CareRequestService {
         CareRequest careRequest = careRequestRepository.save(CareRequest.builder()
                 .memberId(memberId)
                 .sitterProfileId(sitter.getId())
+                .sitterMemberId(sitter.getMemberId())
                 .careType(request.careType())
                 .message(request.message())
                 .requestPrice(request.requestPrice())
@@ -197,7 +200,7 @@ public class CareRequestService {
     }
 
     private void validateParty(Long memberId, CareRequest careRequest) {
-        if (!careRequest.isOwnedBy(memberId) && !careRequest.getSitterProfileId().equals(memberId)) {
+        if (!careRequest.isOwnedBy(memberId) && !careRequest.getSitterMemberId().equals(memberId)) {
             throw new CareRequestException(CareRequestErrorCode.NOT_CARE_REQUEST_PARTY);
         }
     }
