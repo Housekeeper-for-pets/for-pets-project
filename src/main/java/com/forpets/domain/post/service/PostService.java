@@ -218,6 +218,26 @@ public class PostService {
         return postRepository.searchPosts(condition, pageable);
     }
 
+    public PostPageResponse searchMyPosts(Long memberId, String status, int page, int size) {
+        validatePageRequest(page, size);
+        PostStatus postStatus = parseStatus(status);
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        return postRepository.searchMyPosts(memberId, postStatus, pageable);
+    }
+
+    private PostStatus parseStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        try {
+            return PostStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException exception) {
+            throw new PostException(PostErrorCode.INVALID_POST_STATUS);
+        }
+    }
+
     public List<PostTimeSlot> findTimeSlotsByPostId(Long postId) {
         return postTimeSlotRepository.findAllByPostIdOrderByTimeSlotInfoSequence(postId);
     }

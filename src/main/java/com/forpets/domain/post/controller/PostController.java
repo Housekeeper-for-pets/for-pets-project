@@ -67,6 +67,19 @@ public class PostController {
     }
 
     /*
+    내가 쓴 공고 조회
+     */
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<PostPageResponse>> getMyPosts(
+            @LoginUser CurrentMember currentMember,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(
+                ApiResponse.success(postService.searchMyPosts(currentMember.id(), status, page, size)));
+    }
+
+    /*
     3. 공고 상세 조회
      */
     @GetMapping("/{postId}")
