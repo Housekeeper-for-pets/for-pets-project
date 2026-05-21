@@ -2,12 +2,17 @@ package com.forpets.domain.auth.controller;
 
 import com.forpets.domain.auth.dto.*;
 import com.forpets.domain.auth.service.AuthService;
-import com.forpets.global.common.*;
+import com.forpets.global.common.ApiResponse;
+import com.forpets.global.common.MessageResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 인증과 회원가입 API를 제공합니다.
