@@ -60,4 +60,32 @@ public class ChatRoomParticipant extends BaseEntity {
         this.memberId = memberId;
         this.isLeft = false;
     }
+
+    // 채팅방 나가기
+    public void leave(LocalDateTime now) {
+        this.isLeft = true;
+        this.leftAt = now;
+        this.visibleFromAt = now;
+    }
+
+    // 채팅방 재입장
+    public void rejoin() {
+        this.isLeft = false;
+    }
+
+    // 마지막 읽은 메시지 갱신
+    public void updateLastRead(Long messageId, LocalDateTime now) {
+        if (messageId == null) {
+            return;
+        }
+
+        if (this.lastReadMessageId == null || messageId > this.lastReadMessageId) {
+            this.lastReadMessageId = messageId;
+            this.lastReadAt = now;
+        }
+    }
+
+    public boolean isLeft() {
+        return this.isLeft;
+    }
 }

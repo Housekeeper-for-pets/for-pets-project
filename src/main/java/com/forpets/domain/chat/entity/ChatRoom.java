@@ -37,7 +37,7 @@ public class ChatRoom extends BaseEntity {
     @Column(name = "member_b_id", nullable = false)
     private Long memberBId;
 
-    @Column(name = "room_key", nullable = false)
+    @Column(name = "room_key", nullable = false, length = 50)
     private String roomKey;
 
     @Column(name = "last_message_id")
@@ -51,5 +51,28 @@ public class ChatRoom extends BaseEntity {
         this.memberAId = memberAId;
         this.memberBId = memberBId;
         this.roomKey = roomKey;
+    }
+
+    public void updateLastMessage(Long messageId, LocalDateTime messageAt) {
+        this.lastMessageId = messageId;
+        this.lastMessageAt = messageAt;
+    }
+
+    // 1:1 채팅방 키 생성
+    public static String generateRoomKey(Long memberId1, Long memberId2) {
+        long memberAId = Math.min(memberId1, memberId2);
+        long memberBId = Math.max(memberId1, memberId2);
+
+        return memberAId + ":" + memberBId;
+    }
+
+    // 작은 회원 ID 반환
+    public static Long resolveMemberAId(Long memberId1, Long memberId2) {
+        return Math.min(memberId1, memberId2);
+    }
+
+    // 큰 회원 ID 반환
+    public static Long resolveMemberBId(Long memberId1, Long memberId2) {
+        return Math.max(memberId1, memberId2);
     }
 }
