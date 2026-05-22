@@ -18,6 +18,7 @@ public enum PaymentErrorCode implements ErrorCode {
     PORTONE_PAYMENT_NOT_PAID(HttpStatus.BAD_REQUEST, "PORTONE_PAYMENT_NOT_PAID", "결제가 완료되지 않았습니다."),
     PORTONE_PAYMENT_VERIFY_FAILED(HttpStatus.BAD_REQUEST, "PORTONE_PAYMENT_VERIFY_FAILED", "PortOne 결제 검증에 실패했습니다."),
     PORTONE_PAYMENT_CANCEL_FAILED(HttpStatus.BAD_REQUEST, "PORTONE_PAYMENT_CANCEL_FAILED", "PortOne 결제 취소에 실패했습니다."),
+    PAYMENT_LOCK_FAILED(HttpStatus.CONFLICT, "PAYMENT_LOCK_FAILED", "결제 처리 중입니다. 잠시 후 다시 시도해주세요."),
     ;
 
     private final HttpStatus status;

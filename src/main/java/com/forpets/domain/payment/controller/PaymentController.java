@@ -1,11 +1,14 @@
 package com.forpets.domain.payment.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.forpets.domain.payment.dto.CreatePaymentRequest;
 import com.forpets.domain.payment.dto.ConfirmPaymentRequest;
 import com.forpets.domain.payment.dto.ConfirmPaymentResponse;
 import com.forpets.domain.payment.dto.FailPaymentRequest;
 import com.forpets.domain.payment.dto.PaymentResponseDto;
+import com.forpets.domain.payment.dto.PortOneWebhookResponse;
 import com.forpets.domain.payment.service.PaymentService;
+import com.forpets.domain.payment.service.PaymentWebhookService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final PaymentWebhookService paymentWebhookService;
 
     /*
     결제 요청 생성
@@ -56,5 +60,12 @@ public class PaymentController {
             @RequestBody @Valid FailPaymentRequest request) {
         return ResponseEntity.ok(
                 ApiResponse.success(paymentService.fail(currentMember.id(), request)));
+    }
+
+    @PostMapping("/webhook/portone")
+    public ResponseEntity<ApiResponse<PortOneWebhookResponse>> receivePortOneWebhook(
+            @RequestBody JsonNode payload) {
+        return ResponseEntity.ok(
+                ApiResponse.success(paymentWebhookService.handlePortOneWebhook(payload)));
     }
 }
