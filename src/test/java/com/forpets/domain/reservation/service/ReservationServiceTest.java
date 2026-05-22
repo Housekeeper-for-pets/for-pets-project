@@ -29,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -560,6 +561,52 @@ class ReservationServiceTest {
                     .isInstanceOf(ReservationException.class)
                     .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
                             .isEqualTo(ReservationErrorCode.NOT_RESERVATION_PARTY));
+        }
+    }
+
+    // ========================================================
+    // 예약 만료 — Scheduler
+    // ========================================================
+    @Nested
+    @DisplayName("예약 만료 — Scheduler")
+    class ExpireTest {
+
+        @Test
+        @DisplayName("[성공] 2시간 초과 PENDING 예약 만료 처리")
+        void reservation_test_27() {
+            // given
+            LocalDateTime now = LocalDateTime.of(2026, 5, 22, 15, 0);
+            given(reservationRepository.findAllByStatusAndCreatedAtBefore(
+                    ReservationStatus.PENDING, now.minusHours(2)))
+                    .willReturn(List.of(reservation));
+
+            // when
+            int result = reservationService.expirePendingReservations(now);
+
+            // then
+            assertThat(result).isEqualTo(1);
+            assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.EXPIRED);
+            then(paymentRefundService).should()
+                    .refundPaidPayments(reservationId, "예약 결제 제한 시간 초과");
+        }
+
+        @Test
+        @DisplayName("[성공] Proposal 출처 예약 만료 시 ACCEPTED → PENDING 복원")
+        void reservation_test_28() {
+            // given
+            LocalDateTime now = LocalDateTime.of(2026, 5, 22, 15, 0);
+            given(reservationRepository.findAllByStatusAndCreatedAtBefore(
+                    ReservationStatus.PENDING, now.minusHours(2)))
+                    .willReturn(List.of(proposalReservation));
+            given(proposalRepository.findById(proposalId)).willReturn(Optional.of(proposal));
+
+            // when
+            int result = reservationService.expirePendingReservations(now);
+
+            // then
+            assertThat(result).isEqualTo(1);
+            assertThat(proposalReservation.getStatus()).isEqualTo(ReservationStatus.EXPIRED);
+            assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.PENDING);
         }
     }
 }

@@ -42,6 +42,8 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class ReservationService {
     private static final int DEPOSIT_RATIO = 20;
+    private static final long PAYMENT_EXPIRE_HOURS = 2L;
+    private static final String EXPIRE_REFUND_REASON = "예약 결제 제한 시간 초과";
 
     private final ReservationRepository reservationRepository;
     private final ReservationPetRepository reservationPetRepository;
@@ -214,6 +216,31 @@ public class ReservationService {
         handlePostCancellation(reservation);
 
         return toResponseDto(reservation);
+    }
+
+    /*
+    예약 만료 처리
+    PENDING 예약이 생성 후 2시간을 넘기면 EXPIRED로 닫고 이미 결제된 금액을 환불한다.
+     */
+    @Transactional
+    public int expirePendingReservations(LocalDateTime now) {
+        LocalDateTime deadline = now.minusHours(PAYMENT_EXPIRE_HOURS);
+        List<Reservation> expiredTargets = reservationRepository.findAllByStatusAndCreatedAtBefore(
+                ReservationStatus.PENDING, deadline);
+
+        expiredTargets.forEach(this::expireReservation);
+
+        if (!expiredTargets.isEmpty()) {
+            log.info("[예약 만료] 처리 건수={}", expiredTargets.size());
+        }
+
+        return expiredTargets.size();
+    }
+
+    private void expireReservation(Reservation reservation) {
+        reservation.expire();
+        paymentRefundService.refundPaidPayments(reservation.getId(), EXPIRE_REFUND_REASON);
+        handlePostCancellation(reservation);
     }
 
 
