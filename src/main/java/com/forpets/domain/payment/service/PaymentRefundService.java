@@ -30,38 +30,45 @@ public class PaymentRefundService {
     private final ReservationPaymentRepository reservationPaymentRepository;
     private final PortOnePaymentClient portOnePaymentClient;
     private final CouponService couponService;
+    private final PaymentLockService paymentLockService;
 
     @Transactional
     public void syncRefundedByWebhook(String merchantUid, String reason, String rawResponse) {
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-        if (!payment.isPaid()) {
-            return;
-        }
+        paymentLockService.executeWithReservationLock(payment.getReservationId(), () -> {
+            if (!payment.isPaid()) {
+                return null;
+            }
 
-        ReservationPayment reservationPayment = reservationPaymentRepository
-                .findByReservationId(payment.getReservationId())
-                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+            ReservationPayment reservationPayment = reservationPaymentRepository
+                    .findByReservationId(payment.getReservationId())
+                    .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
-        payment.refund(reason, rawResponse);
-        restoreReservationPayment(payment, reservationPayment);
-        restoreCouponIfUsed(payment);
+            payment.refund(reason, rawResponse);
+            restoreReservationPayment(payment, reservationPayment);
+            restoreCouponIfUsed(payment);
+            return null;
+        });
     }
 
     @Transactional
     public void refundPaidPayments(Long reservationId, String reason) {
-        List<Payment> paidPayments = paymentRepository.findAllByReservationIdAndStatus(
-                reservationId, PaymentStatus.PAID);
+        paymentLockService.executeWithReservationLock(reservationId, () -> {
+            List<Payment> paidPayments = paymentRepository.findAllByReservationIdAndStatus(
+                    reservationId, PaymentStatus.PAID);
 
-        if (paidPayments.isEmpty()) {
-            return;
-        }
+            if (paidPayments.isEmpty()) {
+                return null;
+            }
 
-        ReservationPayment reservationPayment = reservationPaymentRepository.findByReservationId(reservationId)
-                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+            ReservationPayment reservationPayment = reservationPaymentRepository.findByReservationId(reservationId)
+                    .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
-        paidPayments.forEach(payment -> refund(payment, reservationPayment, reason));
+            paidPayments.forEach(payment -> refund(payment, reservationPayment, reason));
+            return null;
+        });
     }
 
     private void refund(Payment payment, ReservationPayment reservationPayment, String reason) {

@@ -40,6 +40,7 @@ public class PaymentService {
     private final PaymentMerchantUidGenerator merchantUidGenerator;
     private final PortOnePaymentClient portOnePaymentClient;
     private final ReservationService reservationService;
+    private final PaymentLockService paymentLockService;
 
     /*
     결제 요청 생성
@@ -90,7 +91,8 @@ public class PaymentService {
 
         validatePaymentOwner(memberId, payment);
 
-        return confirmPayment(payment);
+        return paymentLockService.executeWithReservationLock(
+                payment.getReservationId(), () -> confirmPayment(payment));
     }
 
     @Transactional
@@ -98,7 +100,8 @@ public class PaymentService {
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-        return confirmPayment(payment);
+        return paymentLockService.executeWithReservationLock(
+                payment.getReservationId(), () -> confirmPayment(payment));
     }
 
     @Transactional
@@ -106,12 +109,14 @@ public class PaymentService {
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-        if (!payment.isFailable()) {
-            return PaymentResponseDto.from(payment);
-        }
+        return paymentLockService.executeWithReservationLock(payment.getReservationId(), () -> {
+            if (!payment.isFailable()) {
+                return PaymentResponseDto.from(payment);
+            }
 
-        payment.fail(failedReason);
-        return PaymentResponseDto.from(payment);
+            payment.fail(failedReason);
+            return PaymentResponseDto.from(payment);
+        });
     }
 
     /*
