@@ -1,5 +1,7 @@
 package com.forpets.domain.payment.service;
 
+import com.forpets.domain.coupon.dto.CouponApplyResult;
+import com.forpets.domain.coupon.service.CouponService;
 import com.forpets.domain.payment.client.PortOnePaymentClient;
 import com.forpets.domain.payment.client.PortOnePaymentResult;
 import com.forpets.domain.payment.dto.ConfirmPaymentRequest;
@@ -41,6 +43,7 @@ public class PaymentService {
     private final PortOnePaymentClient portOnePaymentClient;
     private final ReservationService reservationService;
     private final PaymentLockService paymentLockService;
+    private final CouponService couponService;
 
     /*
     결제 요청 생성
@@ -57,8 +60,7 @@ public class PaymentService {
         validateNoActivePayment(reservation.getId(), memberId, request.paymentRole());
 
         Long originalAmount = getOriginalAmount(reservationPayment, request.paymentRole());
-        Long discountAmount = ZERO_DISCOUNT_AMOUNT;
-        Long finalAmount = originalAmount - discountAmount;
+        PaymentAmount paymentAmount = calculatePaymentAmount(memberId, request.paymentRole(), originalAmount);
 
         Payment payment = paymentRepository.save(Payment.builder()
                 .reservationId(reservation.getId())
@@ -66,9 +68,9 @@ public class PaymentService {
                 .paymentRole(request.paymentRole())
                 .paymentType(getPaymentType(request.paymentRole()))
                 .originalAmount(originalAmount)
-                .discountAmount(discountAmount)
-                .finalAmount(finalAmount)
-                .userCouponId(null)
+                .discountAmount(paymentAmount.discountAmount())
+                .finalAmount(paymentAmount.finalAmount())
+                .userCouponId(paymentAmount.userCouponId())
                 .provider(PaymentProvider.PORTONE)
                 .merchantUid(merchantUidGenerator.generate(reservation.getId(), request.paymentRole()))
                 .build());
@@ -139,6 +141,21 @@ public class PaymentService {
         return PaymentResponseDto.from(payment);
     }
 
+    public List<PaymentResponseDto> getMyPayments(Long memberId) {
+        return paymentRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId).stream()
+                .map(PaymentResponseDto::from)
+                .toList();
+    }
+
+    public PaymentResponseDto getDetail(Long memberId, Long paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+        validatePaymentOwner(memberId, payment);
+
+        return PaymentResponseDto.from(payment);
+    }
+
     private Reservation findReservation(Long reservationId) {
         return reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
@@ -195,6 +212,8 @@ public class PaymentService {
         validatePortOnePayment(payment, portOnePayment);
 
         payment.approve(portOnePayment.paymentId(), portOnePayment.rawResponse());
+        markCouponAsUsedIfApplied(payment);
+
         ReservationPayment reservationPayment = findReservationPayment(payment.getReservationId());
         markReservationPaymentPaid(reservationPayment, payment.getPaymentRole());
 
@@ -254,10 +273,54 @@ public class PaymentService {
         return (long) reservationPayment.getSitterPrice();
     }
 
+    private PaymentAmount calculatePaymentAmount(Long memberId, PaymentRole paymentRole, Long originalAmount) {
+        if (paymentRole == PaymentRole.SITTER) {
+            return PaymentAmount.withoutCoupon(originalAmount);
+        }
+
+        Long userCouponId = findUsableCouponId(memberId);
+        if (userCouponId == null) {
+            return PaymentAmount.withoutCoupon(originalAmount);
+        }
+
+        CouponApplyResult couponResult = couponService.applyCoupon(memberId, userCouponId, originalAmount);
+        return new PaymentAmount(
+                couponResult.discountAmount(),
+                couponResult.finalPrice(),
+                userCouponId
+        );
+    }
+
+    private Long findUsableCouponId(Long memberId) {
+        return couponService.findActiveUserCouponIds(memberId).stream()
+                .filter(userCouponId -> !paymentRepository.existsByUserCouponIdAndStatusIn(
+                        userCouponId,
+                        ACTIVE_PAYMENT_STATUSES
+                ))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void markCouponAsUsedIfApplied(Payment payment) {
+        if (payment.getUserCouponId() != null) {
+            couponService.markCouponAsUsed(payment.getMemberId(), payment.getUserCouponId());
+        }
+    }
+
     private PaymentType getPaymentType(PaymentRole paymentRole) {
         if (paymentRole == PaymentRole.GUARDIAN) {
             return PaymentType.FULL;
         }
         return PaymentType.DEPOSIT;
+    }
+
+    private record PaymentAmount(
+            Long discountAmount,
+            Long finalAmount,
+            Long userCouponId
+    ) {
+        private static PaymentAmount withoutCoupon(Long originalAmount) {
+            return new PaymentAmount(ZERO_DISCOUNT_AMOUNT, originalAmount, null);
+        }
     }
 }
