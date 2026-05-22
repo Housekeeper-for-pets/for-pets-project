@@ -80,10 +80,15 @@ public class PaymentWebhookService {
             return;
         }
 
-        paymentRepository.findByMerchantUid(payload.merchantUid())
-                .or(() -> paymentRepository.findByPortonePaymentId(payload.portonePaymentId()))
-                .map(Payment::getId)
-                .ifPresent(webhook::connectPayment);
+        Optional<Payment> payment = paymentRepository.findByMerchantUid(payload.merchantUid())
+                .or(() -> paymentRepository.findByPortonePaymentId(payload.portonePaymentId()));
+
+        if (payment.isEmpty()) {
+            webhook.markIgnored("존재하지 않는 결제 웹훅");
+            return;
+        }
+
+        webhook.connectPayment(payment.get().getId());
 
         String status = normalize(payload.status());
         switch (status) {
