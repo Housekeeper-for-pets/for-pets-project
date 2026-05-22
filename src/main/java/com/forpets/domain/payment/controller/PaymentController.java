@@ -1,6 +1,8 @@
 package com.forpets.domain.payment.controller;
 
 import com.forpets.domain.payment.dto.CreatePaymentRequest;
+import com.forpets.domain.payment.dto.ConfirmPaymentRequest;
+import com.forpets.domain.payment.dto.ConfirmPaymentResponse;
 import com.forpets.domain.payment.dto.PaymentResponseDto;
 import com.forpets.domain.payment.service.PaymentService;
 import com.forpets.global.common.ApiResponse;
@@ -29,5 +31,17 @@ public class PaymentController {
             @RequestBody @Valid CreatePaymentRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(paymentService.create(currentMember.id(), request)));
+    }
+
+    /*
+    결제 승인 검증
+    PortOne V2 결제 단건 조회 결과와 서버에 저장된 결제 금액을 비교한다.
+     */
+    @PostMapping("/confirm")
+    public ResponseEntity<ApiResponse<ConfirmPaymentResponse>> confirm(
+            @LoginUser CurrentMember currentMember,
+            @RequestBody @Valid ConfirmPaymentRequest request) {
+        return ResponseEntity.ok(
+                ApiResponse.success(paymentService.confirm(currentMember.id(), request)));
     }
 }

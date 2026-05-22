@@ -207,6 +207,27 @@ public class ReservationService {
         return toResponseDto(reservation);
     }
 
+    /*
+    Payment 도메인에서 PortOne 결제 검증을 마친 뒤 호출하는 예약 확정 처리.
+    양측 결제가 모두 완료된 경우에만 Reservation 을 CONFIRMED 로 전환한다.
+     */
+    @Transactional
+    public ReservationResponseDto confirmAfterPayment(Long reservationId) {
+        Reservation reservation = findById(reservationId);
+        validatePending(reservation);
+
+        ReservationPayment payment = findPayment(reservationId);
+        if (payment.isBothPaid()) {
+            validateNoConfirmedConflict(reservation);
+            reservation.confirm();
+            log.info("[예약 확정] reservationId={}, PortOne 양측 결제 완료 → CONFIRMED", reservationId);
+
+            handlePostConfirmation(reservation);
+        }
+
+        return toResponseDto(reservation);
+    }
+
 
     /*
     케어 완료 처리
