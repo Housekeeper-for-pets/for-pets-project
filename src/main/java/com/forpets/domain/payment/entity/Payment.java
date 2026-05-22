@@ -117,6 +117,10 @@ public class Payment extends BaseEntity {
         return this.status == PaymentStatus.READY || this.status == PaymentStatus.PENDING;
     }
 
+    public boolean isPaid() {
+        return this.status == PaymentStatus.PAID;
+    }
+
     public void approve(String portonePaymentId, String rawResponse) {
         this.status = PaymentStatus.PAID;
         this.portonePaymentId = portonePaymentId;
@@ -127,5 +131,12 @@ public class Payment extends BaseEntity {
     public void fail(String failedReason) {
         this.status = PaymentStatus.FAILED;
         this.failedReason = failedReason;
+    }
+
+    public void refund(String cancelReason, String rawResponse) {
+        this.status = PaymentStatus.REFUNDED;
+        this.cancelReason = cancelReason;
+        this.rawResponse = rawResponse;
+        this.refundedAt = LocalDateTime.now();
     }
 }

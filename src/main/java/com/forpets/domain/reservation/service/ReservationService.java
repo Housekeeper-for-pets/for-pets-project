@@ -8,6 +8,7 @@ import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.repository.PostTimeSlotRepository;
+import com.forpets.domain.payment.service.PaymentRefundService;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
@@ -46,6 +47,7 @@ public class ReservationService {
     private final ReservationPetRepository reservationPetRepository;
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
     private final ReservationPaymentRepository reservationPaymentRepository;
+    private final PaymentRefundService paymentRefundService;
 
     private final PostRepository postRepository;
     private final ProposalRepository proposalRepository;
@@ -206,11 +208,7 @@ public class ReservationService {
         reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
         log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
 
-        // 환불할 예약금이 있으면 환불 처리
-        // V2 결제 연동 시 환불 로직 구현
-        // ReservationPayment payment = findPayment(reservationId);
-        // if (payment.isGuardianPaid()) refundGuardian(reservation);
-        // if (payment.isSitterPaid()) refundSitter(reservation);
+        paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
 
         // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
         handlePostCancellation(reservation);

@@ -47,6 +47,14 @@ public class ReservationPayment {
         this.sitterPaid = true;
     }
 
+    public void guardianRefund() {
+        this.guardianPaid = false;
+    }
+
+    public void sitterRefund() {
+        this.sitterPaid = false;
+    }
+
     public boolean isBothPaid() {
         return this.guardianPaid && this.sitterPaid;
     }

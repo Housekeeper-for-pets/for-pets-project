@@ -11,6 +11,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @Component
 @RequiredArgsConstructor
 public class PortOnePaymentClient {
@@ -43,6 +46,35 @@ public class PortOnePaymentClient {
             throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_VERIFY_FAILED);
         } catch (Exception exception) {
             throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_VERIFY_FAILED);
+        }
+    }
+
+    public PortOneCancelResult cancelPayment(String paymentId, Long amount, String reason) {
+        validateApiSecret();
+
+        try {
+            Map<String, Object> requestBody = new LinkedHashMap<>();
+            if (StringUtils.hasText(portOneProperties.getStoreId())) {
+                requestBody.put("storeId", portOneProperties.getStoreId());
+            }
+            requestBody.put("amount", amount);
+            requestBody.put("reason", reason);
+
+            String rawResponse = RestClient.builder()
+                    .baseUrl(PORTONE_API_URL)
+                    .defaultHeader("Authorization", "PortOne " + portOneProperties.getApiSecret())
+                    .build()
+                    .post()
+                    .uri("/payments/{paymentId}/cancel", paymentId)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(String.class);
+
+            return new PortOneCancelResult(rawResponse);
+        } catch (RestClientException | IllegalArgumentException exception) {
+            throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_CANCEL_FAILED);
+        } catch (Exception exception) {
+            throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_CANCEL_FAILED);
         }
     }
 

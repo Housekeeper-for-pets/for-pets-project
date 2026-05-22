@@ -3,6 +3,7 @@ package com.forpets.domain.reservation.service;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
+import com.forpets.domain.payment.service.PaymentRefundService;
 import com.forpets.domain.reservation.dto.CancelReservationRequest;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.entity.*;
@@ -52,6 +53,9 @@ class ReservationServiceTest {
 
     @Mock
     private ReservationPaymentRepository reservationPaymentRepository;
+
+    @Mock
+    private PaymentRefundService paymentRefundService;
 
     @Mock
     private PostRepository postRepository;
@@ -476,6 +480,8 @@ class ReservationServiceTest {
             assertThat(result.canceledBy()).isEqualTo(CanceledBy.GUARDIAN);
             assertThat(result.cancelReason()).isEqualTo("개인 사정으로 인해 취소합니다");
             assertThat(result.cancelCategory()).isEqualTo(CancelCategory.PERSONAL);
+            then(paymentRefundService).should()
+                    .refundPaidPayments(reservationId, cancelRequest.cancelReason());
         }
 
         @Test
@@ -492,6 +498,8 @@ class ReservationServiceTest {
             // then
             assertThat(result.status()).isEqualTo(ReservationStatus.CANCELED);
             assertThat(result.canceledBy()).isEqualTo(CanceledBy.SITTER);
+            then(paymentRefundService).should()
+                    .refundPaidPayments(reservationId, cancelRequest.cancelReason());
         }
 
         @Test
