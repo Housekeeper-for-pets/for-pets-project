@@ -3,6 +3,7 @@ package com.forpets.domain.payment.controller;
 import com.forpets.domain.payment.dto.CreatePaymentRequest;
 import com.forpets.domain.payment.dto.ConfirmPaymentRequest;
 import com.forpets.domain.payment.dto.ConfirmPaymentResponse;
+import com.forpets.domain.payment.dto.FailPaymentRequest;
 import com.forpets.domain.payment.dto.PaymentResponseDto;
 import com.forpets.domain.payment.service.PaymentService;
 import com.forpets.global.common.ApiResponse;
@@ -43,5 +44,17 @@ public class PaymentController {
             @RequestBody @Valid ConfirmPaymentRequest request) {
         return ResponseEntity.ok(
                 ApiResponse.success(paymentService.confirm(currentMember.id(), request)));
+    }
+
+    /*
+    결제 실패 처리
+    프론트 결제 실패/취소 콜백에서 호출해 진행 중 결제를 FAILED로 변경한다.
+     */
+    @PostMapping("/fail")
+    public ResponseEntity<ApiResponse<PaymentResponseDto>> fail(
+            @LoginUser CurrentMember currentMember,
+            @RequestBody @Valid FailPaymentRequest request) {
+        return ResponseEntity.ok(
+                ApiResponse.success(paymentService.fail(currentMember.id(), request)));
     }
 }

@@ -5,6 +5,7 @@ import com.forpets.domain.payment.client.PortOnePaymentResult;
 import com.forpets.domain.payment.dto.ConfirmPaymentRequest;
 import com.forpets.domain.payment.dto.ConfirmPaymentResponse;
 import com.forpets.domain.payment.dto.CreatePaymentRequest;
+import com.forpets.domain.payment.dto.FailPaymentRequest;
 import com.forpets.domain.payment.dto.PaymentResponseDto;
 import com.forpets.domain.payment.entity.*;
 import com.forpets.domain.payment.exception.PaymentErrorCode;
@@ -105,6 +106,26 @@ public class PaymentService {
         return ConfirmPaymentResponse.of(payment, reservation.status());
     }
 
+    /*
+    결제 실패 처리
+    프론트 결제창 중단/PG 실패 이후 READY 결제를 닫아 다음 결제 요청을 가능하게 한다.
+     */
+    @Transactional
+    public PaymentResponseDto fail(Long memberId, FailPaymentRequest request) {
+        Payment payment = paymentRepository.findByMerchantUid(request.merchantUid())
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+        validatePaymentOwner(memberId, payment);
+        validateFailable(payment);
+
+        payment.fail(request.failedReason());
+
+        log.info("[PaymentService] 결제 실패 처리 paymentId={}, merchantUid={}, reason={}",
+                payment.getId(), payment.getMerchantUid(), request.failedReason());
+
+        return PaymentResponseDto.from(payment);
+    }
+
     private Reservation findReservation(Long reservationId) {
         return reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
@@ -139,6 +160,12 @@ public class PaymentService {
 
     private void validateConfirmable(Payment payment) {
         if (!payment.isConfirmable()) {
+            throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
+        }
+    }
+
+    private void validateFailable(Payment payment) {
+        if (!payment.isFailable()) {
             throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
         }
     }
