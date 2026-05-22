@@ -8,6 +8,7 @@ import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.repository.PostTimeSlotRepository;
+import com.forpets.domain.payment.service.PaymentRefundService;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
@@ -41,11 +42,14 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class ReservationService {
     private static final int DEPOSIT_RATIO = 20;
+    private static final long PAYMENT_EXPIRE_HOURS = 2L;
+    private static final String EXPIRE_REFUND_REASON = "예약 결제 제한 시간 초과";
 
     private final ReservationRepository reservationRepository;
     private final ReservationPetRepository reservationPetRepository;
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
     private final ReservationPaymentRepository reservationPaymentRepository;
+    private final PaymentRefundService paymentRefundService;
 
     private final PostRepository postRepository;
     private final ProposalRepository proposalRepository;
@@ -148,66 +152,6 @@ public class ReservationService {
     }
 
     /*
-    예약 확정 요청
-    보호자가 호출하면 guardianPaid = true
-    시터가 호출하면 sitterPaid = true
-    양쪽 다 true면 CONFIRMED로 전환 + 후속 처리
-
-    CONFIRMED 전환 시:
-    1. 같은 시터의 겹치는 시간대 CONFIRMED 예약 충돌 검사
-    2. 충돌 없으면 CONFIRMED 전환
-    3. 같은 공고의 나머지 PENDING 제안 → REJECTED (Proposal 출처인 경우)
-    4. 같은 시터의 겹치는 시간대 Proposal → WITHDRAWN
-    5. 공고 → CLOSED (Proposal 출처인 경우)
-     */
-    @Transactional
-    public ReservationResponseDto confirm(Long memberId, Long reservationId) {
-
-        /*
-        V2 에서는 여기 결제 로직이 추가되어야합니다!!!!!!!!
-         */
-
-        Reservation reservation = findById(reservationId);
-        validateParty(memberId, reservation);
-        validatePending(reservation);
-
-        ReservationPayment payment = findPayment(reservationId);
-
-        // 보호자/시터 결제 확인 처리
-        if (reservation.isGuardian(memberId)) {
-            if (payment.isGuardianPaid()) {
-                log.info("[ReservationService] 보호자 결제 완료 멱등 처리: 중복 요청 무시");
-                // 이 부분 결제할 때 PaymentException 으로 바꾸는게 좋아보이긴 합니다!
-                // 아래도 마찬가지. . .
-                throw new ReservationException(ReservationErrorCode.ALREADY_PAID);
-            } else {
-                payment.guardianConfirm();
-                log.info("[예약 확정] reservationId={}, 보호자(memberId={}) 결제 확인", reservationId, memberId);
-            }
-        } else {
-            if (payment.isSitterPaid()) {
-                log.info("[ReservationService] 시터 결제 완료 멱등 처리: 중복 요청 무시");
-                throw new ReservationException(ReservationErrorCode.ALREADY_PAID);
-            } else {
-                payment.sitterConfirm();
-                log.info("[예약 확정] reservationId={}, 시터(memberId={}) 결제 확인", reservationId, memberId);
-            }
-        }
-
-        // 양쪽 다 결제 완료 시 CONFIRMED 전환
-        if (payment.isBothPaid()) {
-            validateNoConfirmedConflict(reservation);
-            reservation.confirm();
-            log.info("[예약 확정] reservationId={}, 양측 결제 완료 → CONFIRMED", reservationId);
-
-            // 후속 처리
-            handlePostConfirmation(reservation);
-        }
-
-        return toResponseDto(reservation);
-    }
-
-    /*
     Payment 도메인에서 PortOne 결제 검증을 마친 뒤 호출하는 예약 확정 처리.
     양측 결제가 모두 완료된 경우에만 Reservation 을 CONFIRMED 로 전환한다.
      */
@@ -266,16 +210,37 @@ public class ReservationService {
         reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
         log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
 
-        // 환불할 예약금이 있으면 환불 처리
-        // V2 결제 연동 시 환불 로직 구현
-        // ReservationPayment payment = findPayment(reservationId);
-        // if (payment.isGuardianPaid()) refundGuardian(reservation);
-        // if (payment.isSitterPaid()) refundSitter(reservation);
+        paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
 
         // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
         handlePostCancellation(reservation);
 
         return toResponseDto(reservation);
+    }
+
+    /*
+    예약 만료 처리
+    PENDING 예약이 생성 후 2시간을 넘기면 EXPIRED로 닫고 이미 결제된 금액을 환불한다.
+     */
+    @Transactional
+    public int expirePendingReservations(LocalDateTime now) {
+        LocalDateTime deadline = now.minusHours(PAYMENT_EXPIRE_HOURS);
+        List<Reservation> expiredTargets = reservationRepository.findAllByStatusAndCreatedAtBefore(
+                ReservationStatus.PENDING, deadline);
+
+        expiredTargets.forEach(this::expireReservation);
+
+        if (!expiredTargets.isEmpty()) {
+            log.info("[예약 만료] 처리 건수={}", expiredTargets.size());
+        }
+
+        return expiredTargets.size();
+    }
+
+    private void expireReservation(Reservation reservation) {
+        reservation.expire();
+        paymentRefundService.refundPaidPayments(reservation.getId(), EXPIRE_REFUND_REASON);
+        handlePostCancellation(reservation);
     }
 
 

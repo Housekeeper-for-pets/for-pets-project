@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
@@ -14,6 +15,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     List<Reservation> findAllBySitterMemberId(Long sitterMemberId);
 
     List<Reservation> findAllBySitterProfileIdAndStatus(Long sitterProfileId, ReservationStatus status);
+
+    List<Reservation> findAllByStatusAndCreatedAtBefore(ReservationStatus status, LocalDateTime createdAt);
 
     boolean existsBySitterProfileIdAndStatus(Long sitterProfileId, ReservationStatus status);
 

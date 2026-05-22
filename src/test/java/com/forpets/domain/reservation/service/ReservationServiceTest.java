@@ -3,6 +3,7 @@ package com.forpets.domain.reservation.service;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
+import com.forpets.domain.payment.service.PaymentRefundService;
 import com.forpets.domain.reservation.dto.CancelReservationRequest;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.entity.*;
@@ -28,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -52,6 +54,9 @@ class ReservationServiceTest {
 
     @Mock
     private ReservationPaymentRepository reservationPaymentRepository;
+
+    @Mock
+    private PaymentRefundService paymentRefundService;
 
     @Mock
     private PostRepository postRepository;
@@ -242,22 +247,23 @@ class ReservationServiceTest {
     }
 
     // ========================================================
-    // 예약 확정 — PATCH /api/reservations/{reservationId}/confirm
+    // 예약 확정 — Payment 검증 이후 Reservation CONFIRMED 전환
     // ========================================================
     @Nested
-    @DisplayName("예약 확정 — PATCH /api/reservations/{reservationId}/confirm")
+    @DisplayName("예약 확정 — Payment 검증 이후 Reservation CONFIRMED 전환")
     class ConfirmTest {
 
         @Test
-        @DisplayName("[성공] 보호자 결제 확인 성공 — guardianPaid true, 아직 PENDING")
+        @DisplayName("[성공] 보호자만 결제 완료 — 아직 PENDING")
         void reservation_test_07() {
             // given
+            payment.guardianConfirm();
             given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
             given(reservationPaymentRepository.findByReservationId(reservationId)).willReturn(Optional.of(payment));
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            ReservationResponseDto result = reservationService.confirm(member1Id, reservationId);
+            ReservationResponseDto result = reservationService.confirmAfterPayment(reservationId);
 
             // then
             assertThat(result.guardianPaid()).isTrue();
@@ -265,15 +271,16 @@ class ReservationServiceTest {
         }
 
         @Test
-        @DisplayName("[성공] 시터 결제 확인 성공 — sitterPaid true, 아직 PENDING")
+        @DisplayName("[성공] 시터만 결제 완료 — 아직 PENDING")
         void reservation_test_08() {
             // given
+            payment.sitterConfirm();
             given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
             given(reservationPaymentRepository.findByReservationId(reservationId)).willReturn(Optional.of(payment));
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            ReservationResponseDto result = reservationService.confirm(member2Id, reservationId);
+            ReservationResponseDto result = reservationService.confirmAfterPayment(reservationId);
 
             // then
             assertThat(result.sitterPaid()).isTrue();
@@ -283,8 +290,9 @@ class ReservationServiceTest {
         @Test
         @DisplayName("[성공] 양측 결제 완료 시 CONFIRMED 전환 성공")
         void reservation_test_09() {
-            // given — 보호자 선결제 후 시터 결제 시나리오
-            payment.guardianConfirm(); // 보호자 먼저 결제 완료
+            // given — Payment 도메인에서 양측 결제 완료 처리 후 호출되는 시나리오
+            payment.guardianConfirm();
+            payment.sitterConfirm();
 
             given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
             given(reservationPaymentRepository.findByReservationId(reservationId)).willReturn(Optional.of(payment));
@@ -296,8 +304,8 @@ class ReservationServiceTest {
                     .willReturn(List.of());
             stubToResponseDto(reservationId, reservation, payment);
 
-            // when — 시터가 결제 완료
-            ReservationResponseDto result = reservationService.confirm(member2Id, reservationId);
+            // when
+            ReservationResponseDto result = reservationService.confirmAfterPayment(reservationId);
 
             // then
             assertThat(result.status()).isEqualTo(ReservationStatus.CONFIRMED);
@@ -306,40 +314,11 @@ class ReservationServiceTest {
         }
 
         @Test
-        @DisplayName("[실패] 보호자가 중복 결제 시도")
-        void reservation_test_10() {
-            // given
-            payment.guardianConfirm(); // 이미 결제 완료
-            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
-            given(reservationPaymentRepository.findByReservationId(reservationId)).willReturn(Optional.of(payment));
-
-            // when & then
-            assertThatThrownBy(() -> reservationService.confirm(member1Id, reservationId))
-                    .isInstanceOf(ReservationException.class)
-                    .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
-                            .isEqualTo(ReservationErrorCode.ALREADY_PAID));
-        }
-
-        @Test
-        @DisplayName("[실패] 시터가 중복 결제 시도")
-        void reservation_test_11() {
-            // given
-            payment.sitterConfirm(); // 이미 결제 완료
-            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
-            given(reservationPaymentRepository.findByReservationId(reservationId)).willReturn(Optional.of(payment));
-
-            // when & then
-            assertThatThrownBy(() -> reservationService.confirm(member2Id, reservationId))
-                    .isInstanceOf(ReservationException.class)
-                    .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
-                            .isEqualTo(ReservationErrorCode.ALREADY_PAID));
-        }
-
-        @Test
         @DisplayName("[실패] CONFIRMED 예약과 시간 충돌 시 CONFIRMED 전환 차단")
         void reservation_test_12() {
-            // given — 보호자 선결제 상태에서 시터 결제 시 충돌 발생
+            // given — 양측 결제 완료 상태에서 CONFIRMED 전환 시 충돌 발생
             payment.guardianConfirm();
+            payment.sitterConfirm();
 
             ReservationTimeSlot newSlot = createTimeSlot(
                     reservationId, 1,
@@ -371,7 +350,7 @@ class ReservationServiceTest {
             given(timeSlotValidator.hasTimeConflict(anyList(), anyList())).willReturn(true);
 
             // when & then
-            assertThatThrownBy(() -> reservationService.confirm(member2Id, reservationId))
+            assertThatThrownBy(() -> reservationService.confirmAfterPayment(reservationId))
                     .isInstanceOf(ReservationException.class)
                     .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
                             .isEqualTo(ReservationErrorCode.RESERVATION_CONFLICT));
@@ -388,24 +367,10 @@ class ReservationServiceTest {
 //            given(reservationPaymentRepository.findByReservationId(reservationId)).willReturn(Optional.of(payment));
 
             // when & then
-            assertThatThrownBy(() -> reservationService.confirm(member1Id, reservationId))
+            assertThatThrownBy(() -> reservationService.confirmAfterPayment(reservationId))
                     .isInstanceOf(ReservationException.class)
                     .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
                             .isEqualTo(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION));
-        }
-
-        @Test
-        @DisplayName("[실패] 당사자가 아닌 회원이 확정 시도")
-        void reservation_test_14() {
-            // given
-            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
-//            given(reservationPaymentRepository.findByReservationId(reservationId)).willReturn(Optional.of(payment));
-
-            // when & then
-            assertThatThrownBy(() -> reservationService.confirm(member3Id, reservationId))
-                    .isInstanceOf(ReservationException.class)
-                    .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
-                            .isEqualTo(ReservationErrorCode.NOT_RESERVATION_PARTY));
         }
     }
 
@@ -516,6 +481,8 @@ class ReservationServiceTest {
             assertThat(result.canceledBy()).isEqualTo(CanceledBy.GUARDIAN);
             assertThat(result.cancelReason()).isEqualTo("개인 사정으로 인해 취소합니다");
             assertThat(result.cancelCategory()).isEqualTo(CancelCategory.PERSONAL);
+            then(paymentRefundService).should()
+                    .refundPaidPayments(reservationId, cancelRequest.cancelReason());
         }
 
         @Test
@@ -532,6 +499,8 @@ class ReservationServiceTest {
             // then
             assertThat(result.status()).isEqualTo(ReservationStatus.CANCELED);
             assertThat(result.canceledBy()).isEqualTo(CanceledBy.SITTER);
+            then(paymentRefundService).should()
+                    .refundPaidPayments(reservationId, cancelRequest.cancelReason());
         }
 
         @Test
@@ -592,6 +561,52 @@ class ReservationServiceTest {
                     .isInstanceOf(ReservationException.class)
                     .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
                             .isEqualTo(ReservationErrorCode.NOT_RESERVATION_PARTY));
+        }
+    }
+
+    // ========================================================
+    // 예약 만료 — Scheduler
+    // ========================================================
+    @Nested
+    @DisplayName("예약 만료 — Scheduler")
+    class ExpireTest {
+
+        @Test
+        @DisplayName("[성공] 2시간 초과 PENDING 예약 만료 처리")
+        void reservation_test_27() {
+            // given
+            LocalDateTime now = LocalDateTime.of(2026, 5, 22, 15, 0);
+            given(reservationRepository.findAllByStatusAndCreatedAtBefore(
+                    ReservationStatus.PENDING, now.minusHours(2)))
+                    .willReturn(List.of(reservation));
+
+            // when
+            int result = reservationService.expirePendingReservations(now);
+
+            // then
+            assertThat(result).isEqualTo(1);
+            assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.EXPIRED);
+            then(paymentRefundService).should()
+                    .refundPaidPayments(reservationId, "예약 결제 제한 시간 초과");
+        }
+
+        @Test
+        @DisplayName("[성공] Proposal 출처 예약 만료 시 ACCEPTED → PENDING 복원")
+        void reservation_test_28() {
+            // given
+            LocalDateTime now = LocalDateTime.of(2026, 5, 22, 15, 0);
+            given(reservationRepository.findAllByStatusAndCreatedAtBefore(
+                    ReservationStatus.PENDING, now.minusHours(2)))
+                    .willReturn(List.of(proposalReservation));
+            given(proposalRepository.findById(proposalId)).willReturn(Optional.of(proposal));
+
+            // when
+            int result = reservationService.expirePendingReservations(now);
+
+            // then
+            assertThat(result).isEqualTo(1);
+            assertThat(proposalReservation.getStatus()).isEqualTo(ReservationStatus.EXPIRED);
+            assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.PENDING);
         }
     }
 }

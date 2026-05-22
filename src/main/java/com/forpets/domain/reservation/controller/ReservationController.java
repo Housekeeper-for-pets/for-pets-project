@@ -42,19 +42,6 @@ public class ReservationController {
     }
 
     /*
-    예약 확정
-    보호자 또는 시터가 각각 호출해서 결제 진행 (V2) MVP 에서는 호출만 하면 결제를 한걸로 침
-    양쪽 다 완료되면 그 때 CONFIRMED
-     */
-    @PatchMapping("/{reservationId}/confirm")
-    public ResponseEntity<ApiResponse<ReservationResponseDto>> confirm(
-            @LoginUser CurrentMember currentMember,
-            @PathVariable Long reservationId) {
-        return ResponseEntity.ok(
-                ApiResponse.success(reservationService.confirm(currentMember.id(), reservationId)));
-    }
-
-    /*
     예약 COMPLETE 처리 reservation 이 CONFIRMED 상태일 때, 시터만 가능
      */
     @PatchMapping("/{reservationId}/complete")
