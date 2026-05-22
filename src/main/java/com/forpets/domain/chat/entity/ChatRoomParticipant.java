@@ -8,7 +8,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 @Getter
 @Entity
@@ -53,7 +52,7 @@ public class ChatRoomParticipant extends BaseEntity {
     private Long lastReadMessageId;
 
     @Column(name = "last_read_at")
-    private LocalTime lastReadAt;
+    private LocalDateTime lastReadAt;
 
     @Builder
     private ChatRoomParticipant(Long chatRoomId, Long memberId){

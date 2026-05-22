@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
         name = "chat_message",
         indexes = {
                 // 특정 채팅방 메세지ID 페이징 조회
-                @Index(name = "idx_chat_message_chat_room_id_id", columnList = "chat_room_id_id"),
+                @Index(name = "idx_chat_message_chat_room_id_id", columnList = "chat_room_id, id"),
                 // visibleFromAt 이후 메세지 조회
                 @Index(name = "idx_chat_message_chat_room_id_created_at", columnList = "chat_room_id, created_at"),
                 // 특정 사용자가 보낸 메세지 조회

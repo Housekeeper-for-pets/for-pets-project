@@ -43,7 +43,7 @@ public class ChatRoom extends BaseEntity {
     @Column(name = "last_message_id")
     private Long lastMessageId;
 
-    @Column(name = "last_massage_at")
+    @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;
 
     @Builder
