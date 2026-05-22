@@ -6,6 +6,8 @@ import com.forpets.domain.payment.client.PortOnePaymentClient;
 import com.forpets.domain.payment.entity.Payment;
 import com.forpets.domain.payment.entity.PaymentRole;
 import com.forpets.domain.payment.entity.PaymentStatus;
+import com.forpets.domain.payment.exception.PaymentErrorCode;
+import com.forpets.domain.payment.exception.PaymentException;
 import com.forpets.domain.payment.repository.PaymentRepository;
 import com.forpets.domain.reservation.entity.ReservationPayment;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
@@ -28,6 +30,24 @@ public class PaymentRefundService {
     private final ReservationPaymentRepository reservationPaymentRepository;
     private final PortOnePaymentClient portOnePaymentClient;
     private final CouponService couponService;
+
+    @Transactional
+    public void syncRefundedByWebhook(String merchantUid, String reason, String rawResponse) {
+        Payment payment = paymentRepository.findByMerchantUid(merchantUid)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+        if (!payment.isPaid()) {
+            return;
+        }
+
+        ReservationPayment reservationPayment = reservationPaymentRepository
+                .findByReservationId(payment.getReservationId())
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+
+        payment.refund(reason, rawResponse);
+        restoreReservationPayment(payment, reservationPayment);
+        restoreCouponIfUsed(payment);
+    }
 
     @Transactional
     public void refundPaidPayments(Long reservationId, String reason) {

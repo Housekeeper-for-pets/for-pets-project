@@ -139,4 +139,11 @@ public class Payment extends BaseEntity {
         this.rawResponse = rawResponse;
         this.refundedAt = LocalDateTime.now();
     }
+
+    public void cancel(String cancelReason, String rawResponse) {
+        this.status = PaymentStatus.CANCELED;
+        this.cancelReason = cancelReason;
+        this.rawResponse = rawResponse;
+        this.canceledAt = LocalDateTime.now();
+    }
 }

@@ -89,21 +89,29 @@ public class PaymentService {
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
         validatePaymentOwner(memberId, payment);
-        validateConfirmable(payment);
 
-        PortOnePaymentResult portOnePayment = portOnePaymentClient.getPayment(payment.getMerchantUid());
-        validatePortOnePayment(payment, portOnePayment);
+        return confirmPayment(payment);
+    }
 
-        payment.approve(portOnePayment.paymentId(), portOnePayment.rawResponse());
-        ReservationPayment reservationPayment = findReservationPayment(payment.getReservationId());
-        markReservationPaymentPaid(reservationPayment, payment.getPaymentRole());
+    @Transactional
+    public ConfirmPaymentResponse confirmByWebhook(String merchantUid) {
+        Payment payment = paymentRepository.findByMerchantUid(merchantUid)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-        var reservation = reservationService.confirmAfterPayment(payment.getReservationId());
+        return confirmPayment(payment);
+    }
 
-        log.info("[PaymentService] 결제 승인 완료 paymentId={}, reservationId={}, role={}",
-                payment.getId(), payment.getReservationId(), payment.getPaymentRole());
+    @Transactional
+    public PaymentResponseDto failByWebhook(String merchantUid, String failedReason) {
+        Payment payment = paymentRepository.findByMerchantUid(merchantUid)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-        return ConfirmPaymentResponse.of(payment, reservation.status());
+        if (!payment.isFailable()) {
+            return PaymentResponseDto.from(payment);
+        }
+
+        payment.fail(failedReason);
+        return PaymentResponseDto.from(payment);
     }
 
     /*
@@ -168,6 +176,29 @@ public class PaymentService {
         if (!payment.isFailable()) {
             throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
         }
+    }
+
+    private ConfirmPaymentResponse confirmPayment(Payment payment) {
+        if (payment.isPaid()) {
+            Reservation reservation = findReservation(payment.getReservationId());
+            return ConfirmPaymentResponse.of(payment, reservation.getStatus());
+        }
+
+        validateConfirmable(payment);
+
+        PortOnePaymentResult portOnePayment = portOnePaymentClient.getPayment(payment.getMerchantUid());
+        validatePortOnePayment(payment, portOnePayment);
+
+        payment.approve(portOnePayment.paymentId(), portOnePayment.rawResponse());
+        ReservationPayment reservationPayment = findReservationPayment(payment.getReservationId());
+        markReservationPaymentPaid(reservationPayment, payment.getPaymentRole());
+
+        var reservation = reservationService.confirmAfterPayment(payment.getReservationId());
+
+        log.info("[PaymentService] 결제 승인 완료 paymentId={}, reservationId={}, role={}",
+                payment.getId(), payment.getReservationId(), payment.getPaymentRole());
+
+        return ConfirmPaymentResponse.of(payment, reservation.status());
     }
 
     private void validatePortOnePayment(Payment payment, PortOnePaymentResult portOnePayment) {

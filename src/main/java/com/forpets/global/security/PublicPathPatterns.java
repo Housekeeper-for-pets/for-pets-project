@@ -16,7 +16,8 @@ public final class PublicPathPatterns {
     public static final String[] PUBLIC_POST = {
             "/api/auth/signup",
             "/api/auth/login",
-            "/api/auth/reissue"
+            "/api/auth/reissue",
+            "/api/payments/webhook/portone"
     };
 
     public static final String[] PUBLIC_GET = {
