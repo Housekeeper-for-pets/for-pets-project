@@ -51,6 +51,8 @@ public class ReservationService {
     private final ReservationPaymentRepository reservationPaymentRepository;
     private final PaymentRefundService paymentRefundService;
 
+    private final ReservationLockService reservationLockService;
+
     private final PostRepository postRepository;
     private final ProposalRepository proposalRepository;
     private final PostTimeSlotRepository postTimeSlotRepository;
@@ -161,15 +163,27 @@ public class ReservationService {
         validatePending(reservation);
 
         ReservationPayment payment = findPayment(reservationId);
-        if (payment.isBothPaid()) {
-            validateNoConfirmedConflict(reservation);
-            reservation.confirm();
-            log.info("[예약 확정] reservationId={}, PortOne 양측 결제 완료 → CONFIRMED", reservationId);
-
-            handlePostConfirmation(reservation);
+        if (!payment.isBothPaid()) {
+            return toResponseDto(reservation);
         }
 
-        return toResponseDto(reservation);
+        return reservationLockService.executeWithSitterLock(
+                reservation.getSitterProfileId(), () -> {
+                    validateNoConfirmedConflict(reservation);
+                    reservation.confirm();
+                    log.info("[예약 확정] reservationId={}, CONFIRMED", reservationId);
+                    handlePostConfirmation(reservation);
+                    return toResponseDto(reservation);
+                });
+//        if (payment.isBothPaid()) {
+//            validateNoConfirmedConflict(reservation);
+//            reservation.confirm();
+//            log.info("[예약 확정] reservationId={}, PortOne 양측 결제 완료 → CONFIRMED", reservationId);
+//
+//            handlePostConfirmation(reservation);
+//        }
+//
+//        return toResponseDto(reservation);
     }
 
 
@@ -287,19 +301,6 @@ public class ReservationService {
 
         return hasConflictWith(confirmed, timeSlots);
     }
-
-    /*
-    V2
-    PENDING 예약과 시간 충돌 여부 확인
-    충돌 시 true 반환 → 호출하는 쪽에서 경고 처리
-     */
-//    public boolean hasPendingConflict(Long sitterProfileId, List<? extends HasTimeSlotInfo> timeSlots) {
-//        List<Reservation> pending = reservationRepository
-//                .findAllBySitterProfileIdAndStatus(sitterProfileId, ReservationStatus.PENDING);
-//
-//        return hasConflictWith(pending, timeSlots);
-//    }
-
 
     private boolean hasConflictWith(List<Reservation> reservations, List<? extends HasTimeSlotInfo> newSlots) {
         for (Reservation existing : reservations) {

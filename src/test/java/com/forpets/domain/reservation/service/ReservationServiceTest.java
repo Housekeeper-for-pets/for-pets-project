@@ -33,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
@@ -69,6 +70,10 @@ class ReservationServiceTest {
 
     @Mock
     private TimeSlotValidator timeSlotValidator;
+
+    // Reservation Lock 을 추가하면서 executeWithSitterLock task 를 그냥 실행하도록 해주기
+    @Mock
+    private ReservationLockService reservationLockService;
 
     // ── 테스트 픽스처 ──
     private Reservation reservation;        // PENDING 상태 예약 (CareRequest 출처)
@@ -304,6 +309,14 @@ class ReservationServiceTest {
                     .willReturn(List.of());
             stubToResponseDto(reservationId, reservation, payment);
 
+            // 만약에 executeWithSitterLock 동작에 대한 부분이 들어오면 무조건 통과시켜주기!
+            given(reservationLockService.executeWithSitterLock(
+                    any(), any()))
+                    .willAnswer(invocation -> {
+                        Supplier<?> task = invocation.getArgument(1);
+                        return task.get();  // 락 없이 그냥 실행
+                    });
+
             // when
             ReservationResponseDto result = reservationService.confirmAfterPayment(reservationId);
 
@@ -348,6 +361,14 @@ class ReservationServiceTest {
             given(reservationTimeSlotRepository.findAllByReservationIdOrderByTimeSlotInfoSequence(999L))
                     .willReturn(List.of(conflictSlot));
             given(timeSlotValidator.hasTimeConflict(anyList(), anyList())).willReturn(true);
+
+            // 만약에 executeWithSitterLock 동작에 대한 부분이 들어오면 무조건 통과시켜주기!
+            given(reservationLockService.executeWithSitterLock(
+                    any(), any()))
+                    .willAnswer(invocation -> {
+                        Supplier<?> task = invocation.getArgument(1);
+                        return task.get();  // 락 없이 그냥 실행
+                    });
 
             // when & then
             assertThatThrownBy(() -> reservationService.confirmAfterPayment(reservationId))
