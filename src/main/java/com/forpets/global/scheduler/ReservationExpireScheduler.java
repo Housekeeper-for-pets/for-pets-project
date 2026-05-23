@@ -38,6 +38,8 @@ public class ReservationExpireScheduler {
             int expiredCount = reservationService.expirePendingReservations(LocalDateTime.now());
             if (expiredCount > 0) {
                 log.info("[ReservationExpireScheduler] 만료 예약 처리 완료 count={}", expiredCount);
+            }else{
+                log.info("[ReservationExpireScheduler] 만료 예약 없음");
             }
         } catch (Exception e){
             log.error("[ReservationExpireScheduler] 예약 만료 처리 중 에러 발생", e);
