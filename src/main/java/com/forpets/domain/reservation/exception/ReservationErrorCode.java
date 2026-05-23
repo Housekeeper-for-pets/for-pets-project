@@ -16,6 +16,7 @@ public enum ReservationErrorCode implements ErrorCode {
     NOT_RESERVATION_SITTER(HttpStatus.FORBIDDEN, "NOT_RESERVATION_SITTER", "해당 예약의 시터가 아닙니다."),
     CARE_NOT_COMPLETED_YET(HttpStatus.BAD_REQUEST, "CARE_NOT_COMPLETED_YET", "아직 돌봄이 끝나지 않았습니다."),
     ALREADY_PAID(HttpStatus.BAD_REQUEST, "ALREADY_PAID", "중복 결제입니다."),
+    RESERVATION_CONFIRM_LOCK_FAILED(HttpStatus.CONFLICT, "RESERVATION_CONFIRM_LOCK_FAILED", "예약 확정 처리 중입니다. 잠시 후 다시 시도해주세요."),
     ;
 
     private final HttpStatus status;
