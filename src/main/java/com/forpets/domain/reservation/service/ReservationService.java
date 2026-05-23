@@ -227,6 +227,7 @@ public class ReservationService {
         log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
 
         paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
+        paymentRefundService.expireNonPaidPayments(reservationId);
 
         // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
         handlePostCancellation(reservation);
@@ -256,6 +257,7 @@ public class ReservationService {
     private void expireReservation(Reservation reservation) {
         reservation.expire();
         paymentRefundService.refundPaidPayments(reservation.getId(), EXPIRE_REFUND_REASON);
+        paymentRefundService.expireNonPaidPayments(reservation.getId());
         handlePostCancellation(reservation);
     }
 
