@@ -10,7 +10,8 @@ public final class PublicPathPatterns {
             "/health",
             "/actuator/**",
             "/error",
-            "/favicon.ico"
+            "/favicon.ico",
+            "/ws/**"
     };
 
     public static final String[] PUBLIC_POST = {
