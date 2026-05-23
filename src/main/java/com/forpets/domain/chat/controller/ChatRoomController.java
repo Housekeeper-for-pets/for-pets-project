@@ -2,13 +2,13 @@ package com.forpets.domain.chat.controller;
 
 import com.forpets.domain.chat.dto.ChatRoomCreateRequest;
 import com.forpets.domain.chat.dto.ChatRoomCreateResponse;
+import com.forpets.domain.chat.dto.ChatRoomLeaveResponse;
 import com.forpets.domain.chat.dto.ChatRoomListResponse;
 import com.forpets.domain.chat.service.ChatRoomService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
 import jakarta.validation.Valid;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -53,6 +53,20 @@ public class ChatRoomController {
                 cursorChatRoomId,
                 size
         );
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // 채팅방 나가기
+    @PatchMapping("/{chatRoomId}/leave")
+    public ResponseEntity<ApiResponse<ChatRoomLeaveResponse>> leaveChatRoom(
+            @LoginUser CurrentMember currentMember,
+            @PathVariable Long chatRoomId
+    ) {
+        ChatRoomLeaveResponse response = chatRoomService.leaveChatRoom(
+                currentMember.id(),
+                chatRoomId
+        );
+
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
