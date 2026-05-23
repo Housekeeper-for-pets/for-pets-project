@@ -15,6 +15,23 @@ public class ReservationExpireScheduler {
 
     private final ReservationService reservationService;
 
+    /*
+        1분마다 실행시켜서 2시간 초과한 예약을 만료시킴
+        resrvation service 내부의 expirePendingReservations 얘가 @Transactional 이므로
+        후속처리들이 원자적으로 실행된다
+
+        후속 처리
+        - reservation : PENDING -> EXPIRED
+        - payment : (한 쪽이 결제를 했다면) PAID -> REFUNDED
+        - payment : (결제 요청만 하고 결제 아직 안 했다면) READY/PENDING -> EXPIRED
+        - ReservationPayment : true -> false
+        - UserCoupon : USED -> ACTIVE
+        - (source=)Proposal : ACCEPTED -> PENDING
+        - (source=)CareRequest : ACCEPTED -> PENDING
+
+        엄청 많네요 ......
+     */
+
     @Scheduled(fixedDelayString = "${reservation.expire.fixed-delay:60000}")
     public void expirePendingReservations() {
         try{
