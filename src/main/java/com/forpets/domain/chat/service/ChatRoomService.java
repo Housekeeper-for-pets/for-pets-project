@@ -1,6 +1,7 @@
 package com.forpets.domain.chat.service;
 
 import com.forpets.domain.chat.dto.ChatRoomCreateResponse;
+import com.forpets.domain.chat.dto.ChatRoomLeaveResponse;
 import com.forpets.domain.chat.dto.ChatRoomListItem;
 import com.forpets.domain.chat.dto.ChatRoomListResponse;
 import com.forpets.domain.chat.entity.ChatMessage;
@@ -16,7 +17,6 @@ import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -321,5 +321,34 @@ public class ChatRoomService {
         }
 
         return lastMessage.getContent();
+    }
+
+    // 채팅방 나가기
+    @Transactional
+    public ChatRoomLeaveResponse leaveChatRoom(Long memberId, Long chatRoomId) {
+        ChatRoomParticipant participant = chatRoomParticipantRepository
+                .findByChatRoomIdAndMemberId(chatRoomId, memberId)
+                .orElseThrow(() -> new ChatException(ChatErrorCode.CHAT_ROOM_ACCESS_DENIED));
+
+        // 이미 나감
+        if (participant.isLeft()) {
+            return new ChatRoomLeaveResponse(
+                    chatRoomId,
+                    participant.isLeft(),
+                    participant.getLeftAt(),
+                    participant.getVisibleFromAt()
+            );
+        }
+
+        // 찐 나가기
+        LocalDateTime now = LocalDateTime.now();
+        participant.leave(now);
+
+        return new ChatRoomLeaveResponse(
+                chatRoomId,
+                participant.isLeft(),
+                participant.getLeftAt(),
+                participant.getVisibleFromAt()
+        );
     }
 }
