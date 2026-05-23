@@ -39,6 +39,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             Pageable pageable
     );
 
+
     // 커서 이전 메시지 조회
     @Query("""
         SELECT m FROM ChatMessage m
