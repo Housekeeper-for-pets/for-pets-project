@@ -152,6 +152,7 @@ public class Payment extends BaseEntity {
     public void expire(){
         if (this.status == PaymentStatus.READY || this.status == PaymentStatus.PENDING){
             this.status = PaymentStatus.EXPIRED;
+            return;
         }
         throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
     }
