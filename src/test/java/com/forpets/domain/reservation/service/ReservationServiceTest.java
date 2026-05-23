@@ -1,5 +1,6 @@
 package com.forpets.domain.reservation.service;
 
+import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
@@ -74,6 +75,9 @@ class ReservationServiceTest {
     // Reservation Lock 을 추가하면서 executeWithSitterLock task 를 그냥 실행하도록 해주기
     @Mock
     private ReservationLockService reservationLockService;
+
+    @Mock
+    private CareRequestRepository careRequestRepository;
 
     // ── 테스트 픽스처 ──
     private Reservation reservation;        // PENDING 상태 예약 (CareRequest 출처)

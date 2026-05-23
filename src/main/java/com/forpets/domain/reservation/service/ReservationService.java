@@ -3,6 +3,7 @@ package com.forpets.domain.reservation.service;
 import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
+import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
@@ -58,6 +59,7 @@ public class ReservationService {
     private final PostTimeSlotRepository postTimeSlotRepository;
 
     private final TimeSlotValidator timeSlotValidator;
+    private final CareRequestRepository careRequestRepository;
 
     /*
     예약 생성 1: 순방향로직에서 Reservation 생성 (트리거: CareRequest 수락)
@@ -225,6 +227,7 @@ public class ReservationService {
         log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
 
         paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
+        paymentRefundService.expireNonPaidPayments(reservationId);
 
         // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
         handlePostCancellation(reservation);
@@ -254,7 +257,14 @@ public class ReservationService {
     private void expireReservation(Reservation reservation) {
         reservation.expire();
         paymentRefundService.refundPaidPayments(reservation.getId(), EXPIRE_REFUND_REASON);
+        paymentRefundService.expireNonPaidPayments(reservation.getId());
         handlePostCancellation(reservation);
+
+        // careRequest 도 restore 해줌
+        // 수동 취소에서도 Pending 으로 돌아가는걸 방지하기 위해 expireReservation 으로 위치 이동시킴
+        if (reservation.getSource() == ReservationSource.CARE_REQUEST){
+            careRequestRepository.findById(reservation.getSourceId()).ifPresent(CareRequest::restoreToPending);
+        }
     }
 
 

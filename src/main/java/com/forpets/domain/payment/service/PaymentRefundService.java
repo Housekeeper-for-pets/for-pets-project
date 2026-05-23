@@ -56,8 +56,8 @@ public class PaymentRefundService {
     @Transactional
     public void refundPaidPayments(Long reservationId, String reason) {
         paymentLockService.executeWithReservationLock(reservationId, () -> {
-            List<Payment> paidPayments = paymentRepository.findAllByReservationIdAndStatus(
-                    reservationId, PaymentStatus.PAID);
+            List<Payment> paidPayments = paymentRepository.findAllByReservationIdAndStatusIn(
+                    reservationId, List.of(PaymentStatus.PAID));
 
             if (paidPayments.isEmpty()) {
                 return null;
@@ -103,5 +103,22 @@ public class PaymentRefundService {
         if (payment.getUserCouponId() != null) {
             couponService.restoreCoupon(payment.getMemberId(), payment.getUserCouponId());
         }
+    }
+
+    /*
+     * 창을 열기만 하고 결제하진 않은 건(READY/PENDING)을  EXPIRED 처리
+     * refundPaidPayments()랑 같이 호출하기
+     */
+    @Transactional
+    public void expireNonPaidPayments(Long reservationId) {
+        List<Payment> nonPaidPayments = paymentRepository.findAllByReservationIdAndStatusIn(
+                reservationId, List.of(PaymentStatus.READY, PaymentStatus.PENDING));
+
+        nonPaidPayments.forEach(payment -> {
+            payment.expire();
+            restoreCouponIfUsed(payment);
+            log.info("[PaymentRefundService] 미결제 Payment 만료 처리 paymentId={}, reservationId={}, 기존상태={}",
+                    payment.getId(), payment.getReservationId(), payment.getStatus());
+        });
     }
 }
