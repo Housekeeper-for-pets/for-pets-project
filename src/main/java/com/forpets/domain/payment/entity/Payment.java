@@ -1,5 +1,7 @@
 package com.forpets.domain.payment.entity;
 
+import com.forpets.domain.payment.exception.PaymentErrorCode;
+import com.forpets.domain.payment.exception.PaymentException;
 import com.forpets.global.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -145,5 +147,12 @@ public class Payment extends BaseEntity {
         this.cancelReason = cancelReason;
         this.rawResponse = rawResponse;
         this.canceledAt = LocalDateTime.now();
+    }
+
+    public void expire(){
+        if (this.status == PaymentStatus.READY || this.status == PaymentStatus.PENDING){
+            this.status = PaymentStatus.EXPIRED;
+        }
+        throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
     }
 }

@@ -3,6 +3,7 @@ package com.forpets.domain.reservation.service;
 import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
+import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
@@ -58,6 +59,7 @@ public class ReservationService {
     private final PostTimeSlotRepository postTimeSlotRepository;
 
     private final TimeSlotValidator timeSlotValidator;
+    private final CareRequestRepository careRequestRepository;
 
     /*
     예약 생성 1: 순방향로직에서 Reservation 생성 (트리거: CareRequest 수락)
@@ -426,6 +428,10 @@ public class ReservationService {
     private void handlePostCancellation(Reservation reservation) {
         if (reservation.getSource() == ReservationSource.PROPOSAL) {
             proposalRepository.findById(reservation.getSourceId()).ifPresent(Proposal::restoreToPending);
+        }
+        // ReservationSource.CARE_REQUEST 인 경우에
+        else {
+            careRequestRepository.findById(reservation.getSourceId()).ifPresent(CareRequest::restoreToPending);
         }
     }
 
