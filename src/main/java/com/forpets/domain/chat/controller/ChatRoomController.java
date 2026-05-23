@@ -1,9 +1,7 @@
 package com.forpets.domain.chat.controller;
 
-import com.forpets.domain.chat.dto.ChatRoomCreateRequest;
-import com.forpets.domain.chat.dto.ChatRoomCreateResponse;
-import com.forpets.domain.chat.dto.ChatRoomLeaveResponse;
-import com.forpets.domain.chat.dto.ChatRoomListResponse;
+import com.forpets.domain.chat.dto.*;
+import com.forpets.domain.chat.service.ChatMessageService;
 import com.forpets.domain.chat.service.ChatRoomService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
@@ -22,6 +20,7 @@ import java.time.LocalDateTime;
 public class ChatRoomController {
 
     private final ChatRoomService chatRoomService;
+    private final ChatMessageService chatMessageService;
 
 
     // 채팅방 생성 또는 조회
@@ -67,6 +66,23 @@ public class ChatRoomController {
                 chatRoomId
         );
 
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // 메세지 목록 조회
+    @GetMapping("/{chatRoomId}/messages")
+    public ResponseEntity<ApiResponse<ChatMessageListResponse>> getMessages(
+            @LoginUser CurrentMember currentMember,
+            @PathVariable Long chatRoomId,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "30") int size
+    ){
+        ChatMessageListResponse response = chatMessageService.getMessages(
+                currentMember.id(),
+                chatRoomId,
+                cursorId,
+                size
+        );
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
