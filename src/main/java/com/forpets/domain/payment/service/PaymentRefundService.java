@@ -114,10 +114,6 @@ public class PaymentRefundService {
         List<Payment> nonPaidPayments = paymentRepository.findAllByReservationIdAndStatusIn(
                 reservationId, List.of(PaymentStatus.READY, PaymentStatus.PENDING));
 
-        if (nonPaidPayments.isEmpty()){
-            return null;
-        }
-
         nonPaidPayments.forEach(payment -> {
             payment.expire();
             restoreCouponIfUsed(payment);

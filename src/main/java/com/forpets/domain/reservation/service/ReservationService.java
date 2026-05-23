@@ -259,6 +259,12 @@ public class ReservationService {
         paymentRefundService.refundPaidPayments(reservation.getId(), EXPIRE_REFUND_REASON);
         paymentRefundService.expireNonPaidPayments(reservation.getId());
         handlePostCancellation(reservation);
+
+        // careRequest 도 restore 해줌
+        // 수동 취소에서도 Pending 으로 돌아가는걸 방지하기 위해 expireReservation 으로 위치 이동시킴
+        if (reservation.getSource() == ReservationSource.CARE_REQUEST){
+            careRequestRepository.findById(reservation.getSourceId()).ifPresent(CareRequest::restoreToPending);
+        }
     }
 
 
@@ -430,10 +436,6 @@ public class ReservationService {
     private void handlePostCancellation(Reservation reservation) {
         if (reservation.getSource() == ReservationSource.PROPOSAL) {
             proposalRepository.findById(reservation.getSourceId()).ifPresent(Proposal::restoreToPending);
-        }
-        // ReservationSource.CARE_REQUEST 인 경우에
-        else {
-            careRequestRepository.findById(reservation.getSourceId()).ifPresent(CareRequest::restoreToPending);
         }
     }
 
