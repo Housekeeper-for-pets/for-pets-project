@@ -142,21 +142,57 @@ public class PaymentRefundService {
                     .orElseThrow(() -> new ReservationException(
                             ReservationErrorCode.RESERVATION_NOT_FOUND));
 
+            // 1단계: PG 환불 (각자 결제한 곳으로 위약금 뺀 금액 환불)
+            long penaltyAmount = 0L;
             for (Payment payment : paidPayments) {
                 if (!payment.isPaid()) continue;
 
-                if (shouldApplyPenalty(payment, canceledBy)) {
-                    // 위약금 대상: 80%만 환불
-                    long refundAmount = payment.getFinalAmount() * (100 - PENALTY_PERCENT) / 100;
+                long penalty = calculatePenalty(payment, canceledBy);
+                long refundAmount = payment.getFinalAmount() - penalty;
+                penaltyAmount += penalty;
+
+                if (refundAmount > 0) {
                     partialRefund(payment, reservationPayment, refundAmount, reason);
                 } else {
-                    // 위약금 비대상: 전액 환불
-                    refund(payment, reservationPayment, reason);
+                    // 시터가 취소한 경우, 시터 결제는 전액 위약금이라 PG 환불 0원
+                    // 상태만 REFUNDED 로 닫는다
+                    markAsRefundedWithoutPgCall(payment, reservationPayment, reason);
                 }
             }
+
+            // 2단계: 위약금을 상대방에게 보상금으로 정산
+            // TODO: Settlement 완성되면 여기 아래에 추가해주시면 됩니다!!!
+            if (penaltyAmount > 0) {
+                log.info("[PaymentRefundService] 위약금 정산 예정 reservationId={}, 위약금총액={}, 취소주체={}, 보상수신자={}",
+                        reservationId, penaltyAmount, canceledBy,
+                        canceledBy == CanceledBy.GUARDIAN ? "SITTER" : "GUARDIAN");
+                // settlementService.create(reservationId, penaltyAmount,
+                //     canceledBy == CanceledBy.GUARDIAN ? PaymentRole.SITTER : PaymentRole.GUARDIAN);
+            }
+
             return null;
         });
     }
+
+    /*
+     * 위약금 계산
+     * - 보호자가 취소: 보호자가 자기 결제금의 20% 위약금
+     * - 시터가 취소: 시터가 자기 예약금 100% 위약금
+     * - 취소 안 한 쪽: 위약금 0 (전액 환불)
+     */
+    private long calculatePenalty(Payment payment, CanceledBy canceledBy) {
+        if (canceledBy == CanceledBy.GUARDIAN
+                && payment.getPaymentRole() == PaymentRole.GUARDIAN) {
+            return payment.getFinalAmount() * PENALTY_PERCENT / 100;
+        }
+        if (canceledBy == CanceledBy.SITTER
+                && payment.getPaymentRole() == PaymentRole.SITTER) {
+            return payment.getFinalAmount(); // 시터 예약금 전액
+        }
+        return 0L;
+    }
+
+
 
 
     /**
@@ -180,8 +216,20 @@ public class PaymentRefundService {
         restoreReservationPayment(payment, reservationPayment);
         restoreCouponIfUsed(payment);
 
-        log.info("[PaymentRefundService] 위약금 차감 환불 완료 paymentId={}, 원래금액={}, 환불금액={}, 위약금={}",
+        log.info("[PaymentRefundService] 부분 환불 완료 paymentId={}, 원래금액={}, 환불금액={}, 위약금={}",
                 payment.getId(), payment.getFinalAmount(), refundAmount,
                 payment.getFinalAmount() - refundAmount);
+    }
+
+
+    private void markAsRefundedWithoutPgCall(Payment payment,
+                                             ReservationPayment reservationPayment,
+                                             String reason) {
+        payment.refund(reason, null);
+        restoreReservationPayment(payment, reservationPayment);
+        restoreCouponIfUsed(payment);
+
+        log.info("[PaymentRefundService] PG 환불 없이 상태만 닫음 paymentId={}, 전액위약금={}",
+                payment.getId(), payment.getFinalAmount());
     }
 }
