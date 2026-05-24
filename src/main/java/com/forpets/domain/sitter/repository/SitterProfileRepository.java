@@ -16,6 +16,11 @@ public interface SitterProfileRepository extends JpaRepository<SitterProfile, Lo
             nativeQuery = true)
     int countByMemberIdIncludingDeleted(@Param("memberId") Long memberId);
 
+    @Query(value =
+            "SELECT * FROM sitter_profile WHERE member_id = :memberId",
+            nativeQuery = true)
+    Optional<SitterProfile> findByIdIncludingDeleted(@Param("memberId") Long memberId);
+
     boolean existsByMemberId(Long memberId);
 
     Optional<SitterProfile> findByMemberId(Long memberId);

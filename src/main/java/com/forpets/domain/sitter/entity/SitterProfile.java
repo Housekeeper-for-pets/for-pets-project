@@ -77,6 +77,7 @@ public class SitterProfile extends BaseEntity {
         this.possiblePetSize = possiblePetSize == null ? PossiblePetSize.ALL : possiblePetSize;
         this.pricePerHour = pricePerHour;
         this.status = SitterProfileStatus.RESERVABLE;
+        this.approvalStatus = SitterApprovalStatus.PENDING;
     }
 
     public void update(String introduction, int experienceYears,
@@ -111,6 +112,16 @@ public class SitterProfile extends BaseEntity {
     public void delete() {
         this.deleted = true;
         this.deletedAt = LocalDateTime.now();
+    }
+
+    public void reactivate() {
+        this.deleted = false;
+        this.deletedAt = null;
+        this.approvalStatus = SitterApprovalStatus.PENDING;
+        this.status = SitterProfileStatus.NON_RESERVABLE;
+        this.rejectReason = null;
+        this.evaluatedBy = null;
+        this.evaluatedAt = null;
     }
 
     public boolean isApproved() {
