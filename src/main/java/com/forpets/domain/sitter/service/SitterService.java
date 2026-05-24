@@ -110,6 +110,7 @@ public class SitterService {
 
     public SitterResponseDto getSitterById(Long sitterId) {
         SitterProfile sitter = findById(sitterId);
+        validateApproved(sitter);
         Member member = memberService.findById(sitter.getMemberId());
         List<SitterSchedule> schedules = sitterScheduleRepository.findAllBySitterProfileId(sitter.getId());
         return SitterResponseDto.from(sitter, member.getRegion(), schedules);
