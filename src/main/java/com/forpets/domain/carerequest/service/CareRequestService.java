@@ -206,7 +206,7 @@ public class CareRequestService {
     }
 
     private void validateReservable(SitterProfile sitter) {
-        if (!sitter.isReservable()) {
+        if (!sitter.isReservable() || !sitter.isApproved()) {
             throw new CareRequestException(CareRequestErrorCode.SITTER_NOT_RESERVABLE);
         }
     }

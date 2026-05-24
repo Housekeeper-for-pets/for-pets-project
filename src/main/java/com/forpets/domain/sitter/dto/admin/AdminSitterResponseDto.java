@@ -1,13 +1,11 @@
-package com.forpets.domain.sitter.dto.profile;
+package com.forpets.domain.sitter.dto.admin;
 
 import com.forpets.domain.member.entity.Region;
-import com.forpets.domain.sitter.dto.schedule.ScheduleResponseDto;
 import com.forpets.domain.sitter.entity.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
-public record SitterResponseDto(
+public record AdminSitterResponseDto(
         Long id,
         Long memberId,
         Region region,
@@ -18,16 +16,14 @@ public record SitterResponseDto(
         Integer pricePerHour,
         SitterProfileStatus status,
         SitterApprovalStatus approvalStatus,
-        List<ScheduleResponseDto> schedules,
+        String rejectReason,
+        Long evaluatedBy,
+        LocalDateTime evaluatedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
-    public static SitterResponseDto from(SitterProfile sitter, Region region) {
-        return from(sitter, region, List.of());
-    }
-
-    public static SitterResponseDto from(SitterProfile sitter, Region region, List<SitterSchedule> schedules) {
-        return new SitterResponseDto(
+    public static AdminSitterResponseDto from(SitterProfile sitter, Region region) {
+        return new AdminSitterResponseDto(
                 sitter.getId(),
                 sitter.getMemberId(),
                 region,
@@ -38,7 +34,9 @@ public record SitterResponseDto(
                 sitter.getPricePerHour(),
                 sitter.getStatus(),
                 sitter.getApprovalStatus(),
-                schedules.stream().map(ScheduleResponseDto::from).toList(),
+                sitter.getRejectReason(),
+                sitter.getEvaluatedBy(),
+                sitter.getEvaluatedAt(),
                 sitter.getCreatedAt(),
                 sitter.getUpdatedAt()
         );

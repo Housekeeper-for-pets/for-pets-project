@@ -80,6 +80,8 @@ public class DataInit implements CommandLineRunner {
     public void run(String... args) {
         if (memberRepository.count() > 0) return;
 
+        Member adminMember = saveMember("dragonRock@test.com", "소란석", "010-0000-0000", MemberGender.MALE, Region.YONGSAN);
+        adminMember.setAdmin();
         // =============================================
         // 1. Member 5명 (기존)
         // =============================================
