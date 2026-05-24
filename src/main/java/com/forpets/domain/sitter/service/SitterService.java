@@ -133,6 +133,7 @@ public class SitterService {
     public SitterResponseDto update(Long memberId, UpdateSitterRequest request) {
         Member member = memberService.findById(memberId);
         SitterProfile sitter = findByMemberId(memberId);
+        validateApproved(sitter);
 
         sitter.update(
                 request.introduction(),
@@ -153,6 +154,7 @@ public class SitterService {
     public SitterResponseDto updateStatus(Long memberId, UpdateSitterStatusRequest request) {
         Member member = memberService.findById(memberId);
         SitterProfile sitter = findByMemberId(memberId);
+        validateApproved(sitter);
 
         sitter.changeStatus(request.status());
 
@@ -167,6 +169,7 @@ public class SitterService {
     @Transactional
     public void delete(Long memberId) {
         SitterProfile sitter = findByMemberId(memberId);
+        validateNotPending(sitter);
         if (associationChecker.hasSitterActiveAssociation(sitter.getId())){
             throw new SitterException(SitterErrorCode.SITTER_USED_IN_ACTIVE_PROCESS);
         }
@@ -178,6 +181,17 @@ public class SitterService {
     }
 
     // -------------Transaction 아닌 method 들------------------
+
+    private void validateApproved(SitterProfile sitter) {
+        if (!sitter.isApproved()) throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);
+    }
+
+    // rejected 되면 삭제 후 재등록이 가능하도록 함
+    private void validateNotPending(SitterProfile sitter){
+        if (sitter.getApprovalStatus() == SitterApprovalStatus.PENDING){
+            throw new SitterException(SitterErrorCode.SITTER_ALREADY_PENDING);
+        }
+    }
 
     /**
      * 정렬 필드 화이트리스트 검증
@@ -248,13 +262,4 @@ public class SitterService {
             throw new SitterException(SitterErrorCode.SITTER_PROFILE_ALREADY_REGISTERED);
         }
     }
-
-    /*
-    시터에게 진행 중인 예약(PENDING/CONFIRMED)이 있는지 확인
-     */
-//    private void validateNoActiveReservation(Long sitterId) {
-//         if (reservationService.existsInProgressBySitterId(sitterId)) {
-//             throw new SitterException(SitterErrorCode.HAS_ACTIVE_RESERVATION);
-//         }
-//    }
 }

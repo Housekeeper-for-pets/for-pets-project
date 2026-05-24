@@ -1,5 +1,7 @@
 package com.forpets.domain.sitter.entity;
 
+import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.global.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
