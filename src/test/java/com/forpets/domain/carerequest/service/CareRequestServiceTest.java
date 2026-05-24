@@ -104,6 +104,7 @@ class CareRequestServiceTest {
                 .pricePerHour(15000)
                 .build();
         ReflectionTestUtils.setField(sitterProfile, "id", sitterProfileId);
+        sitterProfile.approve(member3Id);
 
         // member1(째길중)의 반려동물들
         pet1 = Pet.builder()
