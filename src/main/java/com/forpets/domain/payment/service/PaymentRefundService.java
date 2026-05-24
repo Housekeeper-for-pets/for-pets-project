@@ -9,6 +9,7 @@ import com.forpets.domain.payment.entity.PaymentStatus;
 import com.forpets.domain.payment.exception.PaymentErrorCode;
 import com.forpets.domain.payment.exception.PaymentException;
 import com.forpets.domain.payment.repository.PaymentRepository;
+import com.forpets.domain.reservation.entity.CanceledBy;
 import com.forpets.domain.reservation.entity.ReservationPayment;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
@@ -31,6 +32,9 @@ public class PaymentRefundService {
     private final PortOnePaymentClient portOnePaymentClient;
     private final CouponService couponService;
     private final PaymentLockService paymentLockService;
+
+
+    private static final int PENALTY_PERCENT = 20;
 
     @Transactional
     public void syncRefundedByWebhook(String merchantUid, String reason, String rawResponse) {
@@ -120,5 +124,64 @@ public class PaymentRefundService {
             log.info("[PaymentRefundService] 미결제 Payment 만료 처리 paymentId={}, reservationId={}, 기존상태={}",
                     payment.getId(), payment.getReservationId(), payment.getStatus());
         });
+    }
+
+
+    @Transactional
+    public void refundWithPenalty(Long reservationId, String reason, CanceledBy canceledBy) {
+        paymentLockService.executeWithReservationLock(reservationId, () -> {
+            List<Payment> paidPayments = paymentRepository.findAllByReservationIdAndStatusIn(
+                    reservationId, List.of(PaymentStatus.PAID));
+
+            if (paidPayments.isEmpty()) {
+                return null;
+            }
+
+            ReservationPayment reservationPayment = reservationPaymentRepository
+                    .findByReservationId(reservationId)
+                    .orElseThrow(() -> new ReservationException(
+                            ReservationErrorCode.RESERVATION_NOT_FOUND));
+
+            for (Payment payment : paidPayments) {
+                if (!payment.isPaid()) continue;
+
+                if (shouldApplyPenalty(payment, canceledBy)) {
+                    // 위약금 대상: 80%만 환불
+                    long refundAmount = payment.getFinalAmount() * (100 - PENALTY_PERCENT) / 100;
+                    partialRefund(payment, reservationPayment, refundAmount, reason);
+                } else {
+                    // 위약금 비대상: 전액 환불
+                    refund(payment, reservationPayment, reason);
+                }
+            }
+            return null;
+        });
+    }
+
+
+    /**
+     * 위약금 적용 대상 판별
+     * - 보호자가 취소 → 보호자 결제가 위약금 대상 (80%만 환불)
+     * - 시터가 취소 → 시터 예약금이 위약금 대상 (80%만 환불, 20%는 보호자에게)
+     */
+    private boolean shouldApplyPenalty(Payment payment, CanceledBy canceledBy) {
+        if (canceledBy == CanceledBy.GUARDIAN) {
+            return payment.getPaymentRole() == PaymentRole.GUARDIAN;
+        }
+        return payment.getPaymentRole() == PaymentRole.SITTER;
+    }
+
+    private void partialRefund(Payment payment, ReservationPayment reservationPayment,
+                               Long refundAmount, String reason) {
+        PortOneCancelResult cancelResult = portOnePaymentClient.cancelPayment(
+                payment.getMerchantUid(), refundAmount, reason);
+
+        payment.refund(reason, cancelResult.rawResponse());
+        restoreReservationPayment(payment, reservationPayment);
+        restoreCouponIfUsed(payment);
+
+        log.info("[PaymentRefundService] 위약금 차감 환불 완료 paymentId={}, 원래금액={}, 환불금액={}, 위약금={}",
+                payment.getId(), payment.getFinalAmount(), refundAmount,
+                payment.getFinalAmount() - refundAmount);
     }
 }
