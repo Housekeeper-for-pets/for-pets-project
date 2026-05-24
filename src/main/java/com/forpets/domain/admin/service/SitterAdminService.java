@@ -5,6 +5,8 @@ import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.sitter.dto.admin.AdminSitterResponseDto;
 import com.forpets.domain.sitter.entity.SitterApprovalStatus;
 import com.forpets.domain.sitter.entity.SitterProfile;
+import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,4 +32,44 @@ public class SitterAdminService {
                 })
                 .toList();
     }
+
+
+    @Transactional
+    public AdminSitterResponseDto approve(Long adminId, Long sitterId) {
+        SitterProfile sitter = findById(sitterId);
+        validatePendingApproval(sitter);
+
+        sitter.approve(adminId);
+
+        Member member = memberService.findById(sitter.getMemberId());
+        member.changeRoleToSitter();
+
+        return AdminSitterResponseDto.from(sitter, member.getRegion());
+    }
+
+
+    @Transactional
+    public AdminSitterResponseDto reject(Long adminId, Long sitterId, String rejectReason) {
+        SitterProfile sitter = findById(sitterId);
+        validatePendingApproval(sitter);
+
+        sitter.reject(adminId, rejectReason);
+
+        Member member = memberService.findById(sitter.getMemberId());
+
+        return AdminSitterResponseDto.from(sitter, member.getRegion());
+    }
+
+
+    private SitterProfile findById(Long sitterId) {
+        return sitterProfileRepository.findById(sitterId)
+                .orElseThrow(() -> new SitterException(SitterErrorCode.SITTER_NOT_FOUND));
+    }
+
+    private void validatePendingApproval(SitterProfile sitter) {
+        if (sitter.getApprovalStatus() != SitterApprovalStatus.PENDING) {
+            throw new SitterException(SitterErrorCode.NOT_PENDING_APPROVAL);
+        }
+    }
+
 }
