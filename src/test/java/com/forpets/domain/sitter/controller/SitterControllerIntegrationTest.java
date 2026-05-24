@@ -433,14 +433,17 @@ class SitterControllerIntegrationTest {
         member.changeRoleToSitter();
         Member savedMember = memberRepository.save(member);
 
-        return sitterProfileRepository.save(SitterProfile.builder()
+        SitterProfile sitterProfile = SitterProfile.builder()
                 .memberId(savedMember.getId())
                 .introduction("integration test sitter")
                 .experienceYears(experienceYears)
                 .possiblePetType(possiblePetType)
                 .possiblePetSize(possiblePetSize)
                 .pricePerHour(pricePerHour)
-                .build());
+                .build();
+        sitterProfile.approve(savedMember.getId());
+
+        return sitterProfileRepository.save(sitterProfile);
     }
 
     private String bearerToken() {

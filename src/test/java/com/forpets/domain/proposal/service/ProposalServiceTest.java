@@ -102,6 +102,7 @@ class ProposalServiceTest {
                 .pricePerHour(15000)
                 .build();
         ReflectionTestUtils.setField(sitterProfile, "id", sitterProfileId);
+        sitterProfile.approve(member3Id);
 
         // PENDING 상태 제안
         proposal = Proposal.builder()
