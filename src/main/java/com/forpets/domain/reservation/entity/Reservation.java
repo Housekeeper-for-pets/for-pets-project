@@ -102,6 +102,32 @@ public class Reservation extends BaseEntity {
         this.canceledAt = LocalDateTime.now();
     }
 
+    // 불가피한 이유로 취소 신청
+    public void requestCancel(String cancelReason, CancelCategory cancelCategory, CanceledBy canceledBy) {
+        if (this.status != ReservationStatus.CONFIRMED) {
+            throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+        }
+        this.status = ReservationStatus.CANCEL_REQUESTED;
+        this.cancelReason = cancelReason;
+        this.cancelCategory = cancelCategory;
+        this.canceledBy = canceledBy;
+    }
+
+    // 불가피한 이유로 취소 신청을 했지만 받아들여지지 않은 경우 다시 CONFIRMED 상태로 돌림
+    public void restoreToConfirmed() {
+        if (this.status != ReservationStatus.CANCEL_REQUESTED) {
+            throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+        }
+        this.status = ReservationStatus.CONFIRMED;
+        this.cancelReason = null;
+        this.cancelCategory = null;
+        this.canceledBy = null;
+    }
+
+    public boolean isCancelRequested() {
+        return this.status == ReservationStatus.CANCEL_REQUESTED;
+    }
+
     public void expire() {
         this.status = ReservationStatus.EXPIRED;
         this.expiredAt = LocalDateTime.now();
