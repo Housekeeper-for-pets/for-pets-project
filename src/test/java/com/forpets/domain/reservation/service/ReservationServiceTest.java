@@ -481,37 +481,72 @@ class ReservationServiceTest {
     }
 
     // ========================================================
-    // 예약 취소 — PATCH /api/reservations/{reservationId}/cancel
-    // ========================================================
+// 예약 취소 — PATCH /api/reservations/{reservationId}/cancel
+// ========================================================
     @Nested
     @DisplayName("예약 취소 — PATCH /api/reservations/{reservationId}/cancel")
     class CancelTest {
 
-        private final CancelReservationRequest cancelRequest = new CancelReservationRequest(
+        private final CancelReservationRequest personalCancelRequest = new CancelReservationRequest(
                 "개인 사정으로 인해 취소합니다", CancelCategory.PERSONAL
         );
 
+        private final CancelReservationRequest unavoidableCancelRequest = new CancelReservationRequest(
+                "병원에 입원하게 되어 어쩔 수 없이 취소합니다", CancelCategory.UNAVOIDABLE
+        );
+
+        // ── PENDING 취소 ──
+
         @Test
-        @DisplayName("[성공] 보호자가 PENDING 예약 취소 성공")
+        @DisplayName("[성공] 보호자가 PENDING 예약 취소 → 전액 환불")
         void reservation_test_19() {
             // given
             given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            ReservationResponseDto result = reservationService.cancel(member1Id, reservationId, cancelRequest);
+            ReservationResponseDto result = reservationService.cancel(
+                    member1Id, reservationId, personalCancelRequest);
 
             // then
             assertThat(result.status()).isEqualTo(ReservationStatus.CANCELED);
             assertThat(result.canceledBy()).isEqualTo(CanceledBy.GUARDIAN);
             assertThat(result.cancelReason()).isEqualTo("개인 사정으로 인해 취소합니다");
             assertThat(result.cancelCategory()).isEqualTo(CancelCategory.PERSONAL);
+
+            // PENDING 이므로 전액 환불 호출
             then(paymentRefundService).should()
-                    .refundPaidPayments(reservationId, cancelRequest.cancelReason());
+                    .refundPaidPayments(reservationId, personalCancelRequest.cancelReason());
+            then(paymentRefundService).should()
+                    .expireNonPaidPayments(reservationId);
+            // 위약금 환불은 호출되면 안 됨
+            then(paymentRefundService).should(never())
+                    .refundWithPenalty(any(), any(), any());
         }
 
         @Test
-        @DisplayName("[성공] 시터가 CONFIRMED 예약 취소 성공")
+        @DisplayName("[성공] 보호자가 PENDING 예약 UNAVOIDABLE 취소 → 전액 환불 (관리자 검토 X)")
+        void reservation_test_19_b() {
+            // given — PENDING 은 cancelCategory 무관하게 즉시 환불
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
+            stubToResponseDto(reservationId, reservation, payment);
+
+            // when
+            ReservationResponseDto result = reservationService.cancel(
+                    member1Id, reservationId, unavoidableCancelRequest);
+
+            // then
+            assertThat(result.status()).isEqualTo(ReservationStatus.CANCELED);
+            then(paymentRefundService).should()
+                    .refundPaidPayments(reservationId, unavoidableCancelRequest.cancelReason());
+            then(paymentRefundService).should(never())
+                    .refundWithPenalty(any(), any(), any());
+        }
+
+        // ── CONFIRMED + 일반 취소 (위약금 차감) ──
+
+        @Test
+        @DisplayName("[성공] 시터가 CONFIRMED 예약 PERSONAL 취소 → 위약금 차감 환불")
         void reservation_test_20() {
             // given
             reservation.confirm();
@@ -519,28 +554,128 @@ class ReservationServiceTest {
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            ReservationResponseDto result = reservationService.cancel(member2Id, reservationId, cancelRequest);
+            ReservationResponseDto result = reservationService.cancel(
+                    member2Id, reservationId, personalCancelRequest);
 
             // then
             assertThat(result.status()).isEqualTo(ReservationStatus.CANCELED);
             assertThat(result.canceledBy()).isEqualTo(CanceledBy.SITTER);
+
+            // CONFIRMED + 일반사유 → 위약금 차감 환불 호출
             then(paymentRefundService).should()
-                    .refundPaidPayments(reservationId, cancelRequest.cancelReason());
+                    .refundWithPenalty(reservationId, personalCancelRequest.cancelReason(), CanceledBy.SITTER);
+            then(paymentRefundService).should()
+                    .expireNonPaidPayments(reservationId);
+            // 전액환불은 호출되면 안 됨
+            then(paymentRefundService).should(never())
+                    .refundPaidPayments(any(), any());
         }
+
+        @Test
+        @DisplayName("[성공] 보호자가 CONFIRMED 예약 PERSONAL 취소 → 위약금 차감 환불")
+        void reservation_test_20_b() {
+            // given
+            reservation.confirm();
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
+            stubToResponseDto(reservationId, reservation, payment);
+
+            // when
+            ReservationResponseDto result = reservationService.cancel(
+                    member1Id, reservationId, personalCancelRequest);
+
+            // then
+            assertThat(result.status()).isEqualTo(ReservationStatus.CANCELED);
+            assertThat(result.canceledBy()).isEqualTo(CanceledBy.GUARDIAN);
+
+            // canceledBy=GUARDIAN 으로 위약금 차감 호출
+            then(paymentRefundService).should()
+                    .refundWithPenalty(reservationId, personalCancelRequest.cancelReason(), CanceledBy.GUARDIAN);
+            then(paymentRefundService).should(never())
+                    .refundPaidPayments(any(), any());
+        }
+
+        // ── CONFIRMED + UNAVOIDABLE (관리자 검토 대기) ──
+
+        @Test
+        @DisplayName("[성공] 시터가 CONFIRMED 예약 UNAVOIDABLE 취소 요청 → CANCEL_REQUESTED")
+        void reservation_test_20_c() {
+            // given
+            reservation.confirm();
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
+            stubToResponseDto(reservationId, reservation, payment);
+
+            // when
+            ReservationResponseDto result = reservationService.cancel(
+                    member2Id, reservationId, unavoidableCancelRequest);
+
+            // then — 상태는 CANCEL_REQUESTED, 환불은 아직 호출 X
+            assertThat(result.status()).isEqualTo(ReservationStatus.CANCEL_REQUESTED);
+            assertThat(result.canceledBy()).isEqualTo(CanceledBy.SITTER);
+            assertThat(result.cancelCategory()).isEqualTo(CancelCategory.UNAVOIDABLE);
+            assertThat(result.cancelReason()).isEqualTo("병원에 입원하게 되어 어쩔 수 없이 취소합니다");
+
+            // 어떤 환불 메서드도 호출되면 안 됨
+            then(paymentRefundService).should(never())
+                    .refundPaidPayments(any(), any());
+            then(paymentRefundService).should(never())
+                    .refundWithPenalty(any(), any(), any());
+            then(paymentRefundService).should(never())
+                    .expireNonPaidPayments(any());
+        }
+
+        @Test
+        @DisplayName("[성공] 보호자가 CONFIRMED 예약 UNAVOIDABLE 취소 요청 → CANCEL_REQUESTED")
+        void reservation_test_20_d() {
+            // given
+            reservation.confirm();
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
+            stubToResponseDto(reservationId, reservation, payment);
+
+            // when
+            ReservationResponseDto result = reservationService.cancel(
+                    member1Id, reservationId, unavoidableCancelRequest);
+
+            // then
+            assertThat(result.status()).isEqualTo(ReservationStatus.CANCEL_REQUESTED);
+            assertThat(result.canceledBy()).isEqualTo(CanceledBy.GUARDIAN);
+
+            then(paymentRefundService).shouldHaveNoInteractions();
+        }
+
+        // ── 후속 처리 ──
 
         @Test
         @DisplayName("[성공] Proposal 출처 취소 시 ACCEPTED → PENDING 복원")
         void reservation_test_21() {
-            // given
-            given(reservationRepository.findById(proposalReservationId)).willReturn(Optional.of(proposalReservation));
+            // given — PENDING 상태로 취소 (handlePostCancellation 호출 경로)
+            given(reservationRepository.findById(proposalReservationId))
+                    .willReturn(Optional.of(proposalReservation));
             given(proposalRepository.findById(proposalId)).willReturn(Optional.of(proposal));
             stubToResponseDto(proposalReservationId, proposalReservation, payment);
 
             // when
-            reservationService.cancel(member1Id, proposalReservationId, cancelRequest);
+            reservationService.cancel(member1Id, proposalReservationId, personalCancelRequest);
 
             // then
             assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.PENDING);
+        }
+
+        @Test
+        @DisplayName("[성공] CONFIRMED + UNAVOIDABLE 취소 요청 시에는 handlePostCancellation 호출 X (예약 살아있음)")
+        void reservation_test_21_b() {
+            // given — Proposal 출처지만 UNAVOIDABLE 요청이라 아직 취소 확정 아님
+            proposalReservation.confirm();
+            given(reservationRepository.findById(proposalReservationId))
+                    .willReturn(Optional.of(proposalReservation));
+            stubToResponseDto(proposalReservationId, proposalReservation, payment);
+
+            // when
+            reservationService.cancel(member1Id, proposalReservationId, unavoidableCancelRequest);
+
+            // then — Proposal 상태 그대로 (관리자 승인 전까진 손대지 않음)
+            assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.ACCEPTED);
+            // Proposal 조회 자체가 호출되면 안 됨
+            then(proposalRepository).should(never()).findById(anyLong());
         }
 
         @Test
@@ -551,11 +686,13 @@ class ReservationServiceTest {
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            reservationService.cancel(member1Id, reservationId, cancelRequest);
+            reservationService.cancel(member1Id, reservationId, personalCancelRequest);
 
             // then
             then(proposalRepository).should(never()).findById(anyLong());
         }
+
+        // ── 실패 케이스 ──
 
         @Test
         @DisplayName("[실패] COMPLETED 예약 취소 시도")
@@ -563,13 +700,27 @@ class ReservationServiceTest {
             // given
             reservation.confirm();
             reservation.complete(); // COMPLETED 상태
-            ReservationTimeSlot pastSlot = createTimeSlot(
-                    reservationId, 1,
-                    LocalDate.now().minusDays(1), LocalTime.of(9, 0), LocalTime.of(12, 0));
             given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
 
             // when & then
-            assertThatThrownBy(() -> reservationService.cancel(member1Id, reservationId, cancelRequest))
+            assertThatThrownBy(() -> reservationService.cancel(
+                    member1Id, reservationId, personalCancelRequest))
+                    .isInstanceOf(ReservationException.class)
+                    .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
+                            .isEqualTo(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION));
+        }
+
+        @Test
+        @DisplayName("[실패] CANCEL_REQUESTED 예약 재취소 시도")
+        void reservation_test_23_b() {
+            // given — 이미 CANCEL_REQUESTED 상태
+            reservation.confirm();
+            reservation.requestCancel("불가피한 사유", CancelCategory.UNAVOIDABLE, CanceledBy.GUARDIAN);
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
+
+            // when & then — isCancelable() 이 false 라 차단
+            assertThatThrownBy(() -> reservationService.cancel(
+                    member1Id, reservationId, personalCancelRequest))
                     .isInstanceOf(ReservationException.class)
                     .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
                             .isEqualTo(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION));
@@ -582,7 +733,8 @@ class ReservationServiceTest {
             given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
 
             // when & then
-            assertThatThrownBy(() -> reservationService.cancel(member3Id, reservationId, cancelRequest))
+            assertThatThrownBy(() -> reservationService.cancel(
+                    member3Id, reservationId, personalCancelRequest))
                     .isInstanceOf(ReservationException.class)
                     .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
                             .isEqualTo(ReservationErrorCode.NOT_RESERVATION_PARTY));
