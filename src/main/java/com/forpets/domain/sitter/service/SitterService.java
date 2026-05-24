@@ -10,6 +10,7 @@ import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
 import com.forpets.domain.sitter.dto.profile.SitterSearchCondition;
 import com.forpets.domain.sitter.dto.profile.UpdateSitterRequest;
 import com.forpets.domain.sitter.dto.profile.UpdateSitterStatusRequest;
+import com.forpets.domain.sitter.entity.SitterApprovalStatus;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.entity.SitterSchedule;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -43,7 +45,35 @@ public class SitterService {
     public SitterResponseDto create(Long memberId, CreateSitterRequest request) {
         Member member = memberService.findById(memberId);
         validateNotAdmin(member);
-        validateProfileNotExists(memberId);
+
+        Optional<SitterProfile> sitterProfileOrNull = sitterProfileRepository.findByIdIncludingDeleted(memberId);
+
+        if (sitterProfileOrNull.isPresent()) {
+            SitterProfile sitter = sitterProfileOrNull.get();
+
+            if (sitter.isDeleted()){
+                sitter.reactivate(); // 상태 초기화 해주기 PENDING 으로 + deleted 도 없애주고
+
+                sitter.update(
+                        request.introduction(),
+                        request.experienceYears(),
+                        request.possiblePetType(),
+                        request.possiblePetSize(),
+                        request.pricePerHour()
+                );
+
+                return SitterResponseDto.from(sitter, member.getRegion());
+            }
+
+            // deleted 가 풀렸고, 이미 승인 대기 중
+            if (sitter.getApprovalStatus() == SitterApprovalStatus.PENDING){
+                throw new SitterException(SitterErrorCode.SITTER_ALREADY_PENDING);
+            }
+
+            // 사용 가능한 시터 프로필이 존재함
+            throw new SitterException(SitterErrorCode.SITTER_PROFILE_ALREADY_REGISTERED);
+        }
+//            validateProfileNotExists(memberId);
 
         SitterProfile sitter = SitterProfile.builder()
                 .memberId(memberId)
@@ -55,7 +85,8 @@ public class SitterService {
                 .build();
 
         sitterProfileRepository.save(sitter);
-        member.changeRoleToSitter();
+        // 승인이 되어야 역할이 변경됨
+//        member.changeRoleToSitter();
 
         return SitterResponseDto.from(sitter, member.getRegion());
     }
@@ -79,6 +110,7 @@ public class SitterService {
 
     public SitterResponseDto getSitterById(Long sitterId) {
         SitterProfile sitter = findById(sitterId);
+        validateApproved(sitter);
         Member member = memberService.findById(sitter.getMemberId());
         List<SitterSchedule> schedules = sitterScheduleRepository.findAllBySitterProfileId(sitter.getId());
         return SitterResponseDto.from(sitter, member.getRegion(), schedules);
@@ -102,6 +134,7 @@ public class SitterService {
     public SitterResponseDto update(Long memberId, UpdateSitterRequest request) {
         Member member = memberService.findById(memberId);
         SitterProfile sitter = findByMemberId(memberId);
+        validateApproved(sitter);
 
         sitter.update(
                 request.introduction(),
@@ -122,6 +155,7 @@ public class SitterService {
     public SitterResponseDto updateStatus(Long memberId, UpdateSitterStatusRequest request) {
         Member member = memberService.findById(memberId);
         SitterProfile sitter = findByMemberId(memberId);
+        validateApproved(sitter);
 
         sitter.changeStatus(request.status());
 
@@ -136,6 +170,7 @@ public class SitterService {
     @Transactional
     public void delete(Long memberId) {
         SitterProfile sitter = findByMemberId(memberId);
+        validateNotPending(sitter);
         if (associationChecker.hasSitterActiveAssociation(sitter.getId())){
             throw new SitterException(SitterErrorCode.SITTER_USED_IN_ACTIVE_PROCESS);
         }
@@ -147,6 +182,17 @@ public class SitterService {
     }
 
     // -------------Transaction 아닌 method 들------------------
+
+    private void validateApproved(SitterProfile sitter) {
+        if (!sitter.isApproved()) throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);
+    }
+
+    // rejected 되면 삭제 후 재등록이 가능하도록 함
+    private void validateNotPending(SitterProfile sitter){
+        if (sitter.getApprovalStatus() == SitterApprovalStatus.PENDING){
+            throw new SitterException(SitterErrorCode.SITTER_ALREADY_PENDING);
+        }
+    }
 
     /**
      * 정렬 필드 화이트리스트 검증
@@ -217,13 +263,4 @@ public class SitterService {
             throw new SitterException(SitterErrorCode.SITTER_PROFILE_ALREADY_REGISTERED);
         }
     }
-
-    /*
-    시터에게 진행 중인 예약(PENDING/CONFIRMED)이 있는지 확인
-     */
-//    private void validateNoActiveReservation(Long sitterId) {
-//         if (reservationService.existsInProgressBySitterId(sitterId)) {
-//             throw new SitterException(SitterErrorCode.HAS_ACTIVE_RESERVATION);
-//         }
-//    }
 }
