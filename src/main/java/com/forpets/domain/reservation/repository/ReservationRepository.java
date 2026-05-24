@@ -1,5 +1,6 @@
 package com.forpets.domain.reservation.repository;
 
+import com.forpets.domain.reservation.entity.CancelCategory;
 import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -41,6 +42,5 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     boolean existsBySitterIdAndStatusIn(@Param("sitterId") Long sitterId, @Param("statuses") List<ReservationStatus> statuses);
 
 
-
-
+    List<Reservation> findAllByStatusAndCancelCategory(ReservationStatus reservationStatus, CancelCategory cancelCategory);
 }
