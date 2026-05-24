@@ -78,7 +78,7 @@ public class SitterProfile extends BaseEntity {
         this.possiblePetType = possiblePetType;
         this.possiblePetSize = possiblePetSize == null ? PossiblePetSize.ALL : possiblePetSize;
         this.pricePerHour = pricePerHour;
-        this.status = SitterProfileStatus.RESERVABLE;
+        this.status = SitterProfileStatus.NON_RESERVABLE;
         this.approvalStatus = SitterApprovalStatus.PENDING;
     }
 

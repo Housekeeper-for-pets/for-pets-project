@@ -19,6 +19,8 @@ import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
+import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
@@ -59,6 +61,7 @@ public class ProposalService {
 
         SitterProfile sitter = sitterService.findByMemberId(memberId);
         validateNoDuplicate(postId, sitter.getId());
+        validateApproved(sitter);
         // 정책 수정으로 CONFIRMED 예약이 있어도 Proposal 은 언제든 받을 수 있음
 
         List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(postId);
@@ -290,4 +293,8 @@ public class ProposalService {
 //        return postRepository.findById(postId)
 //                .orElseThrow(() -> new BusinessException(CommonErrorCode.POST_NOT_FOUND));
 //    }
+
+    private void validateApproved(SitterProfile sitter) {
+        if (!sitter.isApproved()) throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);
+    }
 }

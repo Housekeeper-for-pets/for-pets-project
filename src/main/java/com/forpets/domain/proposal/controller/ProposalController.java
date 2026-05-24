@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,6 +38,7 @@ public class ProposalController {
     /*
     1. 공고에 제안 등록 (역방향)
      */
+    @PreAuthorize("hasRole('SITTER')")
     @PostMapping("/api/posts/{postId}/proposals")
     public ResponseEntity<ApiResponse<ProposalResponseDto>> create(
             @LoginUser CurrentMember currentMember,
