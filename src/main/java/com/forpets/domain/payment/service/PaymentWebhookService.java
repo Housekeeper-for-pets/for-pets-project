@@ -29,9 +29,14 @@ public class PaymentWebhookService {
     private final PaymentService paymentService;
     private final PaymentRefundService paymentRefundService;
 
+    /*
+    PortOne 이 보낸 Webhook 요청을 받아서 파싱
+    우리가 지정한 table 형식으로 저장하기
+     */
     @Transactional
     public PortOneWebhookResponse handlePortOneWebhook(JsonNode payload) {
         WebhookPayload webhookPayload = parsePayload(payload);
+        // PaymentWebhook 으로 저장 (eventId 기준 중복방지 로직)
         PaymentWebhook webhook = saveReceivedWebhook(webhookPayload, payload.toString());
 
         if (webhook.getStatus() != PaymentWebhookStatus.RECEIVED) {
@@ -74,6 +79,11 @@ public class PaymentWebhookService {
         }
     }
 
+    /*
+    실제 비즈니스 처리
+    merchantUid 가 존재하는지 + merchantUid 로 생성된 payment 가 있는지 확인
+    webhook 은 받았는데 paymnet 가 없으면 Webhook Status = IGNORED, 존재하지 않는 결제 웹훅으로 이유 저장
+     */
     private void process(PaymentWebhook webhook, WebhookPayload payload, String rawPayload) {
         if (!StringUtils.hasText(payload.merchantUid())) {
             webhook.markIgnored("결제 ID가 없는 웹훅");
@@ -88,8 +98,14 @@ public class PaymentWebhookService {
             return;
         }
 
+        // 결제 table 과 연결
         webhook.connectPayment(payment.get().getId());
 
+        /* 상태값에 따라 분기
+        PAID: 결제 확인
+        FAILED: 결제 실패 처리
+        CANCELED: 환불 동기화
+         */
         String status = normalize(payload.status());
         switch (status) {
             case "PAID" -> paymentService.confirmByWebhook(payload.merchantUid());

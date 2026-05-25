@@ -50,8 +50,12 @@ public class PaymentService {
     @Transactional
     public PaymentResponseDto create(Long memberId, CreatePaymentRequest request) {
         Reservation reservation = findReservation(request.reservationId());
+        // CONFIRMED, COMPLETED, CANCELED, EXPIRED 상태면 Payment를 생성할 수 없다
         validateReservationPending(reservation);
 
+        // 지불하려는 사람이 Reservation Party 이고,
+        // 중복 지불이 아니며
+        // 진행중인 결제가 없는지 확인
         ReservationPayment reservationPayment = findReservationPayment(reservation.getId());
         validatePaymentParty(memberId, reservation, request.paymentRole());
         validateNotAlreadyPaid(reservationPayment, request.paymentRole());
@@ -87,6 +91,7 @@ public class PaymentService {
      */
     @Transactional
     public ConfirmPaymentResponse confirm(Long memberId, ConfirmPaymentRequest request) {
+        // 프론트에서 자동으로 요청하는 api
         Payment payment = paymentRepository.findByMerchantUid(request.merchantUid())
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
@@ -98,6 +103,7 @@ public class PaymentService {
 
     @Transactional
     public ConfirmPaymentResponse confirmByWebhook(String merchantUid) {
+        // webhook 으로 요청해서 결과값을 직접 받아오는 api
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
@@ -218,6 +224,12 @@ public class PaymentService {
         return ConfirmPaymentResponse.of(payment, reservation.status());
     }
 
+    /*
+    1. 내가 지금 가지고 있는 merchantUid 랑 PortOnePaymentResult 에 저장된 paymentId 와 동일한지
+        (PortOnePayment 에 있는 paymentId 는 merchantUid이다)
+    2. 금액 검증: FinalAmount 가 result 의 totalAmount 랑 동일한지
+    3. result 에 PAID 처리가 되어있는지
+     */
     private void validatePortOnePayment(Payment payment, PortOnePaymentResult portOnePayment) {
         if (!payment.getMerchantUid().equals(portOnePayment.paymentId())) {
             throw new PaymentException(PaymentErrorCode.PAYMENT_ID_MISMATCH);
@@ -232,6 +244,9 @@ public class PaymentService {
         }
     }
 
+    /*
+    Reservation Payment 지불한 역할에 대해서만 Paid 처리
+     */
     private void markReservationPaymentPaid(ReservationPayment reservationPayment, PaymentRole paymentRole) {
         if (paymentRole == PaymentRole.GUARDIAN) {
             reservationPayment.guardianConfirm();
