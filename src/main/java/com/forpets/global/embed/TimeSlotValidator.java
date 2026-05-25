@@ -41,18 +41,21 @@ public class TimeSlotValidator {
         validateNoOverlap(timeSlots);
     }
 
+    // 1. TimeSlot list 가 비어있지 않은지
     private void validateNotEmpty(List<TimeSlotRequest> timeSlots) {
         if (timeSlots == null || timeSlots.isEmpty()) {
             throw new TimeSlotException(TimeSlotErrorCode.TIME_SLOT_REQUIRED);
         }
     }
 
+    // 2. MaxCount 를 넘지 않았는지
     private void validateMaxCount(List<TimeSlotRequest> timeSlots) {
         if (timeSlots.size() > MAX_TIME_SLOT_COUNT) {
             throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_LIMIT_EXCEEDED);
         }
     }
 
+    // 3. 각 TimeSlot 이 과거 날짜가 아니고, 시작시각이 종료 시각보다 이른지
     private void validateEachSlot(List<TimeSlotRequest> timeSlots) {
         LocalDate today = LocalDate.now();
 
@@ -66,6 +69,7 @@ public class TimeSlotValidator {
         }
     }
 
+    // 4. 각 TimeSlot 끼리 겹치지 않는지
     private void validateNoOverlap(List<TimeSlotRequest> timeSlots) {
         // 같은 날짜끼리 그룹핑
         Map<LocalDate, List<TimeSlotRequest>> grouped = timeSlots.stream()

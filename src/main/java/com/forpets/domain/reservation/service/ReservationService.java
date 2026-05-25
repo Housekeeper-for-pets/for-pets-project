@@ -385,8 +385,10 @@ public class ReservationService {
             }
         }
 
+        // 보내뒀던 다른 Proposal 들 중 겹치는건 Withdraw 처리
         withdrawConflictingProposals(reservation);
-        // 겹치는 CareRequest 는 따로 reject 처리 하지 않음
+
+        // 겹치는 CareRequest 는 따로 reject 처리 하지 않고
         // PENDING 유지 (수락 시 충돌 검증에서 차단)
     }
 
@@ -405,27 +407,10 @@ public class ReservationService {
             List<PostTimeSlot> postSlots = postTimeSlotRepository
                     .findAllByPostIdOrderByTimeSlotInfoSequence(proposal.getPostId());
 
-            if (hasTimeConflictBetween(confirmedSlots, postSlots)) {
+            if (timeSlotValidator.hasTimeConflict(confirmedSlots, postSlots)) {
                 proposal.withdraw();
             }
         }
-    }
-
-    private boolean hasTimeConflictBetween(List<ReservationTimeSlot> reservationSlots,
-                                           List<PostTimeSlot> postSlots) {
-        for (ReservationTimeSlot rs : reservationSlots) {
-            TimeSlotInfo ri = rs.getTimeSlotInfo();
-            for (PostTimeSlot ps : postSlots) {
-                TimeSlotInfo pi = ps.getTimeSlotInfo();
-
-                if (ri.getCareDate().equals(pi.getCareDate())
-                        && ri.getStartTime().isBefore(pi.getEndTime())
-                        && ri.getEndTime().isAfter(pi.getStartTime())) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
 
