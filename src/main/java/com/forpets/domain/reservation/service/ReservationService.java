@@ -302,19 +302,16 @@ public class ReservationService {
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
     }
 
+    // CONFIRMED 예약과 충돌하는지 확인하기 위해서 예약목록을 돌면서 체크
     public boolean hasConfirmedConflict(Long sitterProfileId, List<? extends HasTimeSlotInfo> timeSlots) {
         List<Reservation> confirmed = reservationRepository
                 .findAllBySitterProfileIdAndStatus(sitterProfileId, ReservationStatus.CONFIRMED);
 
-        return hasConflictWith(confirmed, timeSlots);
-    }
-
-    private boolean hasConflictWith(List<Reservation> reservations, List<? extends HasTimeSlotInfo> newSlots) {
-        for (Reservation existing : reservations) {
+        for (Reservation existing : confirmed) {
             List<ReservationTimeSlot> existingSlots = reservationTimeSlotRepository
                     .findAllByReservationIdOrderByTimeSlotInfoSequence(existing.getId());
 
-            if (timeSlotValidator.hasTimeConflict(existingSlots, newSlots)) {
+            if (timeSlotValidator.hasTimeConflict(existingSlots, timeSlots)) {
                 return true;
             }
         }
