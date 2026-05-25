@@ -165,27 +165,24 @@ public class ReservationService {
         validatePending(reservation);
 
         ReservationPayment payment = findPayment(reservationId);
+        // 한쪽만 결제한 상황이면 아직 PENDING 으로 둬야함
         if (!payment.isBothPaid()) {
             return toResponseDto(reservation);
         }
 
         return reservationLockService.executeWithSitterLock(
                 reservation.getSitterProfileId(), () -> {
+                    /*
+                    CONFIRMED 예약 중 겹치는게 있으면 안 됨
+                    Reservation Status = CONFIRMED 로 업데이트
+                    역방향으로 인한 Reservation 인 경우 Post, Proposal 후속처리
+                     */
                     validateNoConfirmedConflict(reservation);
                     reservation.confirm();
                     log.info("[예약 확정] reservationId={}, CONFIRMED", reservationId);
                     handlePostConfirmation(reservation);
                     return toResponseDto(reservation);
                 });
-//        if (payment.isBothPaid()) {
-//            validateNoConfirmedConflict(reservation);
-//            reservation.confirm();
-//            log.info("[예약 확정] reservationId={}, PortOne 양측 결제 완료 → CONFIRMED", reservationId);
-//
-//            handlePostConfirmation(reservation);
-//        }
-//
-//        return toResponseDto(reservation);
     }
 
 

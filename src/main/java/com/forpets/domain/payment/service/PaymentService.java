@@ -11,6 +11,7 @@ import com.forpets.domain.payment.entity.*;
 import com.forpets.domain.payment.exception.PaymentErrorCode;
 import com.forpets.domain.payment.exception.PaymentException;
 import com.forpets.domain.payment.repository.PaymentRepository;
+import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationPayment;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
@@ -189,16 +190,27 @@ public class PaymentService {
             return ConfirmPaymentResponse.of(payment, reservation.getStatus());
         }
 
+        // PaymentStatus == READY || PENDING 일 때만 Confirm
         validateConfirmable(payment);
 
         PortOnePaymentResult portOnePayment = portOnePaymentClient.getPayment(payment.getMerchantUid());
+
+        // merchantUid 체크, 금액 검증, 결제가 실제로 완료되었는지 확인
         validatePortOnePayment(payment, portOnePayment);
 
+        /* payment PAID 처리
+        ReservationPayment 도 Paid 처리 (reservationId 를 기준으로 검색해서 결제한 Role 만)
+         */
         payment.approve(portOnePayment.paymentId(), portOnePayment.rawResponse());
         ReservationPayment reservationPayment = findReservationPayment(payment.getReservationId());
         markReservationPaymentPaid(reservationPayment, payment.getPaymentRole());
 
-        var reservation = reservationService.confirmAfterPayment(payment.getReservationId());
+        /*
+        confirm 후속처리
+        - reservation CONFIRMED 처리 : Lock 걸어서 만약 충돌나면 바로 Cancel 처리
+        - 역방향: 나머지 PENDING 제안 → REJECTED, 공고 → CLOSED, 시터의 Proposal → WITHDRAWN
+         */
+        ReservationResponseDto reservation = reservationService.confirmAfterPayment(payment.getReservationId());
 
         log.info("[PaymentService] 결제 승인 완료 paymentId={}, reservationId={}, role={}",
                 payment.getId(), payment.getReservationId(), payment.getPaymentRole());
