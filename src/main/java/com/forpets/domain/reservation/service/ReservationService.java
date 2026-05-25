@@ -341,19 +341,11 @@ public class ReservationService {
     같은 시터의 CONFIRMED 예약 중 시간이 겹치는 건이 있으면 차단
      */
     private void validateNoConfirmedConflict(Reservation reservation) {
-        List<Reservation> confirmedReservations = reservationRepository
-                .findAllBySitterProfileIdAndStatus(reservation.getSitterProfileId(), ReservationStatus.CONFIRMED);
-
         List<ReservationTimeSlot> newTimeSlots = reservationTimeSlotRepository
                 .findAllByReservationIdOrderByTimeSlotInfoSequence(reservation.getId());
 
-        for (Reservation existing : confirmedReservations) {
-            List<ReservationTimeSlot> existingTimeSlots = reservationTimeSlotRepository
-                    .findAllByReservationIdOrderByTimeSlotInfoSequence(existing.getId());
-
-            if (timeSlotValidator.hasTimeConflict(newTimeSlots, existingTimeSlots)) {
-                throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
-            }
+        if (hasConfirmedConflict(reservation.getSitterProfileId(), newTimeSlots)) {
+            throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
         }
     }
 
@@ -407,7 +399,6 @@ public class ReservationService {
         }
     }
 
-
     /*
     취소 후속 처리
     - Proposal 출처: ACCEPTED → PENDING 복원 (다른 제안 채택 가능)
@@ -435,16 +426,4 @@ public class ReservationService {
         }
     }
 
-    // ----- pet service 에서 쓸 ... method  -----
-
-//    public boolean existsActiveReservationByPetId(Long petId) {
-//        return reservationRepository.existsByPetIdAndStatusIn(
-//                petId,
-//                List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED)
-//        );
-//    }
-
-    public boolean existsInProgressBySitterId(Long sitterId) {
-        return reservationRepository.existsBySitterProfileIdAndStatus(sitterId, ReservationStatus.CONFIRMED);
-    }
 }
