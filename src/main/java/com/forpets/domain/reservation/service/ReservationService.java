@@ -194,12 +194,16 @@ public class ReservationService {
     public ReservationResponseDto complete(Long memberId, Long reservationId) {
         /*
         시스템이 보관하고 있던 돈을 시터에게 보내주는 로직
+        - complete 를 호출한 사람 (로그인한 사람) == reservation 의 sitter 인지 확인
+        - completed 가 가능한 상태인지 (confirmed) 확인
+        - 타임슬롯 마지막 시간까지 마쳤는지 확인
          */
         Reservation reservation = findById(reservationId);
         validateSitter(memberId, reservation);
         validateConfirmed(reservation);
         validateCareCompleted(reservationId);
 
+        //status update
         reservation.complete();
         log.info("[케어 완료] reservationId={}, 시터(memberId={}) 완료 처리", reservationId, memberId);
 
@@ -330,6 +334,7 @@ public class ReservationService {
         }
     }
 
+    // complete 가능한 상태인지 확인 == 현재 confirmed 인지 확인
     private void validateConfirmed(Reservation reservation) {
         if (!reservation.isConfirmed()) {
             throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
@@ -409,6 +414,9 @@ public class ReservationService {
         }
     }
 
+    /*
+    timeslot 들을 가져와서 호출 시점이 마지막 날짜의 종료 시간 이후인지 확인
+     */
     private void validateCareCompleted(Long reservationId) {
         List<ReservationTimeSlot> timeSlots = reservationTimeSlotRepository
                 .findAllByReservationIdOrderByTimeSlotInfoSequence(reservationId);
