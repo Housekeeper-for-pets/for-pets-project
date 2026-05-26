@@ -3,7 +3,6 @@ package com.forpets.domain.sitter.service;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.service.MemberService;
-import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.dto.profile.CreateSitterRequest;
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
@@ -18,13 +17,8 @@ import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
 import com.forpets.global.common.AssociationChecker;
-import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
-import com.forpets.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,8 +34,10 @@ public class SitterService {
     private final SitterProfileRepository sitterProfileRepository;
     private final SitterScheduleRepository sitterScheduleRepository;
     private final AssociationChecker associationChecker;
+    private final SitterCacheService sitterCacheService;
 
     @Transactional
+    @CacheEvict(cacheNames = "sitters", allEntries = true, cacheManager = "longTtlCacheManager")
     public SitterResponseDto create(Long memberId, CreateSitterRequest request) {
         Member member = memberService.findById(memberId);
         validateNotAdmin(member);
@@ -98,14 +94,28 @@ public class SitterService {
      * - 페이지 번호 음수 불가
      * 캐시 무효화: 시터 프로필 수정(update), 상태 변경(updateStatus) 시 sitters:* 패턴 전체 무효화 필요
      */
+//    @Cacheable(
+//            cacheNames = "sitters",
+//            keyGenerator = "sitterCacheKeyGenerator",
+//            cacheManager = "longTtlCacheManager",
+//            sync = true
+//    )
+//    public SitterPageResponse searchSitters(SitterSearchCondition condition, int page, int size, String sort) {
+//        validatePageRequest(page, size);
+//        validateSortField(sort);
+//        validatePriceRange(condition);
+//
+//        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sort));
+//
+//        return sitterProfileRepository.searchSitters(condition, pageable);
+//    }
+
     public SitterPageResponse searchSitters(SitterSearchCondition condition, int page, int size, String sort) {
         validatePageRequest(page, size);
         validateSortField(sort);
         validatePriceRange(condition);
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sort));
-
-        return sitterProfileRepository.searchSitters(condition, pageable);
+        return sitterCacheService.searchSitters(condition, page, size, sort);
     }
 
     public SitterResponseDto getSitterById(Long sitterId) {
@@ -131,6 +141,7 @@ public class SitterService {
     시터 프로필 수정 (전체 교체 방식)
      */
     @Transactional
+    @CacheEvict(cacheNames = "sitters", allEntries = true, cacheManager = "longTtlCacheManager")
     public SitterResponseDto update(Long memberId, UpdateSitterRequest request) {
         Member member = memberService.findById(memberId);
         SitterProfile sitter = findByMemberId(memberId);
@@ -152,6 +163,7 @@ public class SitterService {
     lock 을 걸어야 할 듯 합니다 상태를 변경하는 동안 예약이 들어올 수 있으니까!
      */
     @Transactional
+    @CacheEvict(cacheNames = "sitters", allEntries = true, cacheManager = "longTtlCacheManager")
     public SitterResponseDto updateStatus(Long memberId, UpdateSitterStatusRequest request) {
         Member member = memberService.findById(memberId);
         SitterProfile sitter = findByMemberId(memberId);
@@ -168,6 +180,7 @@ public class SitterService {
     - 삭제 시 프로필 상태 DELETED + 회원 역할 MEMBER로 복원
      */
     @Transactional
+    @CacheEvict(cacheNames = "sitters", allEntries = true, cacheManager = "longTtlCacheManager")
     public void delete(Long memberId) {
         SitterProfile sitter = findByMemberId(memberId);
         validateNotPending(sitter);
