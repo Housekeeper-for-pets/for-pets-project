@@ -406,10 +406,13 @@ public class ReservationService {
 
     /*
     CONFIRMED 후속 처리
+    - 충돌 PENDING 예약 Cancel 처리
     - Proposal 출처: 같은 공고의 나머지 PENDING 제안 → REJECTED, 공고 → CLOSED
     - 같은 시터의 겹치는 시간대 Proposal → WITHDRAWN
      */
     private void handlePostConfirmation(Reservation reservation) {
+        cancelConflictingReservations(reservation);
+
         if (reservation.getSource() == ReservationSource.PROPOSAL) {
             // Proposal 출처: 같은 공고의 나머지 PENDING 제안 REJECTED + 공고 CLOSED
             Proposal acceptedProposal = proposalRepository.findById(reservation.getSourceId()).orElse(null);
@@ -431,6 +434,45 @@ public class ReservationService {
 
         // 겹치는 CareRequest 는 따로 reject 처리 하지 않고
         // PENDING 유지 (수락 시 충돌 검증에서 차단)
+    }
+
+    private void cancelConflictingReservations(Reservation confirmedReservation) {
+        List<ReservationTimeSlot> confirmedSlots =
+                reservationTimeSlotRepository.findAllByReservationIdOrderByTimeSlotInfoSequence(confirmedReservation.getId());
+
+        List<Reservation> sitterPendingReservations = reservationRepository
+                .findAllBySitterProfileIdAndStatus(confirmedReservation.getSitterProfileId(), ReservationStatus.PENDING)
+                .stream()
+                .filter(r -> !r.getId().equals(confirmedReservation.getId()))
+                .toList();
+
+        for (Reservation pending : sitterPendingReservations) {
+            List<ReservationTimeSlot> slots = reservationTimeSlotRepository.findAllByReservationIdOrderByTimeSlotInfoSequence(pending.getId());
+            if (!timeSlotValidator.hasTimeConflict(slots, confirmedSlots)) {
+                continue;
+            }
+            pending.cancel("시터의 다른 예약 확정으로 인한 자동 취소", CancelCategory.SCHEDULE_CHANGE,CanceledBy.SITTER);
+
+            refundIfPaid(pending);
+        }
+    }
+
+    private void refundIfPaid(Reservation reservation) {
+        Long reservationId = reservation.getId();
+        ReservationPayment rp = reservationPaymentRepository.findByReservationId(reservationId)
+                .orElse(null);
+        // PENDING 예약이긴 한데 결제를 아무도 안 함
+        if (rp == null) return;
+
+        paymentRefundService.refundPaidPayments(reservationId, "시터의 다른 예약 확정으로 인한 자동 취소");
+
+        if (rp.isSitterPaid()){
+            rp.sitterRefund();
+        }
+
+        if (rp.isGuardianPaid()){
+            rp.guardianRefund();
+        }
     }
 
     /*
