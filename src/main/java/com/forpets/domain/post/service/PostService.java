@@ -25,14 +25,12 @@ import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.exception.ProposalErrorCode;
 import com.forpets.domain.proposal.exception.ProposalException;
 import com.forpets.domain.proposal.repository.ProposalRepository;
-import com.forpets.domain.proposal.service.ProposalService;
-import com.forpets.domain.post.exception.PostErrorCode;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.dto.TimeSlotRequest;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -56,6 +54,7 @@ public class PostService {
     private final TimeSlotValidator timeSlotValidator;
     private final MemberService memberService;
     private final ProposalRepository proposalRepository;
+    private final PostCacheService postCacheService;
 
 
     /*
@@ -67,6 +66,7 @@ public class PostService {
     5. PostTimeSlot 생성 (sequence 자동 계산: careDate ASC, startTime ASC)
      */
     @Transactional
+    @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public PostResponseDto create(Long memberId, CreatePostRequest request) {
         Member member = memberService.findById(memberId);
         List<Pet> pets = validateAndGetPets(memberId, request.petIds());
@@ -97,6 +97,7 @@ public class PostService {
     PetSnapshot은 수정 시점의 최신 Pet 정보로 재생성
      */
     @Transactional
+    @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public PostResponseDto update(Long memberId, Long postId, UpdatePostRequest request) {
         Member member = memberService.findById(memberId);
 
@@ -136,6 +137,7 @@ public class PostService {
     아니면 void 반환해줘도 될 것 같음 고민해보기
      */
     @Transactional
+    @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public PostResponseDto closePost(Long memberId, Long postId) {
         Member member = memberService.findById(memberId);
 
@@ -160,6 +162,7 @@ public class PostService {
     - 본인 공고만
      */
     @Transactional
+    @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public void delete(Long memberId, Long postId) {
         Post post = findById(postId);
         validateAuthor(memberId, post);
@@ -213,9 +216,7 @@ public class PostService {
         validatePageRequest(page, size);
         validateSortField(sort);
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sort));
-
-        return postRepository.searchPosts(condition, pageable);
+        return postCacheService.searchPostings(condition, page, size, sort);
     }
 
     public PostPageResponse searchMyPosts(Long memberId, String status, int page, int size) {

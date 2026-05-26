@@ -36,6 +36,7 @@ import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -169,6 +170,7 @@ public class ReservationService {
     양측 결제가 모두 완료된 경우에만 Reservation 을 CONFIRMED 로 전환한다.
      */
     @Transactional
+    @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public ReservationResponseDto confirmAfterPayment(Long reservationId) {
         Reservation reservation = findById(reservationId);
         validatePending(reservation);
