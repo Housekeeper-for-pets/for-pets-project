@@ -9,6 +9,12 @@ import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.repository.PostTimeSlotRepository;
+import com.forpets.domain.payment.entity.Payment;
+import com.forpets.domain.payment.entity.PaymentRole;
+import com.forpets.domain.payment.entity.PaymentStatus;
+import com.forpets.domain.payment.exception.PaymentErrorCode;
+import com.forpets.domain.payment.exception.PaymentException;
+import com.forpets.domain.payment.repository.PaymentRepository;
 import com.forpets.domain.payment.service.PaymentRefundService;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
@@ -22,6 +28,7 @@ import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
+import com.forpets.domain.settlement.service.SettlementService;
 import com.forpets.global.embed.HasTimeSlotInfo;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.entity.TimeSlotInfo;
@@ -50,7 +57,9 @@ public class ReservationService {
     private final ReservationPetRepository reservationPetRepository;
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
     private final ReservationPaymentRepository reservationPaymentRepository;
+    private final PaymentRepository paymentRepository;
     private final PaymentRefundService paymentRefundService;
+    private final SettlementService settlementService;
 
     private final ReservationLockService reservationLockService;
 
@@ -203,8 +212,17 @@ public class ReservationService {
         validateConfirmed(reservation);
         validateCareCompleted(reservationId);
 
+        Payment guardianPayment = findPaidGuardianPayment(reservationId);
+
         //status update
         reservation.complete();
+        settlementService.createCareCompletionSettlement(
+                reservation.getId(),
+                reservation.getSitterMemberId(),
+                guardianPayment.getId(),
+                guardianPayment.getFinalAmount()
+        );
+        paymentRefundService.refundSitterDepositAfterCompletion(reservationId);
         log.info("[케어 완료] reservationId={}, 시터(memberId={}) 완료 처리", reservationId, memberId);
 
         return toResponseDto(reservation);
@@ -328,6 +346,12 @@ public class ReservationService {
     private ReservationPayment findPayment(Long reservationId) {
         return reservationPaymentRepository.findByReservationId(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+    }
+
+    private Payment findPaidGuardianPayment(Long reservationId) {
+        return paymentRepository.findByReservationIdAndPaymentRoleAndStatus(
+                        reservationId, PaymentRole.GUARDIAN, PaymentStatus.PAID)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
     }
 
     // CONFIRMED 예약과 충돌하는지 확인하기 위해서 예약목록을 돌면서 체크

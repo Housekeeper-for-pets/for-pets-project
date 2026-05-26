@@ -1,6 +1,14 @@
 package com.forpets.domain.reservation.service;
 
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
+import com.forpets.domain.payment.entity.Payment;
+import com.forpets.domain.payment.entity.PaymentProvider;
+import com.forpets.domain.payment.entity.PaymentRole;
+import com.forpets.domain.payment.entity.PaymentStatus;
+import com.forpets.domain.payment.entity.PaymentType;
+import com.forpets.domain.payment.exception.PaymentErrorCode;
+import com.forpets.domain.payment.exception.PaymentException;
+import com.forpets.domain.payment.repository.PaymentRepository;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
@@ -16,6 +24,7 @@ import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.repository.PostTimeSlotRepository;
+import com.forpets.domain.settlement.service.SettlementService;
 import com.forpets.global.common.CareType;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.entity.TimeSlotInfo;
@@ -58,7 +67,13 @@ class ReservationServiceTest {
     private ReservationPaymentRepository reservationPaymentRepository;
 
     @Mock
+    private PaymentRepository paymentRepository;
+
+    @Mock
     private PaymentRefundService paymentRefundService;
+
+    @Mock
+    private SettlementService settlementService;
 
     @Mock
     private PostRepository postRepository;
@@ -93,6 +108,7 @@ class ReservationServiceTest {
     private final Long proposalReservationId = 601L;
     private final Long proposalId = 500L;
     private final Long sourceId = 200L;
+    private final Long guardianPaymentId = 900L;
 
     @BeforeEach
     void setUp() {
@@ -148,6 +164,23 @@ class ReservationServiceTest {
         given(reservationPetRepository.findAllByReservationId(resId)).willReturn(List.of());
         given(reservationTimeSlotRepository.findAllByReservationIdOrderByTimeSlotInfoSequence(resId))
                 .willReturn(List.of());
+    }
+
+    private Payment createPaidGuardianPayment() {
+        Payment guardianPayment = Payment.builder()
+                .reservationId(reservationId)
+                .memberId(member1Id)
+                .paymentRole(PaymentRole.GUARDIAN)
+                .paymentType(PaymentType.FULL)
+                .originalAmount(30000L)
+                .discountAmount(0L)
+                .finalAmount(30000L)
+                .provider(PaymentProvider.PORTONE)
+                .merchantUid("PAY-600-GUARDIAN-TEST")
+                .build();
+        ReflectionTestUtils.setField(guardianPayment, "id", guardianPaymentId);
+        guardianPayment.approve("payment-test", "{}");
+        return guardianPayment;
     }
 
     // ========================================================
@@ -414,12 +447,16 @@ class ReservationServiceTest {
             ReservationTimeSlot pastSlot = createTimeSlot(
                     reservationId, 1,
                     LocalDate.now().minusDays(1), LocalTime.of(9, 0), LocalTime.of(12, 0));
+            Payment guardianPayment = createPaidGuardianPayment();
 
             given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
             // validateCareCompleted + toResponseDto 둘 다 같은 메서드 호출
             // willReturn은 마지막 설정이 이기므로 한 번만 설정하되 pastSlot 반환
             given(reservationTimeSlotRepository.findAllByReservationIdOrderByTimeSlotInfoSequence(reservationId))
                     .willReturn(List.of(pastSlot));
+            given(paymentRepository.findByReservationIdAndPaymentRoleAndStatus(
+                    reservationId, PaymentRole.GUARDIAN, PaymentStatus.PAID))
+                    .willReturn(Optional.of(guardianPayment));
             given(reservationPaymentRepository.findByReservationId(reservationId))
                     .willReturn(Optional.of(payment));
             given(reservationPetRepository.findAllByReservationId(reservationId))
@@ -430,6 +467,9 @@ class ReservationServiceTest {
 
             // then
             assertThat(result.status()).isEqualTo(ReservationStatus.COMPLETED);
+            then(settlementService).should().createCareCompletionSettlement(
+                    reservationId, member2Id, guardianPaymentId, guardianPayment.getFinalAmount());
+            then(paymentRefundService).should().refundSitterDepositAfterCompletion(reservationId);
         }
 
         @Test
@@ -477,6 +517,33 @@ class ReservationServiceTest {
                     .isInstanceOf(ReservationException.class)
                     .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
                             .isEqualTo(ReservationErrorCode.CARE_NOT_COMPLETED_YET));
+        }
+
+        @Test
+        @DisplayName("[실패] 보호자 결제 완료 내역이 없으면 완료 처리 차단")
+        void reservation_test_18_b() {
+            // given
+            reservation.confirm();
+            ReservationTimeSlot pastSlot = createTimeSlot(
+                    reservationId, 1,
+                    LocalDate.now().minusDays(1), LocalTime.of(9, 0), LocalTime.of(12, 0));
+
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
+            given(reservationTimeSlotRepository.findAllByReservationIdOrderByTimeSlotInfoSequence(reservationId))
+                    .willReturn(List.of(pastSlot));
+            given(paymentRepository.findByReservationIdAndPaymentRoleAndStatus(
+                    reservationId, PaymentRole.GUARDIAN, PaymentStatus.PAID))
+                    .willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> reservationService.complete(member2Id, reservationId))
+                    .isInstanceOf(PaymentException.class)
+                    .satisfies(ex -> assertThat(((PaymentException) ex).getErrorCode())
+                            .isEqualTo(PaymentErrorCode.PAYMENT_NOT_FOUND));
+            assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CONFIRMED);
+            then(settlementService).should(never())
+                    .createCareCompletionSettlement(any(), any(), any(), any());
+            then(paymentRefundService).should(never()).refundSitterDepositAfterCompletion(any());
         }
     }
 
