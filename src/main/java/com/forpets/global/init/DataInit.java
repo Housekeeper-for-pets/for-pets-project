@@ -31,10 +31,7 @@ import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
-import com.forpets.domain.sitter.entity.PossiblePetSize;
-import com.forpets.domain.sitter.entity.PossiblePetType;
-import com.forpets.domain.sitter.entity.SitterProfile;
-import com.forpets.domain.sitter.entity.SitterSchedule;
+import com.forpets.domain.sitter.entity.*;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
 import com.forpets.global.common.CareType;
@@ -432,6 +429,8 @@ public class DataInit implements CommandLineRunner {
                     sitterMember.getId(), sitterIntros[i],
                     2 + random.nextInt(7), petTypes[i], petSizes[i], prices[i]
             );
+            sp.approve(1L);
+            sp.changeStatus(SitterProfileStatus.RESERVABLE);
             allSitters.add(sp);
             sitterByMemberId.put(sitterMember.getId(), sp);
         }
