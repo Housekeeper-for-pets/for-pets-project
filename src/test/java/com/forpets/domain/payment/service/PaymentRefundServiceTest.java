@@ -12,6 +12,8 @@ import com.forpets.domain.payment.repository.PaymentRepository;
 import com.forpets.domain.reservation.entity.CanceledBy;
 import com.forpets.domain.reservation.entity.ReservationPayment;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
+import com.forpets.domain.settlement.entity.SettlementType;
+import com.forpets.domain.settlement.service.SettlementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -51,6 +53,8 @@ class PaymentRefundServiceTest {
     private CouponService couponService;
     @Mock
     private PaymentLockService paymentLockService;
+    @Mock
+    private SettlementService settlementService;
 
     // ── 픽스처 ──
     private final Long reservationId = 600L;
@@ -209,6 +213,15 @@ class PaymentRefundServiceTest {
             then(portOnePaymentClient).should()
                     .cancelPayment(eq("merchant-sitter-001"), amountCaptor.capture(), anyString());
             assertThat(amountCaptor.getValue()).isEqualTo(20_000L);
+
+            then(settlementService).should().createPenaltySettlement(
+                    reservationId,
+                    sitterMemberId,
+                    guardianPayment.getId(),
+                    20_000L,
+                    SettlementType.OWNER_CANCEL_PENALTY,
+                    "보호자 귀책 취소 보상 - 개인 사정"
+            );
         }
 
         @Test
@@ -252,6 +265,15 @@ class PaymentRefundServiceTest {
             // 시터 결제는 전액 위약금이라 PG 호출 안 됨
             then(portOnePaymentClient).should(never())
                     .cancelPayment(eq("merchant-sitter-001"), any(), anyString());
+
+            then(settlementService).should().createPenaltySettlement(
+                    reservationId,
+                    guardianMemberId,
+                    sitterPayment.getId(),
+                    20_000L,
+                    SettlementType.SITTER_CANCEL_PENALTY,
+                    "시터 귀책 취소 보상 - 개인 사정"
+            );
         }
     }
 
