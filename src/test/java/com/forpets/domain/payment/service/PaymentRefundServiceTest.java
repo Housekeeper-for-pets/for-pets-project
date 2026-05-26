@@ -12,6 +12,8 @@ import com.forpets.domain.payment.repository.PaymentRepository;
 import com.forpets.domain.reservation.entity.CanceledBy;
 import com.forpets.domain.reservation.entity.ReservationPayment;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
+import com.forpets.domain.settlement.entity.SettlementType;
+import com.forpets.domain.settlement.service.SettlementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -51,6 +53,8 @@ class PaymentRefundServiceTest {
     private CouponService couponService;
     @Mock
     private PaymentLockService paymentLockService;
+    @Mock
+    private SettlementService settlementService;
 
     // ── 픽스처 ──
     private final Long reservationId = 600L;
@@ -209,6 +213,15 @@ class PaymentRefundServiceTest {
             then(portOnePaymentClient).should()
                     .cancelPayment(eq("merchant-sitter-001"), amountCaptor.capture(), anyString());
             assertThat(amountCaptor.getValue()).isEqualTo(20_000L);
+
+            then(settlementService).should().createPenaltySettlement(
+                    reservationId,
+                    sitterMemberId,
+                    guardianPayment.getId(),
+                    20_000L,
+                    SettlementType.OWNER_CANCEL_PENALTY,
+                    "보호자 귀책 취소 보상 - 개인 사정"
+            );
         }
 
         @Test
@@ -252,6 +265,15 @@ class PaymentRefundServiceTest {
             // 시터 결제는 전액 위약금이라 PG 호출 안 됨
             then(portOnePaymentClient).should(never())
                     .cancelPayment(eq("merchant-sitter-001"), any(), anyString());
+
+            then(settlementService).should().createPenaltySettlement(
+                    reservationId,
+                    guardianMemberId,
+                    sitterPayment.getId(),
+                    20_000L,
+                    SettlementType.SITTER_CANCEL_PENALTY,
+                    "시터 귀책 취소 보상 - 개인 사정"
+            );
         }
     }
 
@@ -294,6 +316,42 @@ class PaymentRefundServiceTest {
                     .cancelPayment(eq("merchant-guardian-001"), eq(100_000L), anyString());
             then(portOnePaymentClient).should()
                     .cancelPayment(eq("merchant-sitter-001"), eq(20_000L), anyString());
+        }
+    }
+
+    @Nested
+    @DisplayName("케어 완료 예약금 환불 — refundSitterDepositAfterCompletion()")
+    class RefundSitterDepositAfterCompletionTest {
+
+        @Test
+        @DisplayName("[성공] 정상 케어 완료 후 시터 예약금만 환불")
+        void refund_sitter_deposit_after_completion() {
+            // given
+            given(paymentRepository.findByReservationIdAndPaymentRoleAndStatus(
+                    reservationId, PaymentRole.SITTER, PaymentStatus.PAID))
+                    .willReturn(Optional.of(sitterPayment));
+            given(reservationPaymentRepository.findByReservationId(reservationId))
+                    .willReturn(Optional.of(reservationPayment));
+
+            stubPgRefund("merchant-sitter-001", PaymentRole.SITTER);
+
+            // when
+            paymentRefundService.refundSitterDepositAfterCompletion(reservationId);
+
+            // then
+            assertThat(guardianWallet).as("보호자 결제금은 정산 원천이라 환불하지 않음").isEqualTo(0L);
+            assertThat(sitterWallet).as("시터 예약금만 환불").isEqualTo(20_000L);
+            assertThat(platformHeldGuardian).isEqualTo(100_000L);
+            assertThat(platformHeldSitter).isEqualTo(0L);
+            assertThat(guardianPayment.getStatus()).isEqualTo(PaymentStatus.PAID);
+            assertThat(sitterPayment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+            assertThat(reservationPayment.isGuardianPaid()).isTrue();
+            assertThat(reservationPayment.isSitterPaid()).isFalse();
+
+            then(portOnePaymentClient).should()
+                    .cancelPayment(eq("merchant-sitter-001"), eq(20_000L), anyString());
+            then(portOnePaymentClient).should(never())
+                    .cancelPayment(eq("merchant-guardian-001"), any(), anyString());
         }
     }
 }

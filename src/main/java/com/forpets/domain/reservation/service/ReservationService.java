@@ -9,6 +9,12 @@ import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.repository.PostTimeSlotRepository;
+import com.forpets.domain.payment.entity.Payment;
+import com.forpets.domain.payment.entity.PaymentRole;
+import com.forpets.domain.payment.entity.PaymentStatus;
+import com.forpets.domain.payment.exception.PaymentErrorCode;
+import com.forpets.domain.payment.exception.PaymentException;
+import com.forpets.domain.payment.repository.PaymentRepository;
 import com.forpets.domain.payment.service.PaymentRefundService;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
@@ -22,6 +28,7 @@ import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
+import com.forpets.domain.settlement.service.SettlementService;
 import com.forpets.global.embed.HasTimeSlotInfo;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.entity.TimeSlotInfo;
@@ -29,6 +36,7 @@ import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,7 +58,9 @@ public class ReservationService {
     private final ReservationPetRepository reservationPetRepository;
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
     private final ReservationPaymentRepository reservationPaymentRepository;
+    private final PaymentRepository paymentRepository;
     private final PaymentRefundService paymentRefundService;
+    private final SettlementService settlementService;
 
     private final ReservationLockService reservationLockService;
 
@@ -160,6 +170,7 @@ public class ReservationService {
     양측 결제가 모두 완료된 경우에만 Reservation 을 CONFIRMED 로 전환한다.
      */
     @Transactional
+    @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public ReservationResponseDto confirmAfterPayment(Long reservationId) {
         Reservation reservation = findById(reservationId);
         validatePending(reservation);
@@ -192,22 +203,33 @@ public class ReservationService {
      */
     @Transactional
     public ReservationResponseDto complete(Long memberId, Long reservationId) {
-        /*
-        시스템이 보관하고 있던 돈을 시터에게 보내주는 로직
-        - complete 를 호출한 사람 (로그인한 사람) == reservation 의 sitter 인지 확인
-        - completed 가 가능한 상태인지 (confirmed) 확인
-        - 타임슬롯 마지막 시간까지 마쳤는지 확인
-         */
-        Reservation reservation = findById(reservationId);
-        validateSitter(memberId, reservation);
-        validateConfirmed(reservation);
-        validateCareCompleted(reservationId);
+        return reservationLockService.executeWithReservationLock(reservationId, () -> {
+            /*
+            시스템이 보관하고 있던 돈을 시터에게 보내주는 로직
+            - complete 를 호출한 사람 (로그인한 사람) == reservation 의 sitter 인지 확인
+            - completed 가 가능한 상태인지 (confirmed) 확인
+            - 타임슬롯 마지막 시간까지 마쳤는지 확인
+             */
+            Reservation reservation = findById(reservationId);
+            validateSitter(memberId, reservation);
+            validateConfirmed(reservation);
+            validateCareCompleted(reservationId);
 
-        //status update
-        reservation.complete();
-        log.info("[케어 완료] reservationId={}, 시터(memberId={}) 완료 처리", reservationId, memberId);
+            Payment guardianPayment = findPaidGuardianPayment(reservationId);
 
-        return toResponseDto(reservation);
+            //status update
+            reservation.complete();
+            settlementService.createCareCompletionSettlement(
+                    reservation.getId(),
+                    reservation.getSitterMemberId(),
+                    guardianPayment.getId(),
+                    guardianPayment.getFinalAmount()
+            );
+            paymentRefundService.refundSitterDepositAfterCompletion(reservationId);
+            log.info("[케어 완료] reservationId={}, 시터(memberId={}) 완료 처리", reservationId, memberId);
+
+            return toResponseDto(reservation);
+        });
     }
 
     /*
@@ -330,6 +352,12 @@ public class ReservationService {
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
     }
 
+    private Payment findPaidGuardianPayment(Long reservationId) {
+        return paymentRepository.findByReservationIdAndPaymentRoleAndStatus(
+                        reservationId, PaymentRole.GUARDIAN, PaymentStatus.PAID)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+    }
+
     // CONFIRMED 예약과 충돌하는지 확인하기 위해서 예약목록을 돌면서 체크
     public boolean hasConfirmedConflict(Long sitterProfileId, List<? extends HasTimeSlotInfo> timeSlots) {
         List<Reservation> confirmed = reservationRepository
@@ -380,10 +408,13 @@ public class ReservationService {
 
     /*
     CONFIRMED 후속 처리
+    - 충돌 PENDING 예약 Cancel 처리
     - Proposal 출처: 같은 공고의 나머지 PENDING 제안 → REJECTED, 공고 → CLOSED
     - 같은 시터의 겹치는 시간대 Proposal → WITHDRAWN
      */
     private void handlePostConfirmation(Reservation reservation) {
+        cancelConflictingReservations(reservation);
+
         if (reservation.getSource() == ReservationSource.PROPOSAL) {
             // Proposal 출처: 같은 공고의 나머지 PENDING 제안 REJECTED + 공고 CLOSED
             Proposal acceptedProposal = proposalRepository.findById(reservation.getSourceId()).orElse(null);
@@ -405,6 +436,45 @@ public class ReservationService {
 
         // 겹치는 CareRequest 는 따로 reject 처리 하지 않고
         // PENDING 유지 (수락 시 충돌 검증에서 차단)
+    }
+
+    private void cancelConflictingReservations(Reservation confirmedReservation) {
+        List<ReservationTimeSlot> confirmedSlots =
+                reservationTimeSlotRepository.findAllByReservationIdOrderByTimeSlotInfoSequence(confirmedReservation.getId());
+
+        List<Reservation> sitterPendingReservations = reservationRepository
+                .findAllBySitterProfileIdAndStatus(confirmedReservation.getSitterProfileId(), ReservationStatus.PENDING)
+                .stream()
+                .filter(r -> !r.getId().equals(confirmedReservation.getId()))
+                .toList();
+
+        for (Reservation pending : sitterPendingReservations) {
+            List<ReservationTimeSlot> slots = reservationTimeSlotRepository.findAllByReservationIdOrderByTimeSlotInfoSequence(pending.getId());
+            if (!timeSlotValidator.hasTimeConflict(slots, confirmedSlots)) {
+                continue;
+            }
+            pending.cancel("시터의 다른 예약 확정으로 인한 자동 취소", CancelCategory.SCHEDULE_CHANGE,CanceledBy.SITTER);
+
+            refundIfPaid(pending);
+        }
+    }
+
+    private void refundIfPaid(Reservation reservation) {
+        Long reservationId = reservation.getId();
+        ReservationPayment rp = reservationPaymentRepository.findByReservationId(reservationId)
+                .orElse(null);
+        // PENDING 예약이긴 한데 결제를 아무도 안 함
+        if (rp == null) return;
+
+        paymentRefundService.refundPaidPayments(reservationId, "시터의 다른 예약 확정으로 인한 자동 취소");
+
+        if (rp.isSitterPaid()){
+            rp.sitterRefund();
+        }
+
+        if (rp.isGuardianPaid()){
+            rp.guardianRefund();
+        }
     }
 
     /*

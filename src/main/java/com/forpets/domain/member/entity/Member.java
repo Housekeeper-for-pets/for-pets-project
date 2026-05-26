@@ -109,8 +109,4 @@ public class Member extends BaseEntity {
     public boolean isActive() {
         return this.status == MemberStatus.ACTIVE && !this.deleted;
     }
-
-    public void setAdmin(){
-        this.role = MemberRole.ADMIN;
-    }
 }

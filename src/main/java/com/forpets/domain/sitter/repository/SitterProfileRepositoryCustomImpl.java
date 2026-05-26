@@ -44,6 +44,7 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
                 .from(sitter)
                 .join(member).on(member.id.eq(sitter.memberId))
                 .where(
+                        sitter.approvalStatus.eq(SitterApprovalStatus.APPROVED),
                         regionEq(condition),
                         possiblePetTypeEq(condition),
                         possiblePetSizeEq(condition),

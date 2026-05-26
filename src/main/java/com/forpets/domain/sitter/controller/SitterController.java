@@ -15,7 +15,6 @@ import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -66,9 +65,7 @@ public class SitterController {
 
         SitterPageResponse response = sitterService.searchSitters(condition, page,size,sort);
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
-                .body(ApiResponse.success(response));
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
 
@@ -87,9 +84,7 @@ public class SitterController {
     // 3. 시터 상세 조회 (로그인 필수)
     @GetMapping("/{sitterId}")
     public ResponseEntity<ApiResponse<SitterResponseDto>> getSitter(@PathVariable Long sitterId) {
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
-                .body(ApiResponse.success(sitterService.getSitterById(sitterId)));
+        return ResponseEntity.ok(ApiResponse.success(sitterService.getSitterById(sitterId)));
     }
 
     // 4. 내 시터 프로필 조회

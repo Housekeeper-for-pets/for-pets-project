@@ -30,7 +30,9 @@ public enum SitterErrorCode implements ErrorCode {
     SITTER_ALREADY_PENDING(HttpStatus.BAD_REQUEST, "SITTER_ALREADY_PENDING", "시터 프로필 승인 대기 상태입니다."),
     NOT_PENDING_APPROVAL(HttpStatus.BAD_REQUEST, "NOT_PENDING_APPROVAL", "시터 프로필이 대기 상태가 아닙니다."),
 
-    INVALID_SITTER_STATUS(HttpStatus.BAD_REQUEST, "INVALID_SITTER_STATUS", "시터 프로필을 수정 또는 삭제할 수 있는 상태가 아닙니다.")
+    INVALID_SITTER_STATUS(HttpStatus.BAD_REQUEST, "INVALID_SITTER_STATUS", "시터 프로필을 수정 또는 삭제할 수 있는 상태가 아닙니다."),
+    REQUEST_ALREADY_REJECTED(HttpStatus.BAD_REQUEST, "REQUEST_ALREADY_REJECTED", "시터 프로필 등록이 거절 상태입니다. 자세한 문의는 고객센터로 해주세요.")
+
 
     ;
 

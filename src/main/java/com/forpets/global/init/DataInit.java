@@ -31,10 +31,7 @@ import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
-import com.forpets.domain.sitter.entity.PossiblePetSize;
-import com.forpets.domain.sitter.entity.PossiblePetType;
-import com.forpets.domain.sitter.entity.SitterProfile;
-import com.forpets.domain.sitter.entity.SitterSchedule;
+import com.forpets.domain.sitter.entity.*;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
 import com.forpets.global.common.CareType;
@@ -42,6 +39,7 @@ import com.forpets.global.embed.entity.PetSnapshot;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +49,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.*;
 
+@Profile({"local", "docker", "prod"})
 @Component
 @RequiredArgsConstructor
 public class DataInit implements CommandLineRunner {
@@ -81,7 +80,6 @@ public class DataInit implements CommandLineRunner {
         if (memberRepository.count() > 0) return;
 
         Member adminMember = saveMember("dragonRock@test.com", "소란석", "010-0000-0000", MemberGender.MALE, Region.YONGSAN);
-        adminMember.setAdmin();
         // =============================================
         // 1. Member 5명 (기존)
         // =============================================
@@ -127,6 +125,10 @@ public class DataInit implements CommandLineRunner {
                 PossiblePetType.DOG, PossiblePetSize.SMALL, 15000);
         SitterProfile sitter3 = saveSitter(member4.getId(), "모든 반려동물 케어 가능합니다", 5,
                 PossiblePetType.ALL, PossiblePetSize.ALL, 20000);
+
+        sitter1.approve(1L);
+        sitter2.approve(1L);
+        sitter3.approve(1L);
 
         // =============================================
         // 4. SitterSchedule (기존)
@@ -433,6 +435,8 @@ public class DataInit implements CommandLineRunner {
                     sitterMember.getId(), sitterIntros[i],
                     2 + random.nextInt(7), petTypes[i], petSizes[i], prices[i]
             );
+            sp.approve(1L);
+            sp.changeStatus(SitterProfileStatus.RESERVABLE);
             allSitters.add(sp);
             sitterByMemberId.put(sitterMember.getId(), sp);
         }

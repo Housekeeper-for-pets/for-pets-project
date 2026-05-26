@@ -30,6 +30,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.apache.commons:commons-pool2'
 
     // Redisson 기반 분산 락을 사용하기 위한 의존성입니다.
     implementation 'org.redisson:redisson:3.27.2'
