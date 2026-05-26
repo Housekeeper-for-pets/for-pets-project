@@ -2,6 +2,7 @@ package com.forpets.global.config;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.forpets.domain.post.dto.PostPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
@@ -104,7 +105,7 @@ public class RedisCacheConfig implements CachingConfigurer {//errorHandler 오�
     private Duration longTtl(Object key, Object value) {
         log.info("TTL 결정 — value type: {}, value: {}",
                 value == null ? "null" : value.getClass().getName(), value);
-        if (isEmptySitterSearchResult(value)) {
+        if (isEmptySearchResult(value)) {
             log.info("빈 결과 감지 → 1분 TTL 적용");
             return EMPTY_RESULT_TTL;
         }
@@ -113,13 +114,19 @@ public class RedisCacheConfig implements CachingConfigurer {//errorHandler 오�
     }
 
     private Duration shortTtl(Object key, Object value) {
-        if (isEmptySitterSearchResult(value)) {
+        if (isEmptySearchResult(value)) {
             return EMPTY_RESULT_TTL;
         }
         return SHORT_TTL;
     }
 
-    private boolean isEmptySitterSearchResult(Object value) {
-        return value instanceof SitterPageResponse response && response.totalElements() == 0;
+    private boolean isEmptySearchResult(Object value) {
+        if (value instanceof SitterPageResponse response) {
+            return response.totalElements() == 0;
+        }
+        if (value instanceof PostPageResponse response) {
+            return response.totalElements() == 0;
+        }
+        return false;
     }
 }

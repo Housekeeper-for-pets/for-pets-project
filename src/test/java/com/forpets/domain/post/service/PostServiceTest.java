@@ -79,6 +79,9 @@ class PostServiceTest {
     @Mock
     private ProposalRepository proposalRepository;
 
+    @Mock
+    private PostCacheService postCacheService;
+
     // ── 테스트 픽스처 ──
     private Member member1;       // 째길중 — 공고 작성자
     private Member member2;       // 타코맘 — 제3자

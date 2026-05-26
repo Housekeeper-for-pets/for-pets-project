@@ -44,6 +44,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -76,9 +77,12 @@ class PostSearchServiceTest {
     @Mock
     private ProposalRepository proposalRepository;
 
+    @Mock
+    private PostCacheService postCacheService;
+
     private final Long memberId = 1L;
     private final Long postId = 100L;
-
+    
     private Member member;
     private Post post;
     private Pet pet;
@@ -125,25 +129,25 @@ class PostSearchServiceTest {
         void search_posts_test_01() {
             PostSearchCondition condition = new PostSearchCondition(null, null, null, null);
             PostPageResponse response = PostPageResponse.of(List.of(), 0, 0, 0, 10);
-            given(postRepository.searchPosts(eq(condition), any())).willReturn(response);
+            given(postCacheService.searchPostings(eq(condition), eq(0), eq(10), eq("createdAt"))).willReturn(response);
 
             PostPageResponse result = postService.searchPosts(condition, 0, 10, "createdAt");
 
             assertThat(result).isEqualTo(response);
-            then(postRepository).should().searchPosts(eq(condition), any());
+            then(postCacheService).should().searchPostings(eq(condition), eq(0), eq(10), eq("createdAt"));
         }
 
         @Test
         @DisplayName("[성공] 허용된 정렬 필드 updatedAt, budgetAmount는 조회 가능하다")
         void search_posts_test_02() {
             PostSearchCondition condition = new PostSearchCondition(null, null, null, null);
-            given(postRepository.searchPosts(eq(condition), any()))
+            given(postCacheService.searchPostings(eq(condition), eq(0), eq(10), anyString()))
                     .willReturn(PostPageResponse.of(List.of(), 0, 0, 0, 10));
 
             postService.searchPosts(condition, 0, 10, "updatedAt");
             postService.searchPosts(condition, 0, 10, "budgetAmount");
 
-            then(postRepository).should(times(2)).searchPosts(eq(condition), any());
+            then(postCacheService).should(times(2)).searchPostings(eq(condition), eq(0), eq(10), anyString());
         }
 
         @Test

@@ -15,7 +15,6 @@ import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -42,7 +41,7 @@ public class PostController {
 
     /*
     2. 공고 목록 조회
-    - 캐시 전략: Cache-Control public, max-age=300
+    - Redis 캐시: shortTtlCacheManager (TTL 5분, 빈 결과 1분)
     - 정렬 화이트리스트: createdAt(기본), updatedAt, budgetAmount
      */
     @GetMapping
@@ -61,9 +60,7 @@ public class PostController {
 
         PostPageResponse response = postService.searchPosts(condition, page, size, sort);
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=300")
-                .body(ApiResponse.success(response));
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /*
