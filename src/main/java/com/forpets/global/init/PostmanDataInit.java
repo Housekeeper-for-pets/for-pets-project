@@ -116,13 +116,11 @@ public class PostmanDataInit implements CommandLineRunner {
         SitterProfile sitter1 = saveSitter(member2.getId(), "고양이 전문 시터, 자격증 보유", 7,
                 PossiblePetType.CAT, PossiblePetSize.MEDIUM, 18000);
         sitter1.approve(1L);
-        sitter1.changeStatus(SitterProfileStatus.RESERVABLE);
         member2.changeRoleToSitter();
 
         SitterProfile sitter2 = saveSitter(member4.getId(), "뭐든 다 잘 합니다.", 7,
                 PossiblePetType.ALL, PossiblePetSize.ALL, 30000);
         sitter2.approve(1L);
-        sitter2.changeStatus(SitterProfileStatus.RESERVABLE);
         member4.changeRoleToSitter();
 
         // =============================================

@@ -126,6 +126,10 @@ public class DataInit implements CommandLineRunner {
         SitterProfile sitter3 = saveSitter(member4.getId(), "모든 반려동물 케어 가능합니다", 5,
                 PossiblePetType.ALL, PossiblePetSize.ALL, 20000);
 
+        sitter1.approve(1L);
+        sitter2.approve(1L);
+        sitter3.approve(1L);
+
         // =============================================
         // 4. SitterSchedule (기존)
         // =============================================
