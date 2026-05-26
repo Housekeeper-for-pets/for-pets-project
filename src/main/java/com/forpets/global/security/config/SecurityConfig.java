@@ -26,6 +26,7 @@ public class SecurityConfig {
     private final TokenRedisService tokenRedisService;
     private final BearerTokenResolver bearerTokenResolver;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -39,9 +40,12 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .exceptionHandling(exception ->
-                        exception.authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                        exception
+                                .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                                .accessDeniedHandler(jwtAccessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(PublicPathPatterns.ANY_METHOD).permitAll()
                         .requestMatchers(HttpMethod.POST, PublicPathPatterns.PUBLIC_POST).permitAll()
                         .requestMatchers(HttpMethod.GET, PublicPathPatterns.AUTHENTICATED_GET).authenticated()

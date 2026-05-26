@@ -26,7 +26,11 @@ public enum SitterErrorCode implements ErrorCode {
     NOT_SCHEDULE_OWNER(HttpStatus.FORBIDDEN, "NOT_SCHEDULE_OWNER", "본인의 스케줄이 아닙니다."),
     HAS_ACTIVE_RESERVATION(HttpStatus.BAD_REQUEST, "HAS_ACTIVE_RESERVATION", "CONFIRMED 상태의 예약이 있습니다."),
 
-    SITTER_USED_IN_ACTIVE_PROCESS(HttpStatus.BAD_REQUEST, "SITTER_USED_IN_ACTIVE_PROCESS", "활성상태의 제안, 예약 또는 돌봄 요청이 존재하는 시터프로필은 삭제가 불가능합니다.")
+    SITTER_USED_IN_ACTIVE_PROCESS(HttpStatus.BAD_REQUEST, "SITTER_USED_IN_ACTIVE_PROCESS", "활성상태의 제안, 예약 또는 돌봄 요청이 존재하는 시터프로필은 삭제가 불가능합니다."),
+    SITTER_ALREADY_PENDING(HttpStatus.BAD_REQUEST, "SITTER_ALREADY_PENDING", "시터 프로필 승인 대기 상태입니다."),
+    NOT_PENDING_APPROVAL(HttpStatus.BAD_REQUEST, "NOT_PENDING_APPROVAL", "시터 프로필이 대기 상태가 아닙니다."),
+
+    INVALID_SITTER_STATUS(HttpStatus.BAD_REQUEST, "INVALID_SITTER_STATUS", "시터 프로필을 수정 또는 삭제할 수 있는 상태가 아닙니다.")
 
     ;
 

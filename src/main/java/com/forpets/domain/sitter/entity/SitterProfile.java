@@ -1,5 +1,7 @@
 package com.forpets.domain.sitter.entity;
 
+import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.global.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -47,6 +49,19 @@ public class SitterProfile extends BaseEntity {
     @Column(nullable = false, length = 20)
     private SitterProfileStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private SitterApprovalStatus approvalStatus;
+
+    @Column(length = 500)
+    private String rejectReason;
+
+    @Column(name = "evaluated_by")
+    private Long evaluatedBy;
+
+    @Column(name = "evaluated_at")
+    private LocalDateTime evaluatedAt;
+
     @Column(nullable = false)
     private boolean deleted = false;
 
@@ -63,7 +78,8 @@ public class SitterProfile extends BaseEntity {
         this.possiblePetType = possiblePetType;
         this.possiblePetSize = possiblePetSize == null ? PossiblePetSize.ALL : possiblePetSize;
         this.pricePerHour = pricePerHour;
-        this.status = SitterProfileStatus.RESERVABLE;
+        this.status = SitterProfileStatus.NON_RESERVABLE;
+        this.approvalStatus = SitterApprovalStatus.PENDING;
     }
 
     public void update(String introduction, int experienceYears,
@@ -79,9 +95,39 @@ public class SitterProfile extends BaseEntity {
         this.status = status;
     }
 
+    public void approve(Long adminId) {
+        this.approvalStatus = SitterApprovalStatus.APPROVED;
+        this.rejectReason = null;
+        this.evaluatedBy = adminId;
+        this.evaluatedAt = LocalDateTime.now();
+        this.status = SitterProfileStatus.RESERVABLE;
+    }
+
+    public void reject(Long adminId, String rejectReason) {
+        this.approvalStatus = SitterApprovalStatus.REJECTED;
+        this.rejectReason = rejectReason;
+        this.evaluatedBy = adminId;
+        this.evaluatedAt = LocalDateTime.now();
+    }
+
+
     public void delete() {
         this.deleted = true;
         this.deletedAt = LocalDateTime.now();
+    }
+
+    public void reactivate() {
+        this.deleted = false;
+        this.deletedAt = null;
+        this.approvalStatus = SitterApprovalStatus.PENDING;
+        this.status = SitterProfileStatus.NON_RESERVABLE;
+        this.rejectReason = null;
+        this.evaluatedBy = null;
+        this.evaluatedAt = null;
+    }
+
+    public boolean isApproved() {
+        return this.approvalStatus == SitterApprovalStatus.APPROVED;
     }
 
     public boolean isReservable() {

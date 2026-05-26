@@ -3,6 +3,7 @@ package com.forpets.domain.reservation.service;
 import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
+import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
@@ -51,11 +52,14 @@ public class ReservationService {
     private final ReservationPaymentRepository reservationPaymentRepository;
     private final PaymentRefundService paymentRefundService;
 
+    private final ReservationLockService reservationLockService;
+
     private final PostRepository postRepository;
     private final ProposalRepository proposalRepository;
     private final PostTimeSlotRepository postTimeSlotRepository;
 
     private final TimeSlotValidator timeSlotValidator;
+    private final CareRequestRepository careRequestRepository;
 
     /*
     예약 생성 1: 순방향로직에서 Reservation 생성 (트리거: CareRequest 수락)
@@ -161,15 +165,27 @@ public class ReservationService {
         validatePending(reservation);
 
         ReservationPayment payment = findPayment(reservationId);
-        if (payment.isBothPaid()) {
-            validateNoConfirmedConflict(reservation);
-            reservation.confirm();
-            log.info("[예약 확정] reservationId={}, PortOne 양측 결제 완료 → CONFIRMED", reservationId);
-
-            handlePostConfirmation(reservation);
+        if (!payment.isBothPaid()) {
+            return toResponseDto(reservation);
         }
 
-        return toResponseDto(reservation);
+        return reservationLockService.executeWithSitterLock(
+                reservation.getSitterProfileId(), () -> {
+                    validateNoConfirmedConflict(reservation);
+                    reservation.confirm();
+                    log.info("[예약 확정] reservationId={}, CONFIRMED", reservationId);
+                    handlePostConfirmation(reservation);
+                    return toResponseDto(reservation);
+                });
+//        if (payment.isBothPaid()) {
+//            validateNoConfirmedConflict(reservation);
+//            reservation.confirm();
+//            log.info("[예약 확정] reservationId={}, PortOne 양측 결제 완료 → CONFIRMED", reservationId);
+//
+//            handlePostConfirmation(reservation);
+//        }
+//
+//        return toResponseDto(reservation);
     }
 
 
@@ -207,14 +223,39 @@ public class ReservationService {
 
         CanceledBy canceledBy = reservation.isGuardian(memberId) ? CanceledBy.GUARDIAN : CanceledBy.SITTER;
 
+        // reservation 이 Pending 인 경우: 그냥.. 환불해주면 됨
+        if (reservation.isPending()){
+            reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
+            log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
+
+            paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
+            paymentRefundService.expireNonPaidPayments(reservationId);
+
+            // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
+            handlePostCancellation(reservation);
+
+            return toResponseDto(reservation);
+        }
+
+        //  reservation 이 Confirmed 가 된 경우
+        //  : 어쩔 수 없는 일이 아니라면 무조건 위약금을 물게 됨
+
+        // 어쩔수 없는 일인지? -> 관리자 검토 후 위약금 안 물게 해줄 수도 있고 아닐 수도 있어요...
+        if (request.cancelCategory() == CancelCategory.UNAVOIDABLE) {
+            reservation.requestCancel(request.cancelReason(), request.cancelCategory(), canceledBy);
+            log.info("[취소 요청] UNAVOIDABLE 관리자 검토 대기 reservationId={}, 취소주체={}",
+                    reservationId, canceledBy);
+            return toResponseDto(reservation);
+        }
+
+        // 그냥 취소하는거면? -> 위약금 차감 후 취소
         reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
-        log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
+        log.info("[예약 취소] CONFIRMED 위약금 차감 취소 reservationId={}, 취소주체={}, 사유={}",
+                reservationId, canceledBy, request.cancelReason());
 
-        paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
-
-        // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
+        paymentRefundService.refundWithPenalty(reservationId, request.cancelReason(), canceledBy);
+        paymentRefundService.expireNonPaidPayments(reservationId);
         handlePostCancellation(reservation);
-
         return toResponseDto(reservation);
     }
 
@@ -240,7 +281,14 @@ public class ReservationService {
     private void expireReservation(Reservation reservation) {
         reservation.expire();
         paymentRefundService.refundPaidPayments(reservation.getId(), EXPIRE_REFUND_REASON);
+        paymentRefundService.expireNonPaidPayments(reservation.getId());
         handlePostCancellation(reservation);
+
+        // careRequest 도 restore 해줌
+        // 수동 취소에서도 Pending 으로 돌아가는걸 방지하기 위해 expireReservation 으로 위치 이동시킴
+        if (reservation.getSource() == ReservationSource.CARE_REQUEST){
+            careRequestRepository.findById(reservation.getSourceId()).ifPresent(CareRequest::restoreToPending);
+        }
     }
 
 
@@ -287,19 +335,6 @@ public class ReservationService {
 
         return hasConflictWith(confirmed, timeSlots);
     }
-
-    /*
-    V2
-    PENDING 예약과 시간 충돌 여부 확인
-    충돌 시 true 반환 → 호출하는 쪽에서 경고 처리
-     */
-//    public boolean hasPendingConflict(Long sitterProfileId, List<? extends HasTimeSlotInfo> timeSlots) {
-//        List<Reservation> pending = reservationRepository
-//                .findAllBySitterProfileIdAndStatus(sitterProfileId, ReservationStatus.PENDING);
-//
-//        return hasConflictWith(pending, timeSlots);
-//    }
-
 
     private boolean hasConflictWith(List<Reservation> reservations, List<? extends HasTimeSlotInfo> newSlots) {
         for (Reservation existing : reservations) {

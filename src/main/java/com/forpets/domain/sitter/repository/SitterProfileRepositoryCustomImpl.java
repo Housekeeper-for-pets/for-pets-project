@@ -6,6 +6,7 @@ import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
 import com.forpets.domain.sitter.dto.profile.SitterSearchCondition;
 import com.forpets.domain.sitter.entity.QSitterProfile;
+import com.forpets.domain.sitter.entity.SitterApprovalStatus;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.entity.SitterSchedule;
 import com.querydsl.core.types.OrderSpecifier;
@@ -60,6 +61,7 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
                 .from(sitter)
                 .join(member).on(member.id.eq(sitter.memberId))
                 .where(
+                        sitter.approvalStatus.eq(SitterApprovalStatus.APPROVED),
                         regionEq(condition),
                         possiblePetTypeEq(condition),
                         possiblePetSizeEq(condition),

@@ -1,5 +1,6 @@
 package com.forpets.domain.carerequest.entity;
 
+import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.global.common.CareType;
 import com.forpets.global.entity.BaseEntity;
 import jakarta.persistence.*;
@@ -76,4 +77,6 @@ public class CareRequest extends BaseEntity {
     public boolean isTargetSitter(Long sitterProfileId) {
         return this.sitterProfileId.equals(sitterProfileId);
     }
+
+    public void restoreToPending() { this.status = CareRequestStatus.PENDING; }
 }

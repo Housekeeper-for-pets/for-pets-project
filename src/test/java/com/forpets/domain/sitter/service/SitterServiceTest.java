@@ -13,6 +13,7 @@ import com.forpets.domain.sitter.dto.profile.UpdateSitterRequest;
 import com.forpets.domain.sitter.dto.profile.UpdateSitterStatusRequest;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
+import com.forpets.domain.sitter.entity.SitterApprovalStatus;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.entity.SitterProfileStatus;
 import com.forpets.domain.sitter.entity.SitterSchedule;
@@ -133,8 +134,7 @@ class SitterServiceTest {
                     PossiblePetType.ALL, PossiblePetSize.ALL, 15000
             );
             given(memberService.findById(member1Id)).willReturn(member1);
-            given(sitterProfileRepository.existsByMemberId(member1Id)).willReturn(false);
-            given(sitterProfileRepository.countByMemberIdIncludingDeleted(member1Id)).willReturn(0);
+            given(sitterProfileRepository.findByIdIncludingDeleted(member1Id)).willReturn(Optional.empty());
             given(sitterProfileRepository.save(any(SitterProfile.class))).willReturn(sitterProfile);
 
             // when
@@ -148,7 +148,8 @@ class SitterServiceTest {
             assertThat(result.possiblePetSize()).isEqualTo(PossiblePetSize.ALL);
             assertThat(result.pricePerHour()).isEqualTo(15000);
             assertThat(result.region()).isEqualTo(Region.SEOCHO);
-            assertThat(member1.getRole()).isEqualTo(MemberRole.SITTER);
+            assertThat(member1.getRole()).isEqualTo(MemberRole.MEMBER);
+            assertThat(result.approvalStatus()).isEqualTo(SitterApprovalStatus.PENDING);
             then(sitterProfileRepository).should().save(any(SitterProfile.class));
         }
 
@@ -171,8 +172,7 @@ class SitterServiceTest {
             ReflectionTestUtils.setField(sitterWithDefaultSize, "id", 101L);
 
             given(memberService.findById(member2Id)).willReturn(member2);
-            given(sitterProfileRepository.existsByMemberId(member2Id)).willReturn(false);
-            given(sitterProfileRepository.countByMemberIdIncludingDeleted(member2Id)).willReturn(0);
+            given(sitterProfileRepository.findByIdIncludingDeleted(member2Id)).willReturn(Optional.empty());
             given(sitterProfileRepository.save(any(SitterProfile.class))).willReturn(sitterWithDefaultSize);
 
             // when
@@ -191,15 +191,15 @@ class SitterServiceTest {
                     PossiblePetType.CAT, PossiblePetSize.SMALL, 20000
             );
             given(memberService.findById(member1Id)).willReturn(member1);
-            given(sitterProfileRepository.existsByMemberId(member1Id)).willReturn(false);
-            given(sitterProfileRepository.countByMemberIdIncludingDeleted(member1Id)).willReturn(0);
+            given(sitterProfileRepository.findByIdIncludingDeleted(member1Id)).willReturn(Optional.empty());
             given(sitterProfileRepository.save(any(SitterProfile.class))).willReturn(sitterProfile);
 
             // when
             SitterResponseDto result = sitterService.create(member1Id, request);
 
             // then
-            assertThat(result.status()).isEqualTo(SitterProfileStatus.RESERVABLE);
+            assertThat(result.status()).isEqualTo(SitterProfileStatus.NON_RESERVABLE);
+            assertThat(result.approvalStatus()).isEqualTo(SitterApprovalStatus.PENDING);
         }
 
         @Test
@@ -228,13 +228,14 @@ class SitterServiceTest {
                     PossiblePetType.DOG, PossiblePetSize.SMALL, 10000
             );
             given(memberService.findById(member1Id)).willReturn(member1);
-            given(sitterProfileRepository.existsByMemberId(member1Id)).willReturn(true);
+            given(sitterProfileRepository.findByIdIncludingDeleted(member1Id))
+                    .willReturn(Optional.of(sitterProfile));
 
             // when & then
             assertThatThrownBy(() -> sitterService.create(member1Id, request))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
-                            .isEqualTo(SitterErrorCode.SITTER_PROFILE_EXISTS));
+                            .isEqualTo(SitterErrorCode.SITTER_ALREADY_PENDING));
         }
 
         @Test
@@ -245,15 +246,18 @@ class SitterServiceTest {
                     "재등록 시도", 1,
                     PossiblePetType.CAT, PossiblePetSize.MEDIUM, 10000
             );
+            sitterProfile.delete();
             given(memberService.findById(member1Id)).willReturn(member1);
-            given(sitterProfileRepository.existsByMemberId(member1Id)).willReturn(false);
-            given(sitterProfileRepository.countByMemberIdIncludingDeleted(member1Id)).willReturn(1);
+            given(sitterProfileRepository.findByIdIncludingDeleted(member1Id))
+                    .willReturn(Optional.of(sitterProfile));
 
-            // when & then
-            assertThatThrownBy(() -> sitterService.create(member1Id, request))
-                    .isInstanceOf(SitterException.class)
-                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
-                            .isEqualTo(SitterErrorCode.SITTER_PROFILE_ALREADY_REGISTERED));
+            // when
+            SitterResponseDto result = sitterService.create(member1Id, request);
+
+            // then
+            assertThat(sitterProfile.isDeleted()).isFalse();
+            assertThat(result.status()).isEqualTo(SitterProfileStatus.NON_RESERVABLE);
+            assertThat(result.approvalStatus()).isEqualTo(SitterApprovalStatus.PENDING);
         }
     }
 
@@ -320,6 +324,7 @@ class SitterServiceTest {
                     "경력 5년 대형견 전문 시터로 변경", 5,
                     PossiblePetType.DOG, PossiblePetSize.LARGE, 25000
             );
+            sitterProfile.approve(adminMemberId);
             given(memberService.findById(member1Id)).willReturn(member1);
             given(sitterProfileRepository.findByMemberId(member1Id)).willReturn(Optional.of(sitterProfile));
 
@@ -366,6 +371,7 @@ class SitterServiceTest {
         void sitter_test_11() {
             // given
             UpdateSitterStatusRequest request = new UpdateSitterStatusRequest(SitterProfileStatus.NON_RESERVABLE);
+            sitterProfile.approve(adminMemberId);
             given(memberService.findById(member1Id)).willReturn(member1);
             given(sitterProfileRepository.findByMemberId(member1Id)).willReturn(Optional.of(sitterProfile));
 
@@ -380,6 +386,7 @@ class SitterServiceTest {
         @DisplayName("[성공] NON_RESERVABLE → RESERVABLE 변경 성공")
         void sitter_test_12() {
             // given
+            sitterProfile.approve(adminMemberId);
             sitterProfile.changeStatus(SitterProfileStatus.NON_RESERVABLE); // 사전에 NON_RESERVABLE로 설정
             UpdateSitterStatusRequest request = new UpdateSitterStatusRequest(SitterProfileStatus.RESERVABLE);
             given(memberService.findById(member1Id)).willReturn(member1);
@@ -397,6 +404,7 @@ class SitterServiceTest {
         void sitter_test_13() {
             // given — 상태 변경 로직에는 associationChecker 호출이 없으므로 stub 불필요
             UpdateSitterStatusRequest request = new UpdateSitterStatusRequest(SitterProfileStatus.NON_RESERVABLE);
+            sitterProfile.approve(adminMemberId);
             given(memberService.findById(member1Id)).willReturn(member1);
             given(sitterProfileRepository.findByMemberId(member1Id)).willReturn(Optional.of(sitterProfile));
 
@@ -436,6 +444,7 @@ class SitterServiceTest {
         void sitter_test_15() {
             // given
             member1.changeRoleToSitter(); // 사전에 SITTER 역할로 설정
+            sitterProfile.approve(adminMemberId);
             given(sitterProfileRepository.findByMemberId(member1Id)).willReturn(Optional.of(sitterProfile));
             given(associationChecker.hasSitterActiveAssociation(sitterProfileId)).willReturn(false);
             given(memberService.findById(member1Id)).willReturn(member1);
@@ -453,6 +462,7 @@ class SitterServiceTest {
         @DisplayName("[실패] 연관된 Proposal/CareRequest/Reservation이 존재하는 시터프로필 삭제 시도")
         void sitter_test_16() {
             // given
+            sitterProfile.approve(adminMemberId);
             given(sitterProfileRepository.findByMemberId(member1Id)).willReturn(Optional.of(sitterProfile));
             given(associationChecker.hasSitterActiveAssociation(sitterProfileId)).willReturn(true);
 
@@ -592,6 +602,7 @@ class SitterServiceTest {
         @DisplayName("[성공] 존재하는 sitterId로 상세 조회하면 프로필 정보를 반환한다")
         void get_sitter_by_id_test_01() {
             // given
+            sitterProfile.approve(adminMemberId);
             given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
             given(memberService.findById(member1Id)).willReturn(member1);
             given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of());
@@ -623,6 +634,7 @@ class SitterServiceTest {
                     .build();
             ReflectionTestUtils.setField(schedule, "id", 1L);
 
+            sitterProfile.approve(adminMemberId);
             given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
             given(memberService.findById(member1Id)).willReturn(member1);
             given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of(schedule));
@@ -638,6 +650,7 @@ class SitterServiceTest {
         @DisplayName("[성공] schedules가 없는 시터 상세 조회 시 빈 schedules를 반환한다")
         void get_sitter_by_id_test_03() {
             // given
+            sitterProfile.approve(adminMemberId);
             given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
             given(memberService.findById(member1Id)).willReturn(member1);
             given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of());

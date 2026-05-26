@@ -17,6 +17,7 @@ public record SitterResponseDto(
         PossiblePetSize possiblePetSize,
         Integer pricePerHour,
         SitterProfileStatus status,
+        SitterApprovalStatus approvalStatus,
         List<ScheduleResponseDto> schedules,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -36,6 +37,7 @@ public record SitterResponseDto(
                 sitter.getPossiblePetSize(),
                 sitter.getPricePerHour(),
                 sitter.getStatus(),
+                sitter.getApprovalStatus(),
                 schedules.stream().map(ScheduleResponseDto::from).toList(),
                 sitter.getCreatedAt(),
                 sitter.getUpdatedAt()
