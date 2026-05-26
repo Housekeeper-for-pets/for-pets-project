@@ -439,6 +439,15 @@ class ReservationServiceTest {
     @DisplayName("케어 완료 — PATCH /api/reservations/{reservationId}/complete")
     class CompleteTest {
 
+        @BeforeEach
+        void setUpReservationLock() {
+            given(reservationLockService.executeWithReservationLock(any(), any()))
+                    .willAnswer(invocation -> {
+                        Supplier<?> task = invocation.getArgument(1);
+                        return task.get();
+                    });
+        }
+
         @Test
         @DisplayName("[성공] 시터가 CONFIRMED 예약 완료 처리 성공")
         void reservation_test_15() {
