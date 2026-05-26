@@ -18,6 +18,7 @@ public record SitterResponseDto(
         Integer pricePerHour,
         SitterProfileStatus status,
         SitterApprovalStatus approvalStatus,
+        String rejectReason,
         List<ScheduleResponseDto> schedules,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -38,6 +39,7 @@ public record SitterResponseDto(
                 sitter.getPricePerHour(),
                 sitter.getStatus(),
                 sitter.getApprovalStatus(),
+                sitter.getRejectReason(),
                 schedules.stream().map(ScheduleResponseDto::from).toList(),
                 sitter.getCreatedAt(),
                 sitter.getUpdatedAt()
