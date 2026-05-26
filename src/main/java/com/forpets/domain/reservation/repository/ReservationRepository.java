@@ -35,8 +35,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Query("""
     SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END
     FROM Reservation r
-    JOIN ReservationPet rp ON rp.reservationId = r.id
-    WHERE rp.petId = :petId
+    WHERE r.sitterProfileId = :sitterId
     AND r.status IN :statuses
     """)
     boolean existsBySitterIdAndStatusIn(@Param("sitterId") Long sitterId, @Param("statuses") List<ReservationStatus> statuses);

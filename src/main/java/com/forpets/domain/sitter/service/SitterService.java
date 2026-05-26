@@ -47,6 +47,10 @@ public class SitterService {
         if (sitterProfileOrNull.isPresent()) {
             SitterProfile sitter = sitterProfileOrNull.get();
 
+            if (sitter.getApprovalStatus() == SitterApprovalStatus.REJECTED){
+                throw new SitterException(SitterErrorCode.REQUEST_ALREADY_REJECTED);
+            }
+
             if (sitter.isDeleted()){
                 sitter.reactivate(); // 상태 초기화 해주기 PENDING 으로 + deleted 도 없애주고
 
