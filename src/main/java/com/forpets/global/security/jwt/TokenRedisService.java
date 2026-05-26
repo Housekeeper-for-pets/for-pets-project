@@ -1,6 +1,7 @@
 package com.forpets.global.security.jwt;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -9,6 +10,7 @@ import java.time.Duration;
 /**
  * Redis를 사용해 Refresh Token과 Access Token 블랙리스트를 관리합니다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TokenRedisService {
@@ -47,6 +49,11 @@ public class TokenRedisService {
     }
 
     public boolean isBlacklisted(String accessToken) {
-        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(BLACKLIST_PREFIX + accessToken));
+        try {
+            return Boolean.TRUE.equals(stringRedisTemplate.hasKey(BLACKLIST_PREFIX + accessToken));
+        } catch (Exception e) {
+            log.warn("JWT 블랙리스트 Redis 조회 실패 — 보안 우선 원칙 적용, 토큰 차단 처리", e);
+            return true; // 보안 우선: 조회 실패 시 차단
+        }
     }
 }

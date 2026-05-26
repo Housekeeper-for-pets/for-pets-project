@@ -18,6 +18,7 @@ spring:
 
   data:
     redis:
+      timeout: 2000ms # redis 장애시 빠른 실패처리
       lettuce:
         pool:
           max-active: 10
