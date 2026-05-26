@@ -222,6 +222,7 @@ public class ReservationService {
                 guardianPayment.getId(),
                 guardianPayment.getFinalAmount()
         );
+        paymentRefundService.refundSitterDepositAfterCompletion(reservationId);
         log.info("[케어 완료] reservationId={}, 시터(memberId={}) 완료 처리", reservationId, memberId);
 
         return toResponseDto(reservation);

@@ -87,6 +87,25 @@ public class PaymentRefundService {
     }
 
     /*
+    정상 케어 완료 후 시터가 냈던 예약금만 환불한다.
+    보호자 결제금은 시터 정산 Settlement 의 원천이므로 여기서 환불하지 않는다.
+     */
+    @Transactional
+    public void refundSitterDepositAfterCompletion(Long reservationId) {
+        paymentLockService.executeWithReservationLock(reservationId, () -> {
+            Payment sitterPayment = paymentRepository.findByReservationIdAndPaymentRoleAndStatus(
+                            reservationId, PaymentRole.SITTER, PaymentStatus.PAID)
+                    .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+            ReservationPayment reservationPayment = reservationPaymentRepository.findByReservationId(reservationId)
+                    .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+
+            refund(sitterPayment, reservationPayment, "케어 완료에 따른 시터 예약금 환불");
+            return null;
+        });
+    }
+
+    /*
     - Payment status = REFUNDED, reason 저장, rawResponse 저장, refundedAt = now()
     - ReservationPayment table 에도 true로 되어있는거 false 로 다시 바꿔주기 (restoreReservationPayment)
     - Payment table 에 UserCouponId 가 저장되어있다면 restore 해주기

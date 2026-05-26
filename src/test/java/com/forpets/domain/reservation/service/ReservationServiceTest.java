@@ -469,6 +469,7 @@ class ReservationServiceTest {
             assertThat(result.status()).isEqualTo(ReservationStatus.COMPLETED);
             then(settlementService).should().createCareCompletionSettlement(
                     reservationId, member2Id, guardianPaymentId, guardianPayment.getFinalAmount());
+            then(paymentRefundService).should().refundSitterDepositAfterCompletion(reservationId);
         }
 
         @Test
@@ -542,6 +543,7 @@ class ReservationServiceTest {
             assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CONFIRMED);
             then(settlementService).should(never())
                     .createCareCompletionSettlement(any(), any(), any(), any());
+            then(paymentRefundService).should(never()).refundSitterDepositAfterCompletion(any());
         }
     }
 

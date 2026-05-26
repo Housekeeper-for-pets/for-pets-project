@@ -296,4 +296,40 @@ class PaymentRefundServiceTest {
                     .cancelPayment(eq("merchant-sitter-001"), eq(20_000L), anyString());
         }
     }
+
+    @Nested
+    @DisplayName("케어 완료 예약금 환불 — refundSitterDepositAfterCompletion()")
+    class RefundSitterDepositAfterCompletionTest {
+
+        @Test
+        @DisplayName("[성공] 정상 케어 완료 후 시터 예약금만 환불")
+        void refund_sitter_deposit_after_completion() {
+            // given
+            given(paymentRepository.findByReservationIdAndPaymentRoleAndStatus(
+                    reservationId, PaymentRole.SITTER, PaymentStatus.PAID))
+                    .willReturn(Optional.of(sitterPayment));
+            given(reservationPaymentRepository.findByReservationId(reservationId))
+                    .willReturn(Optional.of(reservationPayment));
+
+            stubPgRefund("merchant-sitter-001", PaymentRole.SITTER);
+
+            // when
+            paymentRefundService.refundSitterDepositAfterCompletion(reservationId);
+
+            // then
+            assertThat(guardianWallet).as("보호자 결제금은 정산 원천이라 환불하지 않음").isEqualTo(0L);
+            assertThat(sitterWallet).as("시터 예약금만 환불").isEqualTo(20_000L);
+            assertThat(platformHeldGuardian).isEqualTo(100_000L);
+            assertThat(platformHeldSitter).isEqualTo(0L);
+            assertThat(guardianPayment.getStatus()).isEqualTo(PaymentStatus.PAID);
+            assertThat(sitterPayment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+            assertThat(reservationPayment.isGuardianPaid()).isTrue();
+            assertThat(reservationPayment.isSitterPaid()).isFalse();
+
+            then(portOnePaymentClient).should()
+                    .cancelPayment(eq("merchant-sitter-001"), eq(20_000L), anyString());
+            then(portOnePaymentClient).should(never())
+                    .cancelPayment(eq("merchant-guardian-001"), any(), anyString());
+        }
+    }
 }
