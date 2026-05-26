@@ -616,9 +616,8 @@ class SitterServiceTest {
         void get_sitter_by_id_test_01() {
             // given
             sitterProfile.approve(adminMemberId);
-            given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
-            given(memberService.findById(member1Id)).willReturn(member1);
-            given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of());
+            SitterResponseDto expected = SitterResponseDto.from(sitterProfile, member1.getRegion(), List.of());
+            given(sitterCacheService.getSitterById(sitterProfileId)).willReturn(expected);
 
             // when
             SitterResponseDto result = sitterService.getSitterById(sitterProfileId);
@@ -648,9 +647,8 @@ class SitterServiceTest {
             ReflectionTestUtils.setField(schedule, "id", 1L);
 
             sitterProfile.approve(adminMemberId);
-            given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
-            given(memberService.findById(member1Id)).willReturn(member1);
-            given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of(schedule));
+            SitterResponseDto expected = SitterResponseDto.from(sitterProfile, member1.getRegion(), List.of(schedule));
+            given(sitterCacheService.getSitterById(sitterProfileId)).willReturn(expected);
 
             // when
             SitterResponseDto result = sitterService.getSitterById(sitterProfileId);
@@ -664,9 +662,8 @@ class SitterServiceTest {
         void get_sitter_by_id_test_03() {
             // given
             sitterProfile.approve(adminMemberId);
-            given(sitterProfileRepository.findById(sitterProfileId)).willReturn(Optional.of(sitterProfile));
-            given(memberService.findById(member1Id)).willReturn(member1);
-            given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of());
+            SitterResponseDto expected = SitterResponseDto.from(sitterProfile, member1.getRegion(), List.of());
+            given(sitterCacheService.getSitterById(sitterProfileId)).willReturn(expected);
 
             // when
             SitterResponseDto result = sitterService.getSitterById(sitterProfileId);
@@ -679,7 +676,7 @@ class SitterServiceTest {
         @DisplayName("[실패] 존재하지 않는 sitterId는 SITTER_NOT_FOUND를 반환한다")
         void get_sitter_by_id_test_04() {
             // given
-            given(sitterProfileRepository.findById(99999L)).willReturn(Optional.empty());
+            given(sitterCacheService.getSitterById(99999L)).willThrow(new SitterException(SitterErrorCode.SITTER_NOT_FOUND));
 
             // when & then
             assertThatThrownBy(() -> sitterService.getSitterById(99999L))

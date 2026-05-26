@@ -123,11 +123,12 @@ public class SitterService {
     }
 
     public SitterResponseDto getSitterById(Long sitterId) {
-        SitterProfile sitter = findById(sitterId);
-        validateApproved(sitter);
-        Member member = memberService.findById(sitter.getMemberId());
-        List<SitterSchedule> schedules = sitterScheduleRepository.findAllBySitterProfileId(sitter.getId());
-        return SitterResponseDto.from(sitter, member.getRegion(), schedules);
+        // 캐시 히트 시 DB 조회 0회, 미스 시 SitterCacheService 내부에서만 조회
+        SitterResponseDto result = sitterCacheService.getSitterById(sitterId);
+        if (result.approvalStatus() != SitterApprovalStatus.APPROVED) {
+            throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);
+        }
+        return result;
     }
 
     public SitterResponseDto getMyProfile(Long memberId) {
@@ -159,6 +160,7 @@ public class SitterService {
                 request.pricePerHour()
         );
 
+        sitterCacheService.evictSitterDetail(sitter.getId());
         return SitterResponseDto.from(sitter, member.getRegion());
     }
 
@@ -175,6 +177,7 @@ public class SitterService {
 
         sitter.changeStatus(request.status());
 
+        sitterCacheService.evictSitterDetail(sitter.getId());
         return SitterResponseDto.from(sitter, member.getRegion());
     }
 
@@ -192,10 +195,12 @@ public class SitterService {
             throw new SitterException(SitterErrorCode.SITTER_USED_IN_ACTIVE_PROCESS);
         }
 
+        Long sitterId = sitter.getId();
         sitter.delete();
 
         Member member = memberService.findById(memberId);
         member.restoreRoleToMember();
+        sitterCacheService.evictSitterDetail(sitterId);
     }
 
     // -------------Transaction 아닌 method 들------------------
