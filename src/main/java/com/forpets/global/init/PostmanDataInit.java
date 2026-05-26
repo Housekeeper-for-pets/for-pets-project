@@ -1,6 +1,5 @@
 package com.forpets.global.init;
 
-
 import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
@@ -9,7 +8,6 @@ import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.entity.MemberGender;
-import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.member.repository.MemberRepository;
 import com.forpets.domain.pet.entity.Pet;
@@ -46,7 +44,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.*;
 
 @Component
 @RequiredArgsConstructor
@@ -69,15 +66,12 @@ public class PostmanDataInit implements CommandLineRunner {
     private final ReservationPaymentRepository reservationPaymentRepository;
     private final PasswordEncoder passwordEncoder;
 
-    // 루프 기반 생성에서 사용할 시드 (동일 데이터 재현 보장)
-    private final Random random = new Random(42);
-
     @Override
     @Transactional
     public void run(String... args) {
 
         // =============================================
-        // 1. Member 5명
+        // 1. Member 6명 (admin 포함)
         // =============================================
         Member member1 = saveMember("giljung@test.com", "째길중", "010-1111-1111", MemberGender.MALE, Region.SEOCHO);
         Member member2 = saveMember("jiwon@test.com", "타코맘", "010-2222-2222", MemberGender.FEMALE, Region.DONGJAK);
@@ -86,11 +80,10 @@ public class PostmanDataInit implements CommandLineRunner {
         Member member5 = saveMember("yeongsoo@test.com", "박제로수", "010-5555-5555", MemberGender.MALE, Region.YONGSAN);
         Member adminMember = saveMember("dragonRock@test.com", "소란석", "010-0000-0000", MemberGender.MALE, Region.YONGSAN);
 
-
-
         // =============================================
         // 2. Pet 등록
         // =============================================
+        // member1(길중) - 구피 9마리
         Pet pet1 = savePet(member1.getId(), "일피", PetSpecies.ETC, "하얀구피", PetSize.SMALL, 3, PetGender.MALE, "낯가림 있음");
         Pet pet2 = savePet(member1.getId(), "이피", PetSpecies.ETC, "빨간구피", PetSize.SMALL, 2, PetGender.MALE, "조금 뚱뚱함");
         Pet pet3 = savePet(member1.getId(), "삼피", PetSpecies.ETC, "하얀구피", PetSize.SMALL, 3, PetGender.FEMALE, "쌍피로 이름 짓고 싶었음");
@@ -101,75 +94,50 @@ public class PostmanDataInit implements CommandLineRunner {
         Pet pet8 = savePet(member1.getId(), "팔피", PetSpecies.ETC, "하얀구피", PetSize.SMALL, 3, PetGender.MALE, "가끔 탈출");
         Pet pet9 = savePet(member1.getId(), "구피", PetSpecies.ETC, "하얀구피", PetSize.SMALL, 1, PetGender.FEMALE, "빌드업");
 
+        // member2(타코맘) - 고양이
         Pet pet10 = savePet(member2.getId(), "타코", PetSpecies.CAT, "코리안숏헤어", PetSize.SMALL, 4, PetGender.MALE, "길냥이에요, 많이 울어요, 귀여워요");
 
+        // member3(지민냥) - 강아지, 말
         Pet pet11 = savePet(member3.getId(), "연두", PetSpecies.DOG, "포메라니안", PetSize.SMALL, 1, PetGender.FEMALE, "굉장히 귀여움 겨우 2.5kg");
         Pet pet12 = savePet(member3.getId(), "갈색", PetSpecies.ETC, "제주도 거대 말", PetSize.LARGE, 6, PetGender.MALE, null);
 
+        // member5(박제로수) - 다양한 동물들
         Pet pet13 = savePet(member5.getId(), "길쭝", PetSpecies.DOG, "리트리버", PetSize.LARGE, 26, PetGender.MALE, "리더 재질");
         Pet pet14 = savePet(member5.getId(), "건젼", PetSpecies.ETC, "긴팔원숭이", PetSize.MEDIUM, 24, PetGender.FEMALE, "시끄러움");
         Pet pet15 = savePet(member5.getId(), "지밍", PetSpecies.DOG, "포메라니안", PetSize.SMALL, 23, PetGender.FEMALE, "귀여움");
         Pet pet16 = savePet(member5.getId(), "안경", PetSpecies.CAT, "스핑크스고양이", PetSize.MEDIUM, 26, PetGender.MALE, "똑똑함");
 
         // =============================================
-        // 3. SitterProfile 2명
+        // 3. SitterProfile 2명 (member2, member4)
+        //    - 둘 다 승인 완료 + RESERVABLE 상태
         // =============================================
         SitterProfile sitter1 = saveSitter(member2.getId(), "고양이 전문 시터, 자격증 보유", 7,
                 PossiblePetType.CAT, PossiblePetSize.MEDIUM, 18000);
+        sitter1.approve(1L);
+        sitter1.changeStatus(SitterProfileStatus.RESERVABLE);
+        member2.changeRoleToSitter();
 
         SitterProfile sitter2 = saveSitter(member4.getId(), "뭐든 다 잘 합니다.", 7,
                 PossiblePetType.ALL, PossiblePetSize.ALL, 30000);
-
-        sitter1.changeStatus(SitterProfileStatus.RESERVABLE);
-        sitter1.approve(1L);
-        member2.changeRoleToSitter();
-
-        sitter2.changeStatus(SitterProfileStatus.RESERVABLE);
         sitter2.approve(1L);
+        sitter2.changeStatus(SitterProfileStatus.RESERVABLE);
         member4.changeRoleToSitter();
-
 
         // =============================================
         // 4. SitterSchedule
         // =============================================
-        saveSchedule(sitter1.getId(), DayOfWeek.MONDAY, "09:00", "18:00");
-        saveSchedule(sitter1.getId(), DayOfWeek.TUESDAY, "09:00", "18:00");
+        saveSchedule(sitter1.getId(), DayOfWeek.MONDAY,    "09:00", "18:00");
+        saveSchedule(sitter1.getId(), DayOfWeek.TUESDAY,   "09:00", "18:00");
         saveSchedule(sitter1.getId(), DayOfWeek.WEDNESDAY, "09:00", "18:00");
-        saveSchedule(sitter1.getId(), DayOfWeek.THURSDAY, "09:00", "18:00");
-        saveSchedule(sitter1.getId(), DayOfWeek.FRIDAY, "09:00", "18:00");
+        saveSchedule(sitter1.getId(), DayOfWeek.THURSDAY,  "09:00", "18:00");
+        saveSchedule(sitter1.getId(), DayOfWeek.FRIDAY,    "09:00", "18:00");
+
+        saveSchedule(sitter2.getId(), DayOfWeek.MONDAY,    "10:00", "20:00");
+        saveSchedule(sitter2.getId(), DayOfWeek.WEDNESDAY, "10:00", "20:00");
 
         // =============================================
-        // 5. Post 2개
-        //    - post1: OPEN 상태로 유지, pending proposal 1개 붙어있음
-        //    - post2: proposal 수락으로 CONFIRMED reservation 생성 → CLOSED
-        // =============================================
-
-        // post1: OPEN 유지, sitter1(지원이)의 pending proposal 1개 (postman 테스트용)
-        Post post1 = savePost(member5.getId(), "작은 강아지 봐주실 분 구합니다.",
-                "애기가 무서워하지 않도록 여자 시터분이면 좋겠어요!",
-                CareType.VISIT, 70000, PostStatus.OPEN);
-        savePostPet(post1.getId(), pet15);
-        savePostTimeSlot(post1.getId(), "2026-07-15", "14:00", "18:00", 1);
-
-        saveProposal(post1.getId(), sitter1.getId(), member1.getId(), sitter1.getMemberId(),
-                75000, "뭐든 열심히 할 수 있습니다!");
-
-        // post2: proposal 2개 → 그 중 sitter1(지원이) 수락으로 confirmed reservation 생성
-        Post post2 = savePost(member2.getId(), "고양이 놀아주세요",
-                "너무 바빠서 고양이가 무기력해서 잘 놀아주실분",
-                CareType.VISIT, 120000, PostStatus.OPEN);
-        savePostPet(post2.getId(), pet10);
-        savePostTimeSlot(post2.getId(), "2026-06-10", "10:00", "20:00", 1);
-
-        Proposal post2Proposal1 = saveProposal(post2.getId(), sitter1.getId(), member2.getId(), sitter1.getMemberId(),
-                110000, "고양이 전문이에요. 잘 놀아드릴게요");
-//        Proposal post2Proposal2 = saveProposal(post2.getId(), sitter3.getId(), member2.getId(), sitter3.getMemberId(),
-//                115000, "고양이 진짜 진짜 잘 놀아줘요!!");
-
-        // =============================================
-        // 6. CareRequest 1개 (PENDING)
-        //    - member1(길중) → sitter1(지원)
-        //    - postman에서 같은 펫 조합으로 중복 전송 시 차단 테스트용
+        // 5. CareRequest - PENDING (member1 → sitter1)
+        //    - 중복 전송 차단 테스트용
         // =============================================
         CareRequest careRequest1 = saveCareRequest(member1.getId(), sitter1.getId(), sitter1.getMemberId(),
                 CareType.VISIT, "구피들 돌봐주실 수 있나요?", 40000);
@@ -178,11 +146,11 @@ public class PostmanDataInit implements CommandLineRunner {
         saveCareRequestTimeSlot(careRequest1.getId(), "2026-06-28", "15:00", "19:00", 1);
 
         // =============================================
-        // 7. Reservation - PENDING 1개
-        //    - member1(길중) → sitter1(지원), CareRequest 수락 상태
-        //    - 취소 시 careRequest가 다시 PENDING으로 돌아오는지 확인용
+        // 6. Reservation - PENDING (member1 ↔ sitter1/member2)
+        //    - CareRequest 수락된 상태
+        //    - ReservationPayment 미결제 (false/false)
+        //    - 시간: 2026-07-20 10:00~14:00 (post1과 겹침 → 자동 cancel 대상)
         // =============================================
-
         CareRequest careRequest2 = saveCareRequest(member1.getId(), sitter1.getId(), sitter1.getMemberId(),
                 CareType.VISIT, "다른 구피들도 부탁드려요", 45000);
         saveCareRequestPet(careRequest2.getId(), pet4);
@@ -190,39 +158,78 @@ public class PostmanDataInit implements CommandLineRunner {
         saveCareRequestTimeSlot(careRequest2.getId(), "2026-07-20", "10:00", "14:00", 1);
         careRequest2.accept();
 
-        Reservation reservationPending = saveReservation(member1.getId(), member2.getId(), sitter1.getId(),
+        Reservation reservation1 = saveReservation(member1.getId(), member2.getId(), sitter1.getId(),
                 CareType.VISIT, ReservationSource.CARE_REQUEST, careRequest2.getId(), 45000);
-        saveReservationPet(reservationPending.getId(), pet4);
-        saveReservationPet(reservationPending.getId(), pet5);
-        saveReservationTimeSlot(reservationPending.getId(), "2026-07-20", "10:00", "14:00", 1);
-        saveReservationPayment(reservationPending.getId(), 45000);
-
-        // reservation은 PENDING 유지, Payment는 만들지 않음
+        saveReservationPet(reservation1.getId(), pet4);
+        saveReservationPet(reservation1.getId(), pet5);
+        saveReservationTimeSlot(reservation1.getId(), "2026-07-20", "10:00", "14:00", 1);
+        saveReservationPayment(reservation1.getId(), 45000);
 
         // =============================================
-        // 8. Reservation - CONFIRMED 1개
-        //    - source: PROPOSAL (post2 + post2Proposal1)
-        //    - sitter1(지원)이 수락
-        //    - 중복 수락 불가 / 자동 거절 등 연쇄처리 검증용
+        // 7. Post1 (by member5) - OPEN
+        //    - 시간: 2026-07-20 10:00~14:00 (reservation1과 겹침)
+        //    - Proposal 2개 (member4, member2) - 둘 다 PENDING
+        //    - member2의 Proposal 수락 시 reservation2 생성 시나리오
         // =============================================
-        Reservation reservationConfirmed = saveReservation(member2.getId(), member2.getId(), sitter1.getId(),
-                CareType.VISIT, ReservationSource.PROPOSAL, post2.getId(), 110000);
-        saveReservationPet(reservationConfirmed.getId(), pet10);
-        saveReservationTimeSlot(reservationConfirmed.getId(), "2026-06-10", "10:00", "20:00", 1);
+        Post post1 = savePost(member5.getId(), "우리 댕댕이들 봐주실 분",
+                "길쭝이랑 지밍이 잘 봐주실 분 구해요",
+                CareType.VISIT, 100000, PostStatus.OPEN);
+        savePostPet(post1.getId(), pet13);
+        savePostPet(post1.getId(), pet15);
+        savePostTimeSlot(post1.getId(), "2026-07-20", "10:00", "14:00", 1);
 
-        ReservationPayment confirmedRp = saveReservationPayment(reservationConfirmed.getId(), 110000);
-        confirmedRp.guardianConfirm();
-        confirmedRp.sitterConfirm();
+        // member4(sitter2)의 Proposal
+        saveProposal(post1.getId(), sitter2.getId(), member5.getId(), sitter2.getMemberId(),
+                95000, "대형견도 자신 있습니다!");
 
-        reservationConfirmed.confirm();
+        // member2(sitter1)의 Proposal → 수락 대상
+        saveProposal(post1.getId(), sitter1.getId(), member5.getId(), sitter1.getMemberId(),
+                100000, "고양이 전문이지만 강아지도 잘 봐드려요");
 
-        // confirmAfterPayment 연쇄처리 흉내
-        post2.close();
-        post2Proposal1.accept();
-//        post2Proposal2.reject();
+        // =============================================
+        // 8. CareRequest - PENDING (member5 → sitter1/member2)
+        //    - 다른 시간대, 전체 플로우 후에도 영향 없음 확인용
+        // =============================================
+        CareRequest careRequest3 = saveCareRequest(member5.getId(), sitter1.getId(), sitter1.getMemberId(),
+                CareType.VISIT, "고양이 봐주실 수 있나요?", 50000);
+        saveCareRequestPet(careRequest3.getId(), pet16);
+        saveCareRequestTimeSlot(careRequest3.getId(), "2026-08-05", "10:00", "14:00", 1);
+
+        // =============================================
+        // 9. Post2 (by member1) - OPEN
+        //    - 시간: 2026-07-20 10:00~14:00 (reservation1과 겹침)
+        //    - member2(sitter1)가 작성한 Proposal 존재
+        //    - 시나리오 진행 시 WITHDRAWN 처리 대상
+        // =============================================
+        Post post2 = savePost(member1.getId(), "구피 수조 관리해주세요",
+                "여행 가는 동안 구피들 좀 봐주실 분",
+                CareType.VISIT, 80000, PostStatus.OPEN);
+        savePostPet(post2.getId(), pet6);
+        savePostPet(post2.getId(), pet7);
+        savePostTimeSlot(post2.getId(), "2026-07-20", "10:00", "14:00", 1);
+
+        saveProposal(post2.getId(), sitter1.getId(), member1.getId(), sitter1.getMemberId(),
+                75000, "물고기 케어도 가능합니다");
+
+        // =============================================
+        // 10. Reservation - 다른 시간대 (member5 ↔ sitter1/member2)
+        //     - 위 플로우와 무관한 별개 예약 (시간 안 겹침)
+        //     - 전체 시나리오 후에도 영향 받지 않음 확인용
+        // =============================================
+        CareRequest careRequest4 = saveCareRequest(member5.getId(), sitter1.getId(), sitter1.getMemberId(),
+                CareType.VISIT, "원숭이 좀 봐주세요", 60000);
+        saveCareRequestPet(careRequest4.getId(), pet14);
+        saveCareRequestTimeSlot(careRequest4.getId(), "2026-09-10", "10:00", "14:00", 1);
+        careRequest4.accept();
+
+        Reservation reservation3 = saveReservation(member5.getId(), member2.getId(), sitter1.getId(),
+                CareType.VISIT, ReservationSource.CARE_REQUEST, careRequest4.getId(), 60000);
+        saveReservationPet(reservation3.getId(), pet14);
+        saveReservationTimeSlot(reservation3.getId(), "2026-09-10", "10:00", "14:00", 1);
+        saveReservationPayment(reservation3.getId(), 60000);
     }
 
-    // ===== Helper Methods (기존과 동일) =====
+    // ===== Helper Methods =====
 
     private Member saveMember(String email, String nickname, String phone,
                               MemberGender gender, Region region) {
