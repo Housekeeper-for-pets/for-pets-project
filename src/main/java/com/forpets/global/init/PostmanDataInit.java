@@ -114,12 +114,12 @@ public class PostmanDataInit implements CommandLineRunner {
         //    - 둘 다 승인 완료 + RESERVABLE 상태
         // =============================================
         SitterProfile sitter1 = saveSitter(member2.getId(), "고양이 전문 시터, 자격증 보유", 7,
-                PossiblePetType.CAT, PossiblePetSize.MEDIUM, 18000);
+                PossiblePetType.CAT, PossiblePetSize.MEDIUM, 5000);
         sitter1.approve(1L);
         member2.changeRoleToSitter();
 
         SitterProfile sitter2 = saveSitter(member4.getId(), "뭐든 다 잘 합니다.", 7,
-                PossiblePetType.ALL, PossiblePetSize.ALL, 30000);
+                PossiblePetType.ALL, PossiblePetSize.ALL, 5000);
         sitter2.approve(1L);
         member4.changeRoleToSitter();
 
@@ -140,7 +140,7 @@ public class PostmanDataInit implements CommandLineRunner {
         //    - 중복 전송 차단 테스트용
         // =============================================
         CareRequest careRequest1 = saveCareRequest(member1.getId(), sitter1.getId(), sitter1.getMemberId(),
-                CareType.VISIT, "구피들 돌봐주실 수 있나요?", 40000);
+                CareType.VISIT, "구피들 돌봐주실 수 있나요?", 5000);
         saveCareRequestPet(careRequest1.getId(), pet1);
         saveCareRequestPet(careRequest1.getId(), pet2);
         saveCareRequestTimeSlot(careRequest1.getId(), "2026-06-28", "15:00", "19:00", 1);
@@ -152,18 +152,18 @@ public class PostmanDataInit implements CommandLineRunner {
         //    - 시간: 2026-07-20 10:00~14:00 (post1과 겹침 → 자동 cancel 대상)
         // =============================================
         CareRequest careRequest2 = saveCareRequest(member1.getId(), sitter1.getId(), sitter1.getMemberId(),
-                CareType.VISIT, "다른 구피들도 부탁드려요", 45000);
+                CareType.VISIT, "다른 구피들도 부탁드려요", 5000);
         saveCareRequestPet(careRequest2.getId(), pet4);
         saveCareRequestPet(careRequest2.getId(), pet5);
         saveCareRequestTimeSlot(careRequest2.getId(), "2026-07-20", "10:00", "14:00", 1);
         careRequest2.accept();
 
         Reservation reservation1 = saveReservation(member1.getId(), member2.getId(), sitter1.getId(),
-                CareType.VISIT, ReservationSource.CARE_REQUEST, careRequest2.getId(), 45000);
+                CareType.VISIT, ReservationSource.CARE_REQUEST, careRequest2.getId(), 5000);
         saveReservationPet(reservation1.getId(), pet4);
         saveReservationPet(reservation1.getId(), pet5);
         saveReservationTimeSlot(reservation1.getId(), "2026-07-20", "10:00", "14:00", 1);
-        saveReservationPayment(reservation1.getId(), 45000);
+        saveReservationPayment(reservation1.getId(), 5000);
 
         // =============================================
         // 7. Post1 (by member5) - OPEN
@@ -173,25 +173,25 @@ public class PostmanDataInit implements CommandLineRunner {
         // =============================================
         Post post1 = savePost(member5.getId(), "우리 댕댕이들 봐주실 분",
                 "길쭝이랑 지밍이 잘 봐주실 분 구해요",
-                CareType.VISIT, 100000, PostStatus.OPEN);
+                CareType.VISIT, 5000, PostStatus.OPEN);
         savePostPet(post1.getId(), pet13);
         savePostPet(post1.getId(), pet15);
         savePostTimeSlot(post1.getId(), "2026-07-20", "10:00", "14:00", 1);
 
         // member4(sitter2)의 Proposal
         saveProposal(post1.getId(), sitter2.getId(), member5.getId(), sitter2.getMemberId(),
-                95000, "대형견도 자신 있습니다!");
+                5000, "대형견도 자신 있습니다!");
 
         // member2(sitter1)의 Proposal → 수락 대상
         saveProposal(post1.getId(), sitter1.getId(), member5.getId(), sitter1.getMemberId(),
-                100000, "고양이 전문이지만 강아지도 잘 봐드려요");
+                5000, "고양이 전문이지만 강아지도 잘 봐드려요");
 
         // =============================================
         // 8. CareRequest - PENDING (member5 → sitter1/member2)
         //    - 다른 시간대, 전체 플로우 후에도 영향 없음 확인용
         // =============================================
         CareRequest careRequest3 = saveCareRequest(member5.getId(), sitter1.getId(), sitter1.getMemberId(),
-                CareType.VISIT, "고양이 봐주실 수 있나요?", 50000);
+                CareType.VISIT, "고양이 봐주실 수 있나요?", 5000);
         saveCareRequestPet(careRequest3.getId(), pet16);
         saveCareRequestTimeSlot(careRequest3.getId(), "2026-08-05", "10:00", "14:00", 1);
 
@@ -203,13 +203,13 @@ public class PostmanDataInit implements CommandLineRunner {
         // =============================================
         Post post2 = savePost(member1.getId(), "구피 수조 관리해주세요",
                 "여행 가는 동안 구피들 좀 봐주실 분",
-                CareType.VISIT, 80000, PostStatus.OPEN);
+                CareType.VISIT, 5000, PostStatus.OPEN);
         savePostPet(post2.getId(), pet6);
         savePostPet(post2.getId(), pet7);
         savePostTimeSlot(post2.getId(), "2026-07-20", "10:00", "14:00", 1);
 
         saveProposal(post2.getId(), sitter1.getId(), member1.getId(), sitter1.getMemberId(),
-                75000, "물고기 케어도 가능합니다");
+                5000, "물고기 케어도 가능합니다");
 
         // =============================================
         // 10. Reservation - 다른 시간대 (member5 ↔ sitter1/member2)
@@ -217,16 +217,16 @@ public class PostmanDataInit implements CommandLineRunner {
         //     - 전체 시나리오 후에도 영향 받지 않음 확인용
         // =============================================
         CareRequest careRequest4 = saveCareRequest(member5.getId(), sitter1.getId(), sitter1.getMemberId(),
-                CareType.VISIT, "원숭이 좀 봐주세요", 60000);
+                CareType.VISIT, "원숭이 좀 봐주세요", 5000);
         saveCareRequestPet(careRequest4.getId(), pet14);
         saveCareRequestTimeSlot(careRequest4.getId(), "2026-09-10", "10:00", "14:00", 1);
         careRequest4.accept();
 
         Reservation reservation3 = saveReservation(member5.getId(), member2.getId(), sitter1.getId(),
-                CareType.VISIT, ReservationSource.CARE_REQUEST, careRequest4.getId(), 60000);
+                CareType.VISIT, ReservationSource.CARE_REQUEST, careRequest4.getId(), 5000);
         saveReservationPet(reservation3.getId(), pet14);
         saveReservationTimeSlot(reservation3.getId(), "2026-09-10", "10:00", "14:00", 1);
-        saveReservationPayment(reservation3.getId(), 60000);
+        saveReservationPayment(reservation3.getId(), 5000);
     }
 
     // ===== Helper Methods =====
