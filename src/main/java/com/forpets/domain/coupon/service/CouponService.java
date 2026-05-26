@@ -16,6 +16,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -86,6 +89,25 @@ public class CouponService {
         long finalPrice = originalPrice - discountAmount;
 
         return new CouponApplyResult(discountAmount, finalPrice, coupon.getName());
+    }
+
+    // 결제 도메인에서 자동 적용할 가장 오래된 ACTIVE 쿠폰 ID를 조회
+    public Optional<Long> findFirstActiveUserCouponId(Long userId) {
+        return userCouponRepository.findFirstByUserIdAndStatusOrderByCreatedAtAsc(
+                        userId,
+                        UserCouponStatus.ACTIVE
+                )
+                .map(UserCoupon::getId);
+    }
+
+    public List<Long> findActiveUserCouponIds(Long userId) {
+        return userCouponRepository.findAllByUserIdAndStatusOrderByCreatedAtAsc(
+                        userId,
+                        UserCouponStatus.ACTIVE
+                )
+                .stream()
+                .map(UserCoupon::getId)
+                .toList();
     }
 
 

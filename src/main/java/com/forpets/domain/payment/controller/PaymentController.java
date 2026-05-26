@@ -18,6 +18,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
@@ -36,6 +38,21 @@ public class PaymentController {
             @RequestBody @Valid CreatePaymentRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(paymentService.create(currentMember.id(), request)));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<List<PaymentResponseDto>>> getMyPayments(
+            @LoginUser CurrentMember currentMember) {
+        return ResponseEntity.ok(
+                ApiResponse.success(paymentService.getMyPayments(currentMember.id())));
+    }
+
+    @GetMapping("/{paymentId}")
+    public ResponseEntity<ApiResponse<PaymentResponseDto>> getDetail(
+            @LoginUser CurrentMember currentMember,
+            @PathVariable Long paymentId) {
+        return ResponseEntity.ok(
+                ApiResponse.success(paymentService.getDetail(currentMember.id(), paymentId)));
     }
 
     /*

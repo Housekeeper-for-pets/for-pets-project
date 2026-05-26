@@ -4,12 +4,18 @@ import com.forpets.domain.coupon.entity.UserCoupon;
 import com.forpets.domain.coupon.entity.UserCouponStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {
 
     // 쿠폰 자동 차감 시 가장 먼저 발급된 ACTIVE 쿠폰을 조회
     Optional<UserCoupon> findFirstByUserIdAndStatusOrderByCreatedAtAsc(
+            Long userId,
+            UserCouponStatus status
+    );
+
+    List<UserCoupon> findAllByUserIdAndStatusOrderByCreatedAtAsc(
             Long userId,
             UserCouponStatus status
     );
