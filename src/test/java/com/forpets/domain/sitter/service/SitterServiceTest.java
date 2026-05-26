@@ -58,6 +58,9 @@ class SitterServiceTest {
     @Mock
     private AssociationChecker associationChecker;
 
+    @Mock
+    private SitterCacheService sitterCacheService;
+
     // ── 테스트 픽스처 ──
     private Member member1;  // 째길중 — MEMBER, SEOCHO
     private Member member2;  // 타코맘 — MEMBER, DONGJAK
@@ -497,14 +500,19 @@ class SitterServiceTest {
             // given
             SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
             SitterPageResponse response = SitterPageResponse.of(List.of(), 0, 0, 0, 10);
-            given(sitterProfileRepository.searchSitters(eq(condition), any())).willReturn(response);
+            //given(sitterProfileRepository.searchSitters(eq(condition), any())).willReturn(response);
+            given(sitterCacheService.searchSitters(eq(condition), eq(0), eq(10), eq("createdAt")))
+                    .willReturn(response); // ← sitterProfileRepository → sitterCacheService로 교체
+
 
             // when
             SitterPageResponse result = sitterService.searchSitters(condition, 0, 10, "createdAt");
 
             // then
             assertThat(result).isEqualTo(response);
-            then(sitterProfileRepository).should().searchSitters(eq(condition), any());
+//            then(sitterProfileRepository).should().searchSitters(eq(condition), any());
+            then(sitterCacheService).should().searchSitters(eq(condition), eq(0), eq(10), eq("createdAt"));
+            // ← then(sitterProfileRepository) → then(sitterCacheService)로 교체
         }
 
         @Test
@@ -512,7 +520,9 @@ class SitterServiceTest {
         void search_sitters_test_02() {
             // given
             SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
-            given(sitterProfileRepository.searchSitters(eq(condition), any()))
+//            given(sitterProfileRepository.searchSitters(eq(condition), any()))
+//                    .willReturn(SitterPageResponse.of(List.of(), 0, 0, 0, 10));
+            given(sitterCacheService.searchSitters(eq(condition), eq(0), eq(10), anyString()))
                     .willReturn(SitterPageResponse.of(List.of(), 0, 0, 0, 10));
 
             // when
@@ -520,7 +530,10 @@ class SitterServiceTest {
             sitterService.searchSitters(condition, 0, 10, "experienceYears");
 
             // then
-            then(sitterProfileRepository).should(times(2)).searchSitters(eq(condition), any());
+//            then(sitterProfileRepository).should(times(2)).searchSitters(eq(condition), any());
+            then(sitterCacheService).should(times(2))
+                    .searchSitters(eq(condition), eq(0), eq(10), anyString()); // ← 교체
+
         }
 
         @Test

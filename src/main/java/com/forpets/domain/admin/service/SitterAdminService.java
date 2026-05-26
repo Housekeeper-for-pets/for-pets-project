@@ -9,6 +9,7 @@ import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,7 @@ public class SitterAdminService {
 
 
     @Transactional
+    @CacheEvict(cacheNames = "sitters", allEntries = true, cacheManager = "longTtlCacheManager")
     public AdminSitterResponseDto approve(Long adminId, Long sitterId) {
         SitterProfile sitter = findById(sitterId);
         validatePendingApproval(sitter);
@@ -49,6 +51,7 @@ public class SitterAdminService {
 
 
     @Transactional
+    @CacheEvict(cacheNames = "sitters", allEntries = true, cacheManager = "longTtlCacheManager")
     public AdminSitterResponseDto reject(Long adminId, Long sitterId, String rejectReason) {
         SitterProfile sitter = findById(sitterId);
         validatePendingApproval(sitter);
