@@ -36,6 +36,14 @@ public class PaymentRefundService {
 
     private static final int PENALTY_PERCENT = 20;
 
+    /*
+    merchantUid로 Payment 조회, Lock 걸기
+    - PAID 가 아니면 이미 환불되었거나 다른상태니까 early return
+    - PAID 상태면 환불 처리
+        PaymentStauts -> REFUNDED
+        ReservationPayment -> 다시 paid = false 처리
+        쿠폰을 썼다면 복구
+     */
     @Transactional
     public void syncRefundedByWebhook(String merchantUid, String reason, String rawResponse) {
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
@@ -57,6 +65,9 @@ public class PaymentRefundService {
         });
     }
 
+    /*
+    반복문 돌려서 이미 지불된 상태인 Payment List 찾고 refund method 일괄 적용
+     */
     @Transactional
     public void refundPaidPayments(Long reservationId, String reason) {
         paymentLockService.executeWithReservationLock(reservationId, () -> {
@@ -75,6 +86,11 @@ public class PaymentRefundService {
         });
     }
 
+    /*
+    - Payment status = REFUNDED, reason 저장, rawResponse 저장, refundedAt = now()
+    - ReservationPayment table 에도 true로 되어있는거 false 로 다시 바꿔주기 (restoreReservationPayment)
+    - Payment table 에 UserCouponId 가 저장되어있다면 restore 해주기
+     */
     private void refund(Payment payment, ReservationPayment reservationPayment, String reason) {
         if (!payment.isPaid()) {
             return;
@@ -95,6 +111,7 @@ public class PaymentRefundService {
                 payment.getId(), payment.getReservationId(), payment.getPaymentRole());
     }
 
+    // reservation payment 에 paid = true 처리 되어있는거 false 로 다시 바꿔주기
     private void restoreReservationPayment(Payment payment, ReservationPayment reservationPayment) {
         if (payment.getPaymentRole() == PaymentRole.GUARDIAN) {
             reservationPayment.guardianRefund();

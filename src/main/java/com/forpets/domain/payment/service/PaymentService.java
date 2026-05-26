@@ -11,6 +11,7 @@ import com.forpets.domain.payment.entity.*;
 import com.forpets.domain.payment.exception.PaymentErrorCode;
 import com.forpets.domain.payment.exception.PaymentException;
 import com.forpets.domain.payment.repository.PaymentRepository;
+import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationPayment;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
@@ -49,8 +50,12 @@ public class PaymentService {
     @Transactional
     public PaymentResponseDto create(Long memberId, CreatePaymentRequest request) {
         Reservation reservation = findReservation(request.reservationId());
+        // CONFIRMED, COMPLETED, CANCELED, EXPIRED 상태면 Payment를 생성할 수 없다
         validateReservationPending(reservation);
 
+        // 지불하려는 사람이 Reservation Party 이고,
+        // 중복 지불이 아니며
+        // 진행중인 결제가 없는지 확인
         ReservationPayment reservationPayment = findReservationPayment(reservation.getId());
         validatePaymentParty(memberId, reservation, request.paymentRole());
         validateNotAlreadyPaid(reservationPayment, request.paymentRole());
@@ -86,6 +91,7 @@ public class PaymentService {
      */
     @Transactional
     public ConfirmPaymentResponse confirm(Long memberId, ConfirmPaymentRequest request) {
+        // 프론트에서 자동으로 요청하는 api
         Payment payment = paymentRepository.findByMerchantUid(request.merchantUid())
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
@@ -97,6 +103,7 @@ public class PaymentService {
 
     @Transactional
     public ConfirmPaymentResponse confirmByWebhook(String merchantUid) {
+        // webhook 으로 요청해서 결과값을 직접 받아오는 api
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
@@ -189,16 +196,27 @@ public class PaymentService {
             return ConfirmPaymentResponse.of(payment, reservation.getStatus());
         }
 
+        // PaymentStatus == READY || PENDING 일 때만 Confirm
         validateConfirmable(payment);
 
         PortOnePaymentResult portOnePayment = portOnePaymentClient.getPayment(payment.getMerchantUid());
+
+        // merchantUid 체크, 금액 검증, 결제가 실제로 완료되었는지 확인
         validatePortOnePayment(payment, portOnePayment);
 
+        /* payment PAID 처리
+        ReservationPayment 도 Paid 처리 (reservationId 를 기준으로 검색해서 결제한 Role 만)
+         */
         payment.approve(portOnePayment.paymentId(), portOnePayment.rawResponse());
         ReservationPayment reservationPayment = findReservationPayment(payment.getReservationId());
         markReservationPaymentPaid(reservationPayment, payment.getPaymentRole());
 
-        var reservation = reservationService.confirmAfterPayment(payment.getReservationId());
+        /*
+        confirm 후속처리
+        - reservation CONFIRMED 처리 : Lock 걸어서 만약 충돌나면 바로 Cancel 처리
+        - 역방향: 나머지 PENDING 제안 → REJECTED, 공고 → CLOSED, 시터의 Proposal → WITHDRAWN
+         */
+        ReservationResponseDto reservation = reservationService.confirmAfterPayment(payment.getReservationId());
 
         log.info("[PaymentService] 결제 승인 완료 paymentId={}, reservationId={}, role={}",
                 payment.getId(), payment.getReservationId(), payment.getPaymentRole());
@@ -206,6 +224,12 @@ public class PaymentService {
         return ConfirmPaymentResponse.of(payment, reservation.status());
     }
 
+    /*
+    1. 내가 지금 가지고 있는 merchantUid 랑 PortOnePaymentResult 에 저장된 paymentId 와 동일한지
+        (PortOnePayment 에 있는 paymentId 는 merchantUid이다)
+    2. 금액 검증: FinalAmount 가 result 의 totalAmount 랑 동일한지
+    3. result 에 PAID 처리가 되어있는지
+     */
     private void validatePortOnePayment(Payment payment, PortOnePaymentResult portOnePayment) {
         if (!payment.getMerchantUid().equals(portOnePayment.paymentId())) {
             throw new PaymentException(PaymentErrorCode.PAYMENT_ID_MISMATCH);
@@ -220,6 +244,9 @@ public class PaymentService {
         }
     }
 
+    /*
+    Reservation Payment 지불한 역할에 대해서만 Paid 처리
+     */
     private void markReservationPaymentPaid(ReservationPayment reservationPayment, PaymentRole paymentRole) {
         if (paymentRole == PaymentRole.GUARDIAN) {
             reservationPayment.guardianConfirm();

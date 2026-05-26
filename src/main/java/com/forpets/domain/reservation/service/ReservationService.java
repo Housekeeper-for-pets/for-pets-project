@@ -165,27 +165,24 @@ public class ReservationService {
         validatePending(reservation);
 
         ReservationPayment payment = findPayment(reservationId);
+        // 한쪽만 결제한 상황이면 아직 PENDING 으로 둬야함
         if (!payment.isBothPaid()) {
             return toResponseDto(reservation);
         }
 
         return reservationLockService.executeWithSitterLock(
                 reservation.getSitterProfileId(), () -> {
+                    /*
+                    CONFIRMED 예약 중 겹치는게 있으면 안 됨
+                    Reservation Status = CONFIRMED 로 업데이트
+                    역방향으로 인한 Reservation 인 경우 Post, Proposal 후속처리
+                     */
                     validateNoConfirmedConflict(reservation);
                     reservation.confirm();
                     log.info("[예약 확정] reservationId={}, CONFIRMED", reservationId);
                     handlePostConfirmation(reservation);
                     return toResponseDto(reservation);
                 });
-//        if (payment.isBothPaid()) {
-//            validateNoConfirmedConflict(reservation);
-//            reservation.confirm();
-//            log.info("[예약 확정] reservationId={}, PortOne 양측 결제 완료 → CONFIRMED", reservationId);
-//
-//            handlePostConfirmation(reservation);
-//        }
-//
-//        return toResponseDto(reservation);
     }
 
 
@@ -197,12 +194,16 @@ public class ReservationService {
     public ReservationResponseDto complete(Long memberId, Long reservationId) {
         /*
         시스템이 보관하고 있던 돈을 시터에게 보내주는 로직
+        - complete 를 호출한 사람 (로그인한 사람) == reservation 의 sitter 인지 확인
+        - completed 가 가능한 상태인지 (confirmed) 확인
+        - 타임슬롯 마지막 시간까지 마쳤는지 확인
          */
         Reservation reservation = findById(reservationId);
         validateSitter(memberId, reservation);
         validateConfirmed(reservation);
         validateCareCompleted(reservationId);
 
+        //status update
         reservation.complete();
         log.info("[케어 완료] reservationId={}, 시터(memberId={}) 완료 처리", reservationId, memberId);
 
@@ -329,19 +330,16 @@ public class ReservationService {
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
     }
 
+    // CONFIRMED 예약과 충돌하는지 확인하기 위해서 예약목록을 돌면서 체크
     public boolean hasConfirmedConflict(Long sitterProfileId, List<? extends HasTimeSlotInfo> timeSlots) {
         List<Reservation> confirmed = reservationRepository
                 .findAllBySitterProfileIdAndStatus(sitterProfileId, ReservationStatus.CONFIRMED);
 
-        return hasConflictWith(confirmed, timeSlots);
-    }
-
-    private boolean hasConflictWith(List<Reservation> reservations, List<? extends HasTimeSlotInfo> newSlots) {
-        for (Reservation existing : reservations) {
+        for (Reservation existing : confirmed) {
             List<ReservationTimeSlot> existingSlots = reservationTimeSlotRepository
                     .findAllByReservationIdOrderByTimeSlotInfoSequence(existing.getId());
 
-            if (timeSlotValidator.hasTimeConflict(existingSlots, newSlots)) {
+            if (timeSlotValidator.hasTimeConflict(existingSlots, timeSlots)) {
                 return true;
             }
         }
@@ -360,6 +358,7 @@ public class ReservationService {
         }
     }
 
+    // complete 가능한 상태인지 확인 == 현재 confirmed 인지 확인
     private void validateConfirmed(Reservation reservation) {
         if (!reservation.isConfirmed()) {
             throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
@@ -371,19 +370,11 @@ public class ReservationService {
     같은 시터의 CONFIRMED 예약 중 시간이 겹치는 건이 있으면 차단
      */
     private void validateNoConfirmedConflict(Reservation reservation) {
-        List<Reservation> confirmedReservations = reservationRepository
-                .findAllBySitterProfileIdAndStatus(reservation.getSitterProfileId(), ReservationStatus.CONFIRMED);
-
         List<ReservationTimeSlot> newTimeSlots = reservationTimeSlotRepository
                 .findAllByReservationIdOrderByTimeSlotInfoSequence(reservation.getId());
 
-        for (Reservation existing : confirmedReservations) {
-            List<ReservationTimeSlot> existingTimeSlots = reservationTimeSlotRepository
-                    .findAllByReservationIdOrderByTimeSlotInfoSequence(existing.getId());
-
-            if (timeSlotValidator.hasTimeConflict(newTimeSlots, existingTimeSlots)) {
-                throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
-            }
+        if (hasConfirmedConflict(reservation.getSitterProfileId(), newTimeSlots)) {
+            throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
         }
     }
 
@@ -409,8 +400,10 @@ public class ReservationService {
             }
         }
 
+        // 보내뒀던 다른 Proposal 들 중 겹치는건 Withdraw 처리
         withdrawConflictingProposals(reservation);
-        // 겹치는 CareRequest 는 따로 reject 처리 하지 않음
+
+        // 겹치는 CareRequest 는 따로 reject 처리 하지 않고
         // PENDING 유지 (수락 시 충돌 검증에서 차단)
     }
 
@@ -429,29 +422,11 @@ public class ReservationService {
             List<PostTimeSlot> postSlots = postTimeSlotRepository
                     .findAllByPostIdOrderByTimeSlotInfoSequence(proposal.getPostId());
 
-            if (hasTimeConflictBetween(confirmedSlots, postSlots)) {
+            if (timeSlotValidator.hasTimeConflict(confirmedSlots, postSlots)) {
                 proposal.withdraw();
             }
         }
     }
-
-    private boolean hasTimeConflictBetween(List<ReservationTimeSlot> reservationSlots,
-                                           List<PostTimeSlot> postSlots) {
-        for (ReservationTimeSlot rs : reservationSlots) {
-            TimeSlotInfo ri = rs.getTimeSlotInfo();
-            for (PostTimeSlot ps : postSlots) {
-                TimeSlotInfo pi = ps.getTimeSlotInfo();
-
-                if (ri.getCareDate().equals(pi.getCareDate())
-                        && ri.getStartTime().isBefore(pi.getEndTime())
-                        && ri.getEndTime().isAfter(pi.getStartTime())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
 
     /*
     취소 후속 처리
@@ -463,6 +438,9 @@ public class ReservationService {
         }
     }
 
+    /*
+    timeslot 들을 가져와서 호출 시점이 마지막 날짜의 종료 시간 이후인지 확인
+     */
     private void validateCareCompleted(Long reservationId) {
         List<ReservationTimeSlot> timeSlots = reservationTimeSlotRepository
                 .findAllByReservationIdOrderByTimeSlotInfoSequence(reservationId);
@@ -480,16 +458,4 @@ public class ReservationService {
         }
     }
 
-    // ----- pet service 에서 쓸 ... method  -----
-
-//    public boolean existsActiveReservationByPetId(Long petId) {
-//        return reservationRepository.existsByPetIdAndStatusIn(
-//                petId,
-//                List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED)
-//        );
-//    }
-
-    public boolean existsInProgressBySitterId(Long sitterId) {
-        return reservationRepository.existsBySitterProfileIdAndStatus(sitterId, ReservationStatus.CONFIRMED);
-    }
 }
