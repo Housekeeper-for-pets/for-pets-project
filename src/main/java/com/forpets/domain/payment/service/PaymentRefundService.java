@@ -14,6 +14,8 @@ import com.forpets.domain.reservation.entity.ReservationPayment;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
+import com.forpets.domain.settlement.entity.SettlementType;
+import com.forpets.domain.settlement.service.SettlementService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ public class PaymentRefundService {
     private final PortOnePaymentClient portOnePaymentClient;
     private final CouponService couponService;
     private final PaymentLockService paymentLockService;
+    private final SettlementService settlementService;
 
 
     private static final int PENALTY_PERCENT = 20;
@@ -180,12 +183,16 @@ public class PaymentRefundService {
 
             // 1단계: PG 환불 (각자 결제한 곳으로 위약금 뺀 금액 환불)
             long penaltyAmount = 0L;
+            Long penaltySourcePaymentId = null;
             for (Payment payment : paidPayments) {
                 if (!payment.isPaid()) continue;
 
                 long penalty = calculatePenalty(payment, canceledBy);
                 long refundAmount = payment.getFinalAmount() - penalty;
                 penaltyAmount += penalty;
+                if (penalty > 0) {
+                    penaltySourcePaymentId = payment.getId();
+                }
 
                 if (refundAmount > 0) {
                     partialRefund(payment, reservationPayment, refundAmount, reason);
@@ -197,13 +204,23 @@ public class PaymentRefundService {
             }
 
             // 2단계: 위약금을 상대방에게 보상금으로 정산
-            // TODO: Settlement 완성되면 여기 아래에 추가해주시면 됩니다!!!
             if (penaltyAmount > 0) {
+                Long receiverMemberId = findPenaltyReceiverMemberId(paidPayments, canceledBy);
+                SettlementType settlementType = getPenaltySettlementType(canceledBy);
+                String settlementReason = getPenaltySettlementReason(canceledBy, reason);
+
+                settlementService.createPenaltySettlement(
+                        reservationId,
+                        receiverMemberId,
+                        penaltySourcePaymentId,
+                        penaltyAmount,
+                        settlementType,
+                        settlementReason
+                );
+
                 log.info("[PaymentRefundService] 위약금 정산 예정 reservationId={}, 위약금총액={}, 취소주체={}, 보상수신자={}",
                         reservationId, penaltyAmount, canceledBy,
                         canceledBy == CanceledBy.GUARDIAN ? "SITTER" : "GUARDIAN");
-                // settlementService.create(reservationId, penaltyAmount,
-                //     canceledBy == CanceledBy.GUARDIAN ? PaymentRole.SITTER : PaymentRole.GUARDIAN);
             }
 
             return null;
@@ -228,7 +245,31 @@ public class PaymentRefundService {
         return 0L;
     }
 
+    private Long findPenaltyReceiverMemberId(List<Payment> paidPayments, CanceledBy canceledBy) {
+        PaymentRole receiverRole = canceledBy == CanceledBy.GUARDIAN
+                ? PaymentRole.SITTER
+                : PaymentRole.GUARDIAN;
 
+        return paidPayments.stream()
+                .filter(payment -> payment.getPaymentRole() == receiverRole)
+                .findFirst()
+                .map(Payment::getMemberId)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+    }
+
+    private SettlementType getPenaltySettlementType(CanceledBy canceledBy) {
+        if (canceledBy == CanceledBy.GUARDIAN) {
+            return SettlementType.OWNER_CANCEL_PENALTY;
+        }
+        return SettlementType.SITTER_CANCEL_PENALTY;
+    }
+
+    private String getPenaltySettlementReason(CanceledBy canceledBy, String cancelReason) {
+        String prefix = canceledBy == CanceledBy.GUARDIAN
+                ? "보호자 귀책 취소 보상"
+                : "시터 귀책 취소 보상";
+        return prefix + " - " + cancelReason;
+    }
 
 
     /**
