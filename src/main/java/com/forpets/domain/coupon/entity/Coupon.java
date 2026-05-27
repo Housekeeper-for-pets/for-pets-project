@@ -18,8 +18,8 @@ public class Coupon extends BaseEntity {
     private Long id;
 
     // 낙관적 락 충돌 감지용 버전 값
-    @Version
-    private Long version;
+//    @Version
+//    private Long version;
 
     @Column(nullable = false)
     private String name;
