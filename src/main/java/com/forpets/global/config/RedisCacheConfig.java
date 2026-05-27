@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.forpets.domain.post.dto.PostPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
+import com.forpets.global.cache.GracefulDegradationCacheErrorHandler;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.Cache;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.interceptor.CacheErrorHandler;
@@ -56,27 +56,7 @@ public class RedisCacheConfig implements CachingConfigurer {//errorHandler 오�
     @Bean
     @Override
     public CacheErrorHandler errorHandler() {
-        return new CacheErrorHandler() {
-            @Override
-            public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
-                log.warn("Redis cache get failed. cache={}, key={}", cache.getName(), key, exception);
-            }
-
-            @Override
-            public void handleCachePutError(RuntimeException exception, Cache cache, Object key, Object value) {
-                log.warn("Redis cache put failed. cache={}, key={}", cache.getName(), key, exception);
-            }
-
-            @Override
-            public void handleCacheEvictError(RuntimeException exception, Cache cache, Object key) {
-                log.warn("Redis cache evict failed. cache={}, key={}", cache.getName(), key, exception);
-            }
-
-            @Override
-            public void handleCacheClearError(RuntimeException exception, Cache cache) {
-                log.warn("Redis cache clear failed. cache={}", cache.getName(), exception);
-            }
-        };
+        return new GracefulDegradationCacheErrorHandler();
     }
 
     private RedisCacheConfiguration redisCacheConfiguration(
@@ -103,13 +83,13 @@ public class RedisCacheConfig implements CachingConfigurer {//errorHandler 오�
     }
 
     private Duration longTtl(Object key, Object value) {
-        log.info("TTL 결정 — value type: {}, value: {}",
+        log.debug("TTL 결정 — value type: {}, value: {}",
                 value == null ? "null" : value.getClass().getName(), value);
         if (isEmptySearchResult(value)) {
-            log.info("빈 결과 감지 → 1분 TTL 적용");
+            log.debug("빈 결과 감지 → 1분 TTL 적용");
             return EMPTY_RESULT_TTL;
         }
-        log.info("일반 결과 → 1시간 TTL 적용");
+        log.debug("일반 결과 → 1시간 TTL 적용");
         return LONG_TTL;
     }
 
