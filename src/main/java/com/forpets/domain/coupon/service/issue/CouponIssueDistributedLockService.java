@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import java.util.concurrent.TimeUnit;
 
 @Service
-@Profile("!test")
 @RequiredArgsConstructor
 public class CouponIssueDistributedLockService {
 
