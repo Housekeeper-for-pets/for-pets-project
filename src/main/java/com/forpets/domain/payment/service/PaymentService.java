@@ -88,7 +88,7 @@ public class PaymentService {
 
     /*
     결제 승인 검증
-    PortOne V2에서는 merchantUid 값을 paymentId로 사용한다.
+    PortOne V2에서는 서버가 발급한 merchantUid 값을 PortOne paymentId로 사용한다.
     결제 금액은 프론트 요청값이 아니라 Payment.finalAmount와 PortOne 조회 결과를 비교한다.
      */
     @Transactional
