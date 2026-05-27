@@ -64,10 +64,6 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - kafka-net
 
   # --------------------------
   # Grafana
@@ -85,8 +81,6 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
-    networks:
-      - kafka-net
 
   app:
     build:
