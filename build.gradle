@@ -38,6 +38,8 @@ dependencies {
     implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
     annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
     annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
@@ -57,6 +59,10 @@ dependencies {
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     testImplementation 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // metric 을 Prometheus 가 읽을 수 있는 포맷으로 변환해서 노출
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 
     mockitoAgent('org.mockito:mockito-core') {
         transitive = false

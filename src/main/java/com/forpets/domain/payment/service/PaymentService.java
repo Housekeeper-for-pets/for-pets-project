@@ -21,6 +21,7 @@ import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.service.ReservationService;
+import com.forpets.global.monitoring.TrackExecutionTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -88,9 +89,10 @@ public class PaymentService {
 
     /*
     결제 승인 검증
-    PortOne V2에서는 merchantUid 값을 paymentId로 사용한다.
+    PortOne V2에서는 서버가 발급한 merchantUid 값을 PortOne paymentId로 사용한다.
     결제 금액은 프론트 요청값이 아니라 Payment.finalAmount와 PortOne 조회 결과를 비교한다.
      */
+    @TrackExecutionTime("payment.confirm")
     @Transactional
     public ConfirmPaymentResponse confirm(Long memberId, ConfirmPaymentRequest request) {
         // 프론트에서 자동으로 요청하는 api

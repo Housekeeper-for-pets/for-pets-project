@@ -34,6 +34,7 @@ import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.exception.BusinessException;
 import com.forpets.global.exception.CommonErrorCode;
+import com.forpets.global.monitoring.TrackExecutionTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -169,6 +170,7 @@ public class ReservationService {
     Payment 도메인에서 PortOne 결제 검증을 마친 뒤 호출하는 예약 확정 처리.
     양측 결제가 모두 완료된 경우에만 Reservation 을 CONFIRMED 로 전환한다.
      */
+    @TrackExecutionTime("reservation.confirm")
     @Transactional
     @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public ReservationResponseDto confirmAfterPayment(Long reservationId) {
@@ -201,6 +203,7 @@ public class ReservationService {
     케어 완료 처리
     시터만 호출 가능, CONFIRMED 상태에서만 가능
      */
+    @TrackExecutionTime("reservation.complete")
     @Transactional
     public ReservationResponseDto complete(Long memberId, Long reservationId) {
         return reservationLockService.executeWithReservationLock(reservationId, () -> {
@@ -238,6 +241,7 @@ public class ReservationService {
     예약 당사자만 취소 가능
     취소 사유 필수 (최소 10자)
      */
+    @TrackExecutionTime("reservation.cancel")
     @Transactional
     public ReservationResponseDto cancel(Long memberId, Long reservationId, CancelReservationRequest request) {
         Reservation reservation = findById(reservationId);
