@@ -58,6 +58,10 @@ dependencies {
     testImplementation 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
+    // metric 을 Prometheus 가 읽을 수 있는 포맷으로 변환해서 노출
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
     mockitoAgent('org.mockito:mockito-core') {
         transitive = false
     }
