@@ -95,6 +95,28 @@ class SettlementServiceTest {
                     .satisfies(ex -> assertThat(((SettlementException) ex).getErrorCode())
                             .isEqualTo(SettlementErrorCode.SETTLEMENT_ALREADY_EXISTS));
         }
+
+        @Test
+        @DisplayName("[실패] 케어 완료 정산 금액이 0원 이하이면 생성 불가")
+        void settlement_test_02_b() {
+            // when & then
+            assertThatThrownBy(() -> settlementService.createCareCompletionSettlement(
+                    reservationId, receiverMemberId, sourcePaymentId, 0L))
+                    .isInstanceOf(SettlementException.class)
+                    .satisfies(ex -> assertThat(((SettlementException) ex).getErrorCode())
+                            .isEqualTo(SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT));
+        }
+
+        @Test
+        @DisplayName("[실패] 케어 완료 정산 금액이 null이면 생성 불가")
+        void settlement_test_02_c() {
+            // when & then
+            assertThatThrownBy(() -> settlementService.createCareCompletionSettlement(
+                    reservationId, receiverMemberId, sourcePaymentId, null))
+                    .isInstanceOf(SettlementException.class)
+                    .satisfies(ex -> assertThat(((SettlementException) ex).getErrorCode())
+                            .isEqualTo(SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT));
+        }
     }
 
     @Nested
@@ -139,6 +161,22 @@ class SettlementServiceTest {
                     .isInstanceOf(SettlementException.class)
                     .satisfies(ex -> assertThat(((SettlementException) ex).getErrorCode())
                             .isEqualTo(SettlementErrorCode.INVALID_SETTLEMENT_TYPE));
+        }
+
+        @Test
+        @DisplayName("[실패] 위약금 정산 금액이 0원 이하이면 생성 불가")
+        void settlement_test_04_b() {
+            // when & then
+            assertThatThrownBy(() -> settlementService.createPenaltySettlement(
+                    reservationId,
+                    receiverMemberId,
+                    sourcePaymentId,
+                    0L,
+                    SettlementType.OWNER_CANCEL_PENALTY,
+                    "보호자 귀책 취소 보상"))
+                    .isInstanceOf(SettlementException.class)
+                    .satisfies(ex -> assertThat(((SettlementException) ex).getErrorCode())
+                            .isEqualTo(SettlementErrorCode.INVALID_SETTLEMENT_AMOUNT));
         }
     }
 
@@ -202,6 +240,20 @@ class SettlementServiceTest {
             // then
             assertThat(result).hasSize(1);
             assertThat(result.get(0).receiverMemberId()).isEqualTo(receiverMemberId);
+        }
+
+        @Test
+        @DisplayName("[실패] 존재하지 않는 정산 상세 조회")
+        void settlement_test_09() {
+            // given
+            given(settlementRepository.findById(999L)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> settlementService.getDetail(
+                    receiverMemberId, MemberRole.SITTER, 999L))
+                    .isInstanceOf(SettlementException.class)
+                    .satisfies(ex -> assertThat(((SettlementException) ex).getErrorCode())
+                            .isEqualTo(SettlementErrorCode.SETTLEMENT_NOT_FOUND));
         }
     }
 }
