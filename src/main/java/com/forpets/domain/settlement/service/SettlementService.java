@@ -43,22 +43,15 @@ public class SettlementService {
         validatePositiveAmount(originalAmount);
         validateNotExists(reservationId);
 
-        Long platformFeeAmount = originalAmount * DEFAULT_PLATFORM_FEE_RATE / 100;
-        Long settlementAmount = originalAmount - platformFeeAmount;
-
-        Settlement settlement = Settlement.builder()
-                .reservationId(reservationId)
-                .receiverMemberId(sitterMemberId)
-                .sourcePaymentId(sourcePaymentId)
-                .settlementType(SettlementType.CARE_COMPLETION)
-                .originalAmount(originalAmount)
-                .platformFeeRate(DEFAULT_PLATFORM_FEE_RATE)
-                .platformFeeAmount(platformFeeAmount)
-                .settlementAmount(settlementAmount)
-                .reason("케어 완료 정산")
-                .build();
-
-        return SettlementResponseDto.from(settlementRepository.save(settlement));
+        return SettlementResponseDto.from(saveSettlement(
+                reservationId,
+                sitterMemberId,
+                sourcePaymentId,
+                SettlementType.CARE_COMPLETION,
+                originalAmount,
+                DEFAULT_PLATFORM_FEE_RATE,
+                "케어 완료 정산"
+        ));
     }
 
     @Transactional
@@ -72,19 +65,48 @@ public class SettlementService {
         validatePositiveAmount(penaltyAmount);
         validateNotExists(reservationId);
 
+        return SettlementResponseDto.from(saveSettlement(
+                reservationId,
+                receiverMemberId,
+                sourcePaymentId,
+                settlementType,
+                penaltyAmount,
+                PENALTY_PLATFORM_FEE_RATE,
+                reason
+        ));
+    }
+
+    private Settlement saveSettlement(Long reservationId,
+                                      Long receiverMemberId,
+                                      Long sourcePaymentId,
+                                      SettlementType settlementType,
+                                      Long originalAmount,
+                                      int platformFeeRate,
+                                      String reason) {
+        Long platformFeeAmount = calculatePlatformFeeAmount(originalAmount, platformFeeRate);
+        Long settlementAmount = calculateSettlementAmount(originalAmount, platformFeeAmount);
+
         Settlement settlement = Settlement.builder()
                 .reservationId(reservationId)
                 .receiverMemberId(receiverMemberId)
                 .sourcePaymentId(sourcePaymentId)
                 .settlementType(settlementType)
-                .originalAmount(penaltyAmount)
-                .platformFeeRate(PENALTY_PLATFORM_FEE_RATE)
-                .platformFeeAmount(0L)
-                .settlementAmount(penaltyAmount)
+                .originalAmount(originalAmount)
+                .platformFeeRate(platformFeeRate)
+                .platformFeeAmount(platformFeeAmount)
+                .settlementAmount(settlementAmount)
                 .reason(reason)
                 .build();
 
-        return SettlementResponseDto.from(settlementRepository.save(settlement));
+        return settlementRepository.save(settlement);
+    }
+
+    private Long calculatePlatformFeeAmount(Long amount, int platformFeeRate) {
+        return amount * platformFeeRate / 100;
+    }
+
+    private Long calculateSettlementAmount(Long amount, Long platformFeeAmount) {
+        return amount - platformFeeAmount;
     }
 
     private Settlement findById(Long settlementId) {
