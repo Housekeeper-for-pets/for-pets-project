@@ -92,20 +92,18 @@ public class PaymentRefundService {
     /*
     정상 케어 완료 후 시터가 냈던 예약금만 환불한다.
     보호자 결제금은 시터 정산 Settlement 의 원천이므로 여기서 환불하지 않는다.
+    호출자는 reservationId 기준 Lock 을 잡은 상태에서 호출해야 한다.
      */
     @Transactional
     public void refundSitterDepositAfterCompletion(Long reservationId) {
-        paymentLockService.executeWithReservationLock(reservationId, () -> {
-            Payment sitterPayment = paymentRepository.findByReservationIdAndPaymentRoleAndStatus(
-                            reservationId, PaymentRole.SITTER, PaymentStatus.PAID)
-                    .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+        Payment sitterPayment = paymentRepository.findByReservationIdAndPaymentRoleAndStatus(
+                        reservationId, PaymentRole.SITTER, PaymentStatus.PAID)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-            ReservationPayment reservationPayment = reservationPaymentRepository.findByReservationId(reservationId)
-                    .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+        ReservationPayment reservationPayment = reservationPaymentRepository.findByReservationId(reservationId)
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
-            refund(sitterPayment, reservationPayment, "케어 완료에 따른 시터 예약금 환불");
-            return null;
-        });
+        refund(sitterPayment, reservationPayment, "케어 완료에 따른 시터 예약금 환불");
     }
 
     /*
@@ -270,20 +268,6 @@ public class PaymentRefundService {
                 : "시터 귀책 취소 보상";
         return prefix + " - " + cancelReason;
     }
-
-
-    /**
-     * 위약금 적용 대상 판별
-     * - 보호자가 취소 → 보호자 결제가 위약금 대상 (80%만 환불)
-     * - 시터가 취소 → 시터 예약금이 위약금 대상 (80%만 환불, 20%는 보호자에게)
-     */
-    private boolean shouldApplyPenalty(Payment payment, CanceledBy canceledBy) {
-        if (canceledBy == CanceledBy.GUARDIAN) {
-            return payment.getPaymentRole() == PaymentRole.GUARDIAN;
-        }
-        return payment.getPaymentRole() == PaymentRole.SITTER;
-    }
-
     private void partialRefund(Payment payment, ReservationPayment reservationPayment,
                                Long refundAmount, String reason) {
         PortOneCancelResult cancelResult = portOnePaymentClient.cancelPayment(

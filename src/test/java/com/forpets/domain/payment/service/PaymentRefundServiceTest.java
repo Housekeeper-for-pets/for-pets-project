@@ -35,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
@@ -122,8 +123,8 @@ class PaymentRefundServiceTest {
         reservationPayment.sitterConfirm();
 
         // PaymentLock 통과시키기
-        given(paymentLockService.executeWithReservationLock(any(), any()))
-                .willAnswer(invocation -> {
+        lenient().when(paymentLockService.executeWithReservationLock(any(), any()))
+                .thenAnswer(invocation -> {
                     Supplier<?> task = invocation.getArgument(1);
                     return task.get();
                 });
@@ -352,6 +353,8 @@ class PaymentRefundServiceTest {
                     .cancelPayment(eq("merchant-sitter-001"), eq(20_000L), anyString());
             then(portOnePaymentClient).should(never())
                     .cancelPayment(eq("merchant-guardian-001"), any(), anyString());
+            then(paymentLockService).should(never())
+                    .executeWithReservationLock(any(), any());
         }
     }
 }
