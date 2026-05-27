@@ -29,6 +29,7 @@ public class ChatMessageService {
     private final ChatRoomRepository chatRoomRepository;
 
     // 메세지 목록 조회
+    @Transactional
     public ChatMessageListResponse getMessages(
             Long memberId,
             Long chatRoomId,
