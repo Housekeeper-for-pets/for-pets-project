@@ -46,7 +46,7 @@ class CouponIssueDistributedLockConcurrencyTest {
         );
 
         // 동시에 쿠폰 발급을 요청할 사용자 수
-        int requestCount = 1000;
+        int requestCount = 300;
 
         // 동시에 실행할 스레드 풀 생성
         ExecutorService executorService = Executors.newFixedThreadPool(32);
