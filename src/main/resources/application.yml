@@ -30,7 +30,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info
+        include: health, info, metrics, prometheus
 
 portone:
   store-id: ${PORTONE_STORE_ID:}
