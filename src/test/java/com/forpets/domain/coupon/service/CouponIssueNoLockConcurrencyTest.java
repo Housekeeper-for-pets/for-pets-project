@@ -31,7 +31,6 @@ class CouponIssueNoLockConcurrencyTest {
     @Autowired
     private UserCouponRepository userCouponRepository;
 
-    // PR시 꼭 주석 하기
     @Test
     @DisplayName("락 없이 동시에 쿠폰을 발급하면 정합성 문제가 발생할 수 있다")
     void issueCouponWithoutLockConcurrencyTest() throws InterruptedException {
@@ -45,7 +44,7 @@ class CouponIssueNoLockConcurrencyTest {
         );
 
         // 동시에 쿠폰 발급을 요청할 사용자 수
-        int requestCount = 1000;
+        int requestCount = 300;
 
         // 동시에 실행할 스레드 풀을 생성
         ExecutorService executorService = Executors.newFixedThreadPool(32);

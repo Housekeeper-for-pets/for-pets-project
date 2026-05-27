@@ -10,15 +10,20 @@ import org.hibernate.StaleObjectStateException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 @Service
 @RequiredArgsConstructor
 public class CouponIssueOptimisticLockService {
 
-    // 낙관적 락 충돌이 반복될 때 최대 재시도 횟수
-    private static final int MAX_RETRY_COUNT = 100;
+    // 낙관적 락 충돌 발생 시 최대 재시도 횟수
+    private static final int MAX_RETRY_COUNT = 30;
 
-    // 충돌 직후 같은 시점에 다시 몰리는 것을 줄이기 위한 짧은 대기 시간
-    private static final long RETRY_BACKOFF_MILLIS = 5L;
+    // 재시도 전 대기 시간(ms)
+    private static final long RETRY_BACKOFF_MILLIS = 10L;
+
+    // 테스트 결과 출력용 실제 재시도 횟수
+    private final AtomicInteger actualRetryCount = new AtomicInteger();
 
     private final CouponService couponService;
 
@@ -36,7 +41,8 @@ public class CouponIssueOptimisticLockService {
                     throw e;
                 }
 
-                // 낙관적 락 충돌이면 잠시 대기 후 다시 조회부터 재시도
+                // 낙관적 락 충돌이면 실제 재시도 횟수를 기록하고 잠시 대기 후 다시 조회부터 재시도
+                actualRetryCount.incrementAndGet();
                 lastOptimisticLockException = e;
                 sleepBeforeRetry();
             }
@@ -44,6 +50,21 @@ public class CouponIssueOptimisticLockService {
 
         // 최대 재시도 횟수를 넘기면 마지막 낙관적 락 예외를 그대로 전파
         throw lastOptimisticLockException;
+    }
+
+    // 테스트 시작 전 실제 재시도 횟수 초기화
+    public void resetActualRetryCount() {
+        actualRetryCount.set(0);
+    }
+
+    // 테스트 결과 출력에서 재시도 설정값을 확인하기 위한 getter
+    public int getMaxRetryCount() {
+        return MAX_RETRY_COUNT;
+    }
+
+    // 테스트 결과 출력에서 재시도 대기 시간을 확인하기 위한 getter
+    public long getRetryBackoffMillis() {
+        return RETRY_BACKOFF_MILLIS;
     }
 
     // 재시도 전 짧게 대기
