@@ -8,6 +8,7 @@ import com.forpets.domain.coupon.repository.UserCouponRepository;
 import com.forpets.domain.coupon.service.issue.CouponIssueOptimisticLockService;
 import jakarta.persistence.OptimisticLockException;
 import org.hibernate.StaleObjectStateException;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RedissonClient;
@@ -25,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@Disabled("Coupon @Version 비활성화 상태에서는 낙관적 락 테스트 제외")
 class CouponIssueOptimisticLockConcurrencyTest {
 
     @Autowired
