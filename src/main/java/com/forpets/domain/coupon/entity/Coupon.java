@@ -1,12 +1,7 @@
 package com.forpets.domain.coupon.entity;
 
 import com.forpets.global.entity.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,6 +16,10 @@ public class Coupon extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    // 낙관적 락 충돌 감지용 버전 값
+    @Version
+    private Long version;
 
     @Column(nullable = false)
     private String name;

@@ -18,6 +18,10 @@ repositories {
     mavenCentral()
 }
 
+configurations {
+    mockitoAgent
+}
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -27,6 +31,9 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.apache.commons:commons-pool2'
+
+    // Redisson 기반 분산 락을 사용하기 위한 의존성입니다.
+    implementation 'org.redisson:redisson:3.27.2'
 
     implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
@@ -53,6 +60,10 @@ dependencies {
 
     // metric 을 Prometheus 가 읽을 수 있는 포맷으로 변환해서 노출
     implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    mockitoAgent('org.mockito:mockito-core') {
+        transitive = false
+    }
 }
 
 // ---------------------------------------------------------------
@@ -63,6 +74,8 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
     jvmArgs '-Dfile.encoding=UTF-8'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.asPath}"
+
     environment 'JAVA_TOOL_OPTIONS', '-Dfile.encoding=UTF-8'
     systemProperty 'spring.profiles.active', 'test'
 
@@ -85,6 +98,6 @@ tasks.named('test') {
         if (mainResDir?.exists()) copy { from mainResDir; into safeMainRes }
 
         classpath = files(safeTest, safeTestRes, safeMain, safeMainRes) +
-                    configurations.testRuntimeClasspath
+                configurations.testRuntimeClasspath
     }
 }
