@@ -1,6 +1,8 @@
 package com.forpets.domain.notification.service;
 
 import com.forpets.domain.notification.entity.Notification;
+import com.forpets.domain.notification.exception.NotificationErrorCode;
+import com.forpets.domain.notification.exception.NotificationException;
 import com.forpets.domain.notification.repository.NotificationRepository;
 import com.forpets.global.sse.SseEmitterManager;
 import com.forpets.global.sse.SseEventType;
@@ -25,11 +27,16 @@ public class NotificationService {
      * 핵심: DB 먼저 저장 → SSE는 "있으면 보내고 없으면 말고"
      */
     @Transactional
-    public Notification notify(Long receiverId, Long senderId,
-                               SseEventType type, String message,
-                               Long referenceId, String referenceType) {
+    public Notification notify(
+            Long receiverId,
+            Long senderId,
+            SseEventType type,
+            String message,
+            Long referenceId,
+            String referenceType
+    ) {
 
-        // 1. DB 저장 (영속 보장)
+        //DB 저장
         Notification notification = Notification.builder()
                 .receiverId(receiverId)
                 .senderId(senderId)
@@ -42,7 +49,7 @@ public class NotificationService {
         notificationRepository.save(notification);
         log.info("알림 저장: type={}, receiver={}", type, receiverId);
 
-        // 2. SSE 전송 (연결 안 돼있으면 스킵)
+        // SSE 전송
         sseEmitterManager.sendToUser(receiverId, type.name(),
                 Map.of(
                         "id", notification.getId(),
@@ -81,10 +88,10 @@ public class NotificationService {
     public void markAsRead(Long notificationId, Long userId) {
         Notification notification = notificationRepository
                 .findById(notificationId)
-                .orElseThrow(() -> new IllegalArgumentException("알림 없음"));
+                .orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
 
         if (!notification.getReceiverId().equals(userId)) {
-            throw new IllegalArgumentException("본인 알림만 읽음 처리 가능");
+            throw new NotificationException(NotificationErrorCode.NOT_NOTIFICATION_RECEIVER);
         }
 
         notification.markAsRead();
