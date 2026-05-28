@@ -61,6 +61,11 @@ services:
     container_name: prometheus
     ports:
       - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+      - --web.enable-remote-write-receiver
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
 
@@ -90,7 +95,7 @@ services:
       - "${SERVER_PORT:-8080}:8080"
     environment:
       TZ: ${TZ:-Asia/Seoul}
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: ${DOCKER_SPRING_PROFILES_ACTIVE:-docker}
       SERVER_PORT: 8080
       DB_HOST: ${DOCKER_DB_HOST}
       DB_PORT: ${DOCKER_DB_PORT}
@@ -110,6 +115,20 @@ services:
         condition: service_healthy
       kafka:
         condition: service_started
+
+  k6:
+    image: grafana/k6:latest
+    container_name: for-pets-k6
+    entrypoint: ["sh", "-c", "tail -f /dev/null"]
+    volumes:
+      - ./k6:/scripts
+    environment:
+      BASE_URL: http://app:8080
+      K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
+      K6_PROMETHEUS_RW_TREND_STATS: avg,p(95),p(99),min,max
+    depends_on:
+      - app
+      - prometheus
 
 volumes:
   mysql-data:

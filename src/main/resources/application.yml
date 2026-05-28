@@ -32,6 +32,13 @@ management:
       exposure:
         include: health, info, metrics, prometheus
 
+  metrics:
+    distribution:
+      percentiles:
+        coupon.issue.duration: 0.95, 0.99
+      percentiles-histogram:
+        coupon.issue.duration: true
+
 portone:
   store-id: ${PORTONE_STORE_ID:}
   api-secret: ${PORTONE_API_SECRET:}
