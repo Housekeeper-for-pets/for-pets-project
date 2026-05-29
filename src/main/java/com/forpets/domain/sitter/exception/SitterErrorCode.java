@@ -18,8 +18,8 @@ public enum SitterErrorCode implements ErrorCode {
     INVALID_SORT_FIELD(HttpStatus.BAD_REQUEST, "INVALID_SORT_FIELD", "허용되지 않은 정렬 필드입니다."),
 
     ADMIN_CANNOT_REGISTER_SITTER(HttpStatus.FORBIDDEN, "ADMIN_CANNOT_REGISTER_SITTER", "관리자는 시터 프로필을 등록할 수 없습니다."),
-    SITTER_PROFILE_EXISTS(HttpStatus.BAD_REQUEST, "SITTER_PROFILE_EXISTS", "이미 시터 프로필이 존재합니다."),
-    SITTER_PROFILE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST, "SITTER_PROFILE_ALREADY_REGISTERED", "시터 프로필을 삭제 한 이후 다시 생성할 수 없습니다."),
+    SITTER_PROFILE_EXISTS(HttpStatus.CONFLICT, "SITTER_PROFILE_EXISTS", "이미 시터 프로필이 존재합니다."),
+    SITTER_PROFILE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST, "SITTER_PROFILE_ALREADY_REGISTERED", "활성 상태인 시터 프로필이 존재합니다."),
     SITTER_NOT_FOUND(HttpStatus.NOT_FOUND, "SITTER_NOT_FOUND", "존재하지 않는 시터입니다."),
 
     DUPLICATE_SCHEDULE(HttpStatus.CONFLICT, "DUPLICATE_SCHEDULE", "요일별 1개 시간대만 등록 가능합니다."),
