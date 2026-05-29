@@ -2,11 +2,9 @@ package com.forpets.domain.proposal.service;
 
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
-import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.exception.PostErrorCode;
 import com.forpets.domain.post.exception.PostException;
-import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.service.PostService;
 import com.forpets.domain.proposal.dto.CreateProposalRequest;
 import com.forpets.domain.proposal.dto.ProposalResponseDto;
@@ -22,8 +20,6 @@ import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.service.SitterService;
-import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -59,7 +55,7 @@ public class ProposalService {
         validatePostOpen(post);
         validateNotOwnPost(memberId, post);
 
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         validateNoDuplicate(postId, sitter.getId());
         validateApproved(sitter);
         // 정책 수정으로 CONFIRMED 예약이 있어도 Proposal 은 언제든 받을 수 있음
@@ -109,7 +105,7 @@ public class ProposalService {
     시터 본인의 제안만 조회
      */
     public List<ProposalResponseDto> getMyProposals(Long memberId) {
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
 
         return proposalRepository.findAllBySitterProfileId(sitter.getId()).stream()
                 .map(ProposalResponseDto::from)
@@ -148,7 +144,7 @@ public class ProposalService {
 //        Post post = findPost(proposal.getPostId());
         Post post = postService.findById(proposal.getPostId());
 
-        SitterProfile sitterProfile = sitterService.findById(proposal.getSitterProfileId());
+        SitterProfile sitterProfile = sitterService.findApprovedById(proposal.getSitterProfileId());
         validatePostAuthor(memberId, post);
         // accept 가능한 예약이 존재하는 시점은 어차피 OPEN 밖에 없다
         validatePostOpen(post);
@@ -199,7 +195,7 @@ public class ProposalService {
         Proposal proposal = findById(proposalId);
         validatePending(proposal);
 
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         validateProposalOwner(sitter.getId(), proposal);
 
         proposal.withdraw();

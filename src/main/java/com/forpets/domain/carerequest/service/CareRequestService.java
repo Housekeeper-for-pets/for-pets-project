@@ -12,8 +12,6 @@ import com.forpets.domain.carerequest.repository.CareRequestPetRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
 import com.forpets.domain.pet.entity.Pet;
-import com.forpets.domain.pet.exception.PetErrorCode;
-import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
@@ -57,7 +55,7 @@ public class CareRequestService {
      */
     @Transactional
     public CareRequestResponseDto create(Long memberId, Long sitterId, CreateCareRequestDto request) {
-        SitterProfile sitter = sitterService.findById(sitterId);
+        SitterProfile sitter = sitterService.findApprovedById(sitterId);
         validateReservable(sitter);
 
         log.info("로그인 한 유저의 member Id: {}", memberId);
@@ -122,7 +120,7 @@ public class CareRequestService {
     시터 본인에게 온 요청만 조회
      */
     public List<CareRequestResponseDto> getReceivedRequests(Long memberId) {
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
 
         return careRequestRepository.findAllBySitterProfileId(sitter.getId()).stream()
                 .map(this::toResponseDto)
@@ -143,7 +141,7 @@ public class CareRequestService {
      */
     @Transactional
     public CareRequestResponseDto accept(Long memberId, Long requestId) {
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         CareRequest request = findById(requestId);
         validatePending(request);
         validateTargetSitter(sitter.getId(), request);
@@ -175,7 +173,7 @@ public class CareRequestService {
      */
     @Transactional
     public CareRequestResponseDto reject(Long memberId, Long requestId) {
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         CareRequest request = findById(requestId);
         validatePending(request);
         validateTargetSitter(sitter.getId(), request);

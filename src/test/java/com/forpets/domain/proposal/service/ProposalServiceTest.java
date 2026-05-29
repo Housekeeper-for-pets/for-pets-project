@@ -2,7 +2,6 @@ package com.forpets.domain.proposal.service;
 
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
-import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.exception.PostErrorCode;
 import com.forpets.domain.post.exception.PostException;
@@ -28,7 +27,6 @@ import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.common.CareType;
-import com.forpets.global.embed.entity.PetSnapshot;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -159,7 +157,7 @@ class ProposalServiceTest {
             List<PostTimeSlot> postTimeSlots = List.of(createPostTimeSlot(postId, 1));
 
             given(postService.findById(postId)).willReturn(post);
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(proposalRepository.existsByPostIdAndSitterProfileIdAndStatus(
                     postId, sitterProfileId, ProposalStatus.PENDING)).willReturn(false);
             given(postService.findTimeSlotsByPostId(postId)).willReturn(postTimeSlots);
@@ -215,7 +213,7 @@ class ProposalServiceTest {
             // given
             CreateProposalRequest request = new CreateProposalRequest(25000, "중복 제안");
             given(postService.findById(postId)).willReturn(post);
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(proposalRepository.existsByPostIdAndSitterProfileIdAndStatus(
                     postId, sitterProfileId, ProposalStatus.PENDING)).willReturn(true);
 
@@ -243,7 +241,7 @@ class ProposalServiceTest {
             ReflectionTestUtils.setField(newProposal, "id", 501L);
 
             given(postService.findById(postId)).willReturn(post);
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(proposalRepository.existsByPostIdAndSitterProfileIdAndStatus(
                     postId, sitterProfileId, ProposalStatus.PENDING)).willReturn(false);
             given(postService.findTimeSlotsByPostId(postId)).willReturn(postTimeSlots);
@@ -266,7 +264,7 @@ class ProposalServiceTest {
             List<PostTimeSlot> postTimeSlots = List.of(createPostTimeSlot(postId, 1));
 
             given(postService.findById(postId)).willReturn(post);
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(proposalRepository.existsByPostIdAndSitterProfileIdAndStatus(
                     postId, sitterProfileId, ProposalStatus.PENDING)).willReturn(false);
             given(postService.findTimeSlotsByPostId(postId)).willReturn(postTimeSlots);
@@ -285,7 +283,7 @@ class ProposalServiceTest {
             // given
             CreateProposalRequest request = new CreateProposalRequest(25000, "제안");
             given(postService.findById(postId)).willReturn(post);
-            given(sitterService.findByMemberId(member3Id))
+            given(sitterService.findApprovedByMemberId(member3Id))
                     .willThrow(new SitterException(SitterErrorCode.SITTER_NOT_FOUND));
 
             // when & then
@@ -343,7 +341,7 @@ class ProposalServiceTest {
         @DisplayName("[성공] 시터 본인이 보낸 제안 목록 조회 성공")
         void proposal_test_10() {
             // given
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(proposalRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of(proposal));
 
             // when
@@ -436,7 +434,7 @@ class ProposalServiceTest {
 
             given(proposalRepository.findById(proposalId)).willReturn(Optional.of(proposal));
             given(postService.findById(postId)).willReturn(post);
-            given(sitterService.findById(sitterProfileId)).willReturn(sitterProfile);
+            given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
             given(postService.findPetsByPostId(postId)).willReturn(postPets);
             given(postService.findTimeSlotsByPostId(postId)).willReturn(postTimeSlots);
             given(reservationService.hasConfirmedConflict(eq(sitterProfileId), anyList())).willReturn(false);
@@ -456,7 +454,7 @@ class ProposalServiceTest {
             // given
             given(proposalRepository.findById(proposalId)).willReturn(Optional.of(proposal));
             given(postService.findById(postId)).willReturn(post);
-            given(sitterService.findById(sitterProfileId)).willReturn(sitterProfile);
+            given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
 
             // when & then
             assertThatThrownBy(() -> proposalService.accept(member2Id, proposalId))
@@ -486,7 +484,7 @@ class ProposalServiceTest {
             post.close(); // CLOSED 상태로 변경
             given(proposalRepository.findById(proposalId)).willReturn(Optional.of(proposal));
             given(postService.findById(postId)).willReturn(post);
-            given(sitterService.findById(sitterProfileId)).willReturn(sitterProfile);
+            given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
 
             // when & then
             assertThatThrownBy(() -> proposalService.accept(member1Id, proposalId))
@@ -503,7 +501,7 @@ class ProposalServiceTest {
 
             given(proposalRepository.findById(proposalId)).willReturn(Optional.of(proposal));
             given(postService.findById(postId)).willReturn(post);
-            given(sitterService.findById(sitterProfileId)).willReturn(sitterProfile);
+            given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
             given(postService.findPetsByPostId(postId)).willReturn(List.of(createPostPet(postId, pet1)));
             given(postService.findTimeSlotsByPostId(postId)).willReturn(postTimeSlots);
             given(reservationService.hasConfirmedConflict(eq(sitterProfileId), anyList())).willReturn(true);
@@ -578,7 +576,7 @@ class ProposalServiceTest {
         void proposal_test_23() {
             // given
             given(proposalRepository.findById(proposalId)).willReturn(Optional.of(proposal));
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
 
             // when
             ProposalResponseDto result = proposalService.withdraw(member2Id, proposalId);
@@ -602,7 +600,7 @@ class ProposalServiceTest {
             ReflectionTestUtils.setField(otherSitter, "id", 101L);
 
             given(proposalRepository.findById(proposalId)).willReturn(Optional.of(proposal));
-            given(sitterService.findByMemberId(member3Id)).willReturn(otherSitter);
+            given(sitterService.findApprovedByMemberId(member3Id)).willReturn(otherSitter);
 
             // when & then
             assertThatThrownBy(() -> proposalService.withdraw(member3Id, proposalId))
