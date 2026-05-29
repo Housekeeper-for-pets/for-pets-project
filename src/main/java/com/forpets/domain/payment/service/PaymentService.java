@@ -126,6 +126,7 @@ public class PaymentService {
             }
 
             payment.fail(failedReason);
+            restoreCouponIfApplied(payment);
             return PaymentResponseDto.from(payment);
         });
     }
@@ -143,6 +144,7 @@ public class PaymentService {
         validateFailable(payment);
 
         payment.fail(request.failedReason());
+        restoreCouponIfApplied(payment);
 
         log.info("[PaymentService] 결제 실패 처리 paymentId={}, merchantUid={}, reason={}",
                 payment.getId(), payment.getMerchantUid(), request.failedReason());
@@ -333,6 +335,12 @@ public class PaymentService {
     private void markCouponAsUsedIfApplied(Payment payment) {
         if (payment.getUserCouponId() != null) {
             couponService.markCouponAsUsed(payment.getMemberId(), payment.getUserCouponId());
+        }
+    }
+
+    private void restoreCouponIfApplied(Payment payment) {
+        if (payment.getUserCouponId() != null) {
+            couponService.restoreCoupon(payment.getMemberId(), payment.getUserCouponId());
         }
     }
 
