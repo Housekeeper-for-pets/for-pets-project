@@ -11,26 +11,18 @@ import com.forpets.domain.carerequest.exception.CareRequestException;
 import com.forpets.domain.carerequest.repository.CareRequestPetRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
-import com.forpets.domain.member.entity.Member;
-import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.exception.PetErrorCode;
 import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.service.PetService;
-import com.forpets.domain.post.entity.Post;
-import com.forpets.domain.proposal.entity.Proposal;
-import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
-import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.dto.TimeSlotRequest;
 import com.forpets.global.embed.entity.TimeSlotInfo;
-import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -118,7 +110,7 @@ public class CareRequestService {
     @Transactional
     public CareRequestResponseDto cancel(Long memberId, Long requestId) {
         CareRequest request = findById(requestId);
-        validateOwner(memberId, request);
+        validateCareRequestOwner(memberId, request);
         validatePending(request);
 
         request.cancel();
@@ -217,7 +209,7 @@ public class CareRequestService {
         }
     }
 
-    private void validateOwner(Long memberId, CareRequest request) {
+    private void validateCareRequestOwner(Long memberId, CareRequest request) {
         if (!request.isOwnedBy(memberId)) {
             throw new CareRequestException(CareRequestErrorCode.NOT_CARE_REQUEST_OWNER);
         }

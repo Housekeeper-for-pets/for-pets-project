@@ -214,14 +214,6 @@ public class ProposalService {
                 .orElseThrow(() -> new ProposalException(ProposalErrorCode.PROPOSAL_NOT_FOUND));
     }
 
-    /*
-    PostService에서 사용 — 공고 수정 시 PENDING/ACCEPTED Proposal 존재 여부 확인
-     */
-    public boolean existsPendingOrAcceptedByPostId(Long postId) {
-        return proposalRepository.existsByPostIdAndStatusIn(
-                postId, List.of(ProposalStatus.PENDING, ProposalStatus.ACCEPTED));
-    }
-
     private void validatePostOpen(Post post) {
         if (!post.isOpen()) {
             throw new PostException(PostErrorCode.POST_NOT_OPEN);
@@ -286,15 +278,6 @@ public class ProposalService {
                 .filter(p -> !p.getId().equals(acceptedProposalId))
                 .forEach(Proposal::reject);
     }
-
-    /*
-    PostService 와 ProposalService 사이에 순환참조 발생
-    -> ProposalService 에서 PostRepository 를 직접 참조하도록 함
-     */
-//    private Post findPost(Long postId) {
-//        return postRepository.findById(postId)
-//                .orElseThrow(() -> new BusinessException(CommonErrorCode.POST_NOT_FOUND));
-//    }
 
     private void validateApproved(SitterProfile sitter) {
         if (!sitter.isApproved()) throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);
