@@ -1,5 +1,7 @@
 package com.forpets.domain.reservation.controller;
 
+import com.forpets.domain.member.entity.MemberRole;
+import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.reservation.dto.CancelReservationRequest;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.service.ReservationService;
@@ -28,9 +30,11 @@ public class ReservationController {
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<List<ReservationResponseDto>>> getMyReservations(
-            @LoginUser CurrentMember currentMember) {
+            @LoginUser CurrentMember currentMember,
+            @RequestParam(required = false) String roleAs
+    ) {
         return ResponseEntity.ok(
-                ApiResponse.success(reservationService.getMyReservations(currentMember.id())));
+                ApiResponse.success(reservationService.getMyReservations(currentMember.id(), roleAs)));
     }
 
     @GetMapping("/{reservationId}")

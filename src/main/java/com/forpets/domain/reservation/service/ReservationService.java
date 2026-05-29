@@ -4,6 +4,7 @@ import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
+import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
@@ -143,14 +144,24 @@ public class ReservationService {
     /*
     내 예약 목록 조회
      */
-    public List<ReservationResponseDto> getMyReservations(Long memberId) {
-        List<Reservation> asGuardian = reservationRepository.findAllByGuardianId(memberId);
-        List<Reservation> asSitter = reservationRepository.findAllBySitterMemberId(memberId);
+    public List<ReservationResponseDto> getMyReservations(Long memberId, String roleAs) {
+        List<Reservation> reservationList;
+        // roleAs 값 검증은 따로 하지 않고 만약에 guardian, sitter 이외의 값이 들어오면 그냥 all list return
+        if (roleAs.equals("guardian")){
+            reservationList = reservationRepository.findAllByGuardianId(memberId);
+        }else if (roleAs.equals("sitter")){
+            reservationList = reservationRepository.findAllBySitterMemberId(memberId);
+        }else{
+            reservationList = reservationRepository.findAllBySitterMemberIdOrGuardianId(memberId, memberId);
+        }
 
-        List<Reservation> all = new ArrayList<>(asGuardian);
-        all.addAll(asSitter);
+//        List<Reservation> asGuardian = reservationRepository.findAllByGuardianId(memberId);
+//        List<Reservation> asSitter = reservationRepository.findAllBySitterMemberId(memberId);
+//
+//        List<Reservation> all = new ArrayList<>(asGuardian);
+//        all.addAll(asSitter);
 
-        return all.stream()
+        return reservationList.stream()
                 .sorted(Comparator.comparing(Reservation::getCreatedAt).reversed())
                 .map(this::toResponseDto)
                 .toList();
