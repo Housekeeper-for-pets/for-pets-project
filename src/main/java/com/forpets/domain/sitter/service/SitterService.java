@@ -126,7 +126,7 @@ public class SitterService {
         // 캐시 히트 시 DB 조회 0회, 미스 시 SitterCacheService 내부에서만 조회
         SitterResponseDto result = sitterCacheService.getSitterById(sitterId);
         if (result.approvalStatus() != SitterApprovalStatus.APPROVED) {
-            throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);
+            throw new SitterException(SitterErrorCode.SITTER_NOT_FOUND);
         }
         return result;
     }
