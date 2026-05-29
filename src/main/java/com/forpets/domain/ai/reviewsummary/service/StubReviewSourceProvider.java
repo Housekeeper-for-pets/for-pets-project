@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-@Profile({"local", "postmantest", "test"})
+@Profile("!review")
 public class StubReviewSourceProvider implements ReviewSourceProvider {
 
     @Override

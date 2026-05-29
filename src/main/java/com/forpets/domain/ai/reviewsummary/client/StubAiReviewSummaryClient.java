@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-@Profile({"local", "postmantest", "test"})
+@Profile("!ai")
 public class StubAiReviewSummaryClient implements AiReviewSummaryClient {
 
     @Override
