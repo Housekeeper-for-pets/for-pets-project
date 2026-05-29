@@ -60,7 +60,7 @@ public class ProposalController {
     }
 
     /*
-    3. 시터가 본인이 등록한 공고 목록을 조회
+    3. 시터가 본인이 등록한 제안 목록을 조회
      */
     @GetMapping("/api/proposals/me")
     public ResponseEntity<ApiResponse<List<ProposalResponseDto>>> getMyProposals(

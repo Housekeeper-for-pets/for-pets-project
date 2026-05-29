@@ -150,11 +150,13 @@ public class ProposalService {
 
         SitterProfile sitterProfile = sitterService.findById(proposal.getSitterProfileId());
         validatePostAuthor(memberId, post);
+        // accept 가능한 예약이 존재하는 시점은 어차피 OPEN 밖에 없다
         validatePostOpen(post);
 
         List<PostPet> postPets = postService.findPetsByPostId(post.getId());
         List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(post.getId());
 
+        // 어차피 한 예약이 확정되고 나면 겹치는 예약들은 withdraw 처리 되니까 이 로직이 실행 될 일은 없음
         if (reservationService.hasConfirmedConflict(sitterProfile.getId(), postTimeSlots)) {
             throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
         }
@@ -270,7 +272,7 @@ public class ProposalService {
 
     private void validateProposalOwner(Long sitterProfileId, Proposal proposal) {
         if (!proposal.isOwnedBySitter(sitterProfileId)) {
-            throw new ProposalException(ProposalErrorCode.NOT_PROPOSAL_PARTY);
+            throw new ProposalException(ProposalErrorCode.NOT_PROPOSAL_OWNER);
         }
     }
 
