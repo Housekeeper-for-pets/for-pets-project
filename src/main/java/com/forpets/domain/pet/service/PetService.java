@@ -106,6 +106,23 @@ public class PetService {
         }
     }
 
+    public List<Pet> validateAndGetPets(Long memberId, List<Long> petIds) {
+        // 중복 제거 로직 추가
+        // distinct() 가 내부적으로 HashSet 사용
+        List<Long> distinctIds = petIds.stream().distinct().toList();
+
+        return distinctIds.stream()
+                .map(petId -> {
+                    Pet pet = findById(petId);
+                    if (!pet.getMemberId().equals(memberId)) {
+                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
+                    }
+                    return pet;
+                })
+                .toList();
+    }
+
+
 //    private boolean hasActiveReservation(Long petId) {
 //        return reservationService.existsActiveReservationByPetId(petId);
 //    }

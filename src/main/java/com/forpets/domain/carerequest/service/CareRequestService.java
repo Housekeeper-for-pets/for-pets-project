@@ -65,7 +65,7 @@ public class CareRequestService {
 
         validateNotSelf(memberId, sitter.getMemberId());
 
-        List<Pet> pets = validateAndGetPets(memberId, request.petIds());
+        List<Pet> pets = petService.validateAndGetPets(memberId, request.petIds());
         timeSlotValidator.validate(request.timeSlots());
         validateNoDuplicatePendingRequest(sitter.getId(), request.petIds());
 
@@ -227,17 +227,17 @@ public class CareRequestService {
         }
     }
 
-    private List<Pet> validateAndGetPets(Long memberId, List<Long> petIds) {
-        return petIds.stream()
-                .map(petId -> {
-                    Pet pet = petService.findById(petId);
-                    if (!pet.getMemberId().equals(memberId)) {
-                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
-                    }
-                    return pet;
-                })
-                .toList();
-    }
+//    private List<Pet> validateAndGetPets(Long memberId, List<Long> petIds) {
+//        return petIds.stream()
+//                .map(petId -> {
+//                    Pet pet = petService.findById(petId);
+//                    if (!pet.getMemberId().equals(memberId)) {
+//                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
+//                    }
+//                    return pet;
+//                })
+//                .toList();
+//    }
 
     /*
     동일 시터에게 동일 petIds로 PENDING 중복 요청 방지
