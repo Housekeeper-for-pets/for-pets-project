@@ -3,10 +3,7 @@ package com.forpets.domain.sitter.service;
 import com.forpets.domain.sitter.dto.schedule.ScheduleItemRequest;
 import com.forpets.domain.sitter.dto.schedule.ScheduleResponseDto;
 import com.forpets.domain.sitter.dto.schedule.UpdateScheduleRequest;
-import com.forpets.domain.sitter.entity.SitterProfile;
-import com.forpets.domain.sitter.entity.SitterSchedule;
-import com.forpets.domain.sitter.entity.PossiblePetType;
-import com.forpets.domain.sitter.entity.PossiblePetSize;
+import com.forpets.domain.sitter.entity.*;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
@@ -95,7 +92,7 @@ class SitterScheduleServiceTest {
                     .build();
             ReflectionTestUtils.setField(schedule2, "id", 2L);
 
-            given(sitterService.findApprovedByMemberId(member1Id)).willReturn(sitterProfile);
+            given(sitterService.findByMemberId(member1Id)).willReturn(sitterProfile);
             given(sitterScheduleRepository.saveAll(anyList())).willReturn(List.of(schedule1, schedule2));
 
             // when
@@ -118,7 +115,7 @@ class SitterScheduleServiceTest {
             // given
             UpdateScheduleRequest request = new UpdateScheduleRequest(List.of());
 
-            given(sitterService.findApprovedByMemberId(member1Id)).willReturn(sitterProfile);
+            given(sitterService.findByMemberId(member1Id)).willReturn(sitterProfile);
             given(sitterScheduleRepository.saveAll(anyList())).willReturn(List.of());
 
             // when
@@ -158,7 +155,7 @@ class SitterScheduleServiceTest {
                     })
                     .toList();
 
-            given(sitterService.findApprovedByMemberId(member1Id)).willReturn(sitterProfile);
+            given(sitterService.findByMemberId(member1Id)).willReturn(sitterProfile);
             given(sitterScheduleRepository.saveAll(anyList())).willReturn(savedSchedules);
 
             // when
@@ -177,7 +174,7 @@ class SitterScheduleServiceTest {
             );
             UpdateScheduleRequest request = new UpdateScheduleRequest(items);
 
-            given(sitterService.findApprovedByMemberId(member1Id)).willReturn(sitterProfile);
+            given(sitterService.findByMemberId(member1Id)).willReturn(sitterProfile);
 
             // when & then
             assertThatThrownBy(() -> sitterScheduleService.replaceAll(member1Id, request))
@@ -195,7 +192,7 @@ class SitterScheduleServiceTest {
             );
             UpdateScheduleRequest request = new UpdateScheduleRequest(items);
 
-            given(sitterService.findApprovedByMemberId(member1Id)).willReturn(sitterProfile);
+            given(sitterService.findByMemberId(member1Id)).willReturn(sitterProfile);
 
             // when & then
             assertThatThrownBy(() -> sitterScheduleService.replaceAll(member1Id, request))
@@ -214,7 +211,7 @@ class SitterScheduleServiceTest {
             );
             UpdateScheduleRequest request = new UpdateScheduleRequest(items);
 
-            given(sitterService.findApprovedByMemberId(member1Id)).willReturn(sitterProfile);
+            given(sitterService.findByMemberId(member1Id)).willReturn(sitterProfile);
 
             // when & then
             assertThatThrownBy(() -> sitterScheduleService.replaceAll(member1Id, request))
@@ -232,7 +229,7 @@ class SitterScheduleServiceTest {
             );
             UpdateScheduleRequest request = new UpdateScheduleRequest(items);
 
-            given(sitterService.findApprovedByMemberId(member2Id))
+            given(sitterService.findByMemberId(member2Id))
                     .willThrow(new SitterException(SitterErrorCode.SITTER_NOT_FOUND));
 
             // when & then
@@ -270,7 +267,7 @@ class SitterScheduleServiceTest {
                     .build();
             ReflectionTestUtils.setField(schedule2, "id", 2L);
 
-            given(sitterService.findApprovedByMemberId(member1Id)).willReturn(sitterProfile);
+            given(sitterService.findByMemberId(member1Id)).willReturn(sitterProfile);
             given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId))
                     .willReturn(List.of(schedule1, schedule2));
 
@@ -289,7 +286,7 @@ class SitterScheduleServiceTest {
         @DisplayName("[성공] 등록된 스케줄 없을 때 빈 리스트 반환")
         void schedule_test_09() {
             // given
-            given(sitterService.findApprovedByMemberId(member1Id)).willReturn(sitterProfile);
+            given(sitterService.findByMemberId(member1Id)).willReturn(sitterProfile);
             given(sitterScheduleRepository.findAllBySitterProfileId(sitterProfileId))
                     .willReturn(List.of());
 
@@ -304,7 +301,7 @@ class SitterScheduleServiceTest {
         @DisplayName("[실패] 시터 프로필이 없는 회원이 조회 시도")
         void schedule_test_10() {
             // given
-            given(sitterService.findApprovedByMemberId(member2Id))
+            given(sitterService.findByMemberId(member2Id))
                     .willThrow(new SitterException(SitterErrorCode.SITTER_NOT_FOUND));
 
             // when & then

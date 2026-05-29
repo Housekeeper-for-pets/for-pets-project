@@ -606,7 +606,7 @@ class ProposalServiceTest {
             assertThatThrownBy(() -> proposalService.withdraw(member3Id, proposalId))
                     .isInstanceOf(ProposalException.class)
                     .satisfies(ex -> assertThat(((ProposalException) ex).getErrorCode())
-                            .isEqualTo(ProposalErrorCode.NOT_PROPOSAL_PARTY));
+                            .isEqualTo(ProposalErrorCode.NOT_PROPOSAL_OWNER));
         }
 
         @Test

@@ -189,7 +189,7 @@ class CareRequestServiceTest {
                     validTimeSlots(), 30000
             );
             given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
-            given(petService.findById(pet1Id)).willReturn(pet1);
+            given(petService.validateAndGetPets(member1Id, List.of(pet1Id))).willReturn(List.of(pet1));
             willDoNothing().given(timeSlotValidator).validate(anyList());
             given(careRequestRepository.findAllBySitterProfileIdAndStatus(sitterProfileId, CareRequestStatus.PENDING))
                     .willReturn(List.of());
@@ -243,7 +243,7 @@ class CareRequestServiceTest {
             ReflectionTestUtils.setField(savedRequest, "id", 201L);
 
             given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
-            given(petService.findById(pet2Id)).willReturn(pet2);
+            given(petService.validateAndGetPets(member1Id, List.of(pet2Id))).willReturn(List.of(pet2));
             willDoNothing().given(timeSlotValidator).validate(anyList());
             given(careRequestRepository.findAllBySitterProfileIdAndStatus(sitterProfileId, CareRequestStatus.PENDING))
                     .willReturn(List.of(existingPending));
@@ -297,22 +297,12 @@ class CareRequestServiceTest {
         @DisplayName("[실패] 타인 반려동물로 요청 시 차단")
         void carerequest_test_05() {
             // given — member3(지민냥)의 pet으로 요청
-            Pet otherPet = Pet.builder()
-                    .memberId(member3Id)
-                    .name("갈색")
-                    .species(PetSpecies.ETC)
-                    .breed("제주도 거대 말")
-                    .size(PetSize.LARGE)
-                    .age(6)
-                    .gender(PetGender.MALE)
-                    .build();
-            ReflectionTestUtils.setField(otherPet, "id", 12L);
-
             CreateCareRequestDto request = new CreateCareRequestDto(
                     List.of(12L), CareType.VISIT, "요청", validTimeSlots(), 30000
             );
             given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
-            given(petService.findById(12L)).willReturn(otherPet);
+            given(petService.validateAndGetPets(member1Id, List.of(12L)))
+                    .willThrow(new PetException(PetErrorCode.NOT_PET_OWNER));
 
             // when & then
             assertThatThrownBy(() -> careRequestService.create(member1Id, sitterProfileId, request))
@@ -341,7 +331,7 @@ class CareRequestServiceTest {
             CareRequestPet existingPet = createCareRequestPet(999L, pet1);
 
             given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
-            given(petService.findById(pet1Id)).willReturn(pet1);
+            given(petService.validateAndGetPets(member1Id, List.of(pet1Id))).willReturn(List.of(pet1));
             willDoNothing().given(timeSlotValidator).validate(anyList());
             given(careRequestRepository.findAllBySitterProfileIdAndStatus(sitterProfileId, CareRequestStatus.PENDING))
                     .willReturn(List.of(existingPending));
