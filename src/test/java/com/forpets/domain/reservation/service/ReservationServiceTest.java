@@ -195,11 +195,11 @@ class ReservationServiceTest {
         void reservation_test_01() {
             // given
             given(reservationRepository.findAllByGuardianId(member1Id)).willReturn(List.of(reservation));
-            given(reservationRepository.findAllBySitterMemberId(member1Id)).willReturn(List.of());
+//            given(reservationRepository.findAllBySitterMemberId(member1Id)).willReturn(List.of());
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            List<ReservationResponseDto> result = reservationService.getMyReservations(member1Id);
+            List<ReservationResponseDto> result = reservationService.getMyReservations(member1Id, ReservationRole.GUARDIAN);
 
             // then
             assertThat(result).hasSize(1);
@@ -210,12 +210,12 @@ class ReservationServiceTest {
         @DisplayName("[성공] 시터로 참여한 예약 목록 조회 성공")
         void reservation_test_02() {
             // given
-            given(reservationRepository.findAllByGuardianId(member2Id)).willReturn(List.of());
+//            given(reservationRepository.findAllByGuardianId(member2Id)).willReturn(List.of());
             given(reservationRepository.findAllBySitterMemberId(member2Id)).willReturn(List.of(reservation));
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            List<ReservationResponseDto> result = reservationService.getMyReservations(member2Id);
+            List<ReservationResponseDto> result = reservationService.getMyReservations(member2Id, ReservationRole.SITTER);
 
             // then
             assertThat(result).hasSize(1);

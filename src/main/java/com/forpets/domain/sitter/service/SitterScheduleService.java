@@ -1,7 +1,5 @@
 package com.forpets.domain.sitter.service;
 
-import com.forpets.domain.member.entity.Member;
-import com.forpets.domain.member.service.MemberService;
 import com.forpets.domain.sitter.dto.schedule.ScheduleItemRequest;
 import com.forpets.domain.sitter.dto.schedule.ScheduleResponseDto;
 import com.forpets.domain.sitter.dto.schedule.UpdateScheduleRequest;
@@ -12,8 +10,6 @@ import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
 import com.forpets.global.embed.exception.TimeSlotErrorCode;
 import com.forpets.global.embed.exception.TimeSlotException;
-import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

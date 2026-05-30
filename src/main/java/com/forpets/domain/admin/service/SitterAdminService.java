@@ -26,7 +26,7 @@ public class SitterAdminService {
     private final MemberService memberService;
     private final SitterCacheService sitterCacheService;
 
-    @Cacheable(cacheNames = "adminPendingSitters", cacheManager = "shortTtlCacheManager")
+//    @Cacheable(cacheNames = "adminPendingSitters", cacheManager = "shortTtlCacheManager")
     public List<AdminSitterResponseDto> getPendingSitters() {
         List<SitterProfile> pendingSitters = sitterProfileRepository
                 .findAllByApprovalStatus(SitterApprovalStatus.PENDING);

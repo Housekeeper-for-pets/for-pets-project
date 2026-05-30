@@ -182,7 +182,7 @@ class PostServiceTest {
                     List.of(pet1Id), CareType.VISIT, 30000, validTimeSlots()
             );
             given(memberService.findById(member1Id)).willReturn(member1);
-            given(petService.findById(pet1Id)).willReturn(pet1);
+            given(petService.validateAndGetPets(member1Id, List.of(pet1Id))).willReturn(List.of(pet1));
             willDoNothing().given(timeSlotValidator).validate(anyList());
             given(postRepository.save(any(Post.class))).willReturn(post);
             given(postPetRepository.saveAll(anyList())).willReturn(List.of(createPostPet(postId, pet1)));
@@ -207,25 +207,13 @@ class PostServiceTest {
         @Test
         @DisplayName("[실패] 타인의 반려동물로 공고 등록 시 차단")
         void post_test_02() {
-            // given — member2의 pet으로 member1이 등록
-            Pet otherPet = Pet.builder()
-                    .memberId(member2Id)
-                    .name("연두")
-                    .species(PetSpecies.DOG)
-                    .breed("포메라니안")
-                    .size(PetSize.SMALL)
-                    .age(1)
-                    .gender(PetGender.FEMALE)
-                    .build();
-            ReflectionTestUtils.setField(otherPet, "id", 11L);
-
             CreatePostRequest request = new CreatePostRequest(
                     "제목", "내용", List.of(11L),
                     CareType.VISIT, 30000, validTimeSlots()
             );
             given(memberService.findById(member1Id)).willReturn(member1);
-            given(petService.findById(11L)).willReturn(otherPet);
-
+            given(petService.validateAndGetPets(member1Id, List.of(11L)))
+                    .willThrow(new PetException(PetErrorCode.NOT_PET_OWNER));
             // when & then
             assertThatThrownBy(() -> postService.create(member1Id, request))
                     .isInstanceOf(PetException.class)
@@ -242,7 +230,7 @@ class PostServiceTest {
                     CareType.VISIT, 30000, validTimeSlots()
             );
             given(memberService.findById(member1Id)).willReturn(member1);
-            given(petService.findById(pet1Id)).willReturn(pet1);
+            given(petService.validateAndGetPets(member1Id, List.of(pet1Id))).willReturn(List.of(pet1));
             willThrow(new TimeSlotException(TimeSlotErrorCode.PAST_DATE_NOT_ALLOWED))
                     .given(timeSlotValidator).validate(anyList());
 
@@ -272,7 +260,7 @@ class PostServiceTest {
             given(memberService.findById(member1Id)).willReturn(member1);
             given(postRepository.findById(postId)).willReturn(Optional.of(post));
             given(proposalRepository.existsByPostIdAndStatusIn(eq(postId), anyList())).willReturn(false);
-            given(petService.findById(pet1Id)).willReturn(pet1);
+            given(petService.validateAndGetPets(member1Id, List.of(pet1Id))).willReturn(List.of(pet1));
             willDoNothing().given(timeSlotValidator).validate(anyList());
             given(postPetRepository.saveAll(anyList())).willReturn(List.of(createPostPet(postId, pet1)));
             given(postTimeSlotRepository.saveAll(anyList())).willReturn(List.of(createPostTimeSlot(postId, 1)));
