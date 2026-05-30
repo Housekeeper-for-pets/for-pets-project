@@ -199,7 +199,7 @@ class ReservationServiceTest {
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            List<ReservationResponseDto> result = reservationService.getMyReservations(member1Id, "guardian");
+            List<ReservationResponseDto> result = reservationService.getMyReservations(member1Id, ReservationRole.GUARDIAN);
 
             // then
             assertThat(result).hasSize(1);
@@ -215,7 +215,7 @@ class ReservationServiceTest {
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            List<ReservationResponseDto> result = reservationService.getMyReservations(member2Id, "sitter");
+            List<ReservationResponseDto> result = reservationService.getMyReservations(member2Id, ReservationRole.SITTER);
 
             // then
             assertThat(result).hasSize(1);

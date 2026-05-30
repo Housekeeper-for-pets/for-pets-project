@@ -144,12 +144,12 @@ public class ReservationService {
     /*
     내 예약 목록 조회
      */
-    public List<ReservationResponseDto> getMyReservations(Long memberId, String roleAs) {
+    public List<ReservationResponseDto> getMyReservations(Long memberId, ReservationRole roleAs) {
         List<Reservation> reservationList;
         // roleAs 값 검증은 따로 하지 않고 만약에 guardian, sitter 이외의 값이 들어오면 그냥 all list return
-        if (roleAs.equals("guardian")){
+        if (roleAs == ReservationRole.GUARDIAN){
             reservationList = reservationRepository.findAllByGuardianId(memberId);
-        }else if (roleAs.equals("sitter")){
+        }else if (roleAs == ReservationRole.SITTER){
             reservationList = reservationRepository.findAllBySitterMemberId(memberId);
         }else{
             reservationList = reservationRepository.findAllBySitterMemberIdOrGuardianId(memberId, memberId);

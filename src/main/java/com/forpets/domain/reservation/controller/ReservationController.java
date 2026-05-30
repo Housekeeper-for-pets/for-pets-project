@@ -4,6 +4,7 @@ import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.reservation.dto.CancelReservationRequest;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
+import com.forpets.domain.reservation.entity.ReservationRole;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
@@ -31,7 +32,7 @@ public class ReservationController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<List<ReservationResponseDto>>> getMyReservations(
             @LoginUser CurrentMember currentMember,
-            @RequestParam(required = false) String roleAs
+            @RequestParam(required = false) ReservationRole roleAs
     ) {
         return ResponseEntity.ok(
                 ApiResponse.success(reservationService.getMyReservations(currentMember.id(), roleAs)));
