@@ -129,6 +129,7 @@ public class Reservation extends BaseEntity {
     }
 
     public void expire() {
+        if (!isPending()) return;
         this.status = ReservationStatus.EXPIRED;
         this.expiredAt = LocalDateTime.now();
     }
