@@ -8,7 +8,8 @@ import com.forpets.domain.coupon.repository.UserCouponRepository;
 import com.forpets.domain.coupon.service.issue.CouponIssueDistributedLockService;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -33,23 +34,24 @@ class CouponIssueDistributedLockConcurrencyTest {
     @Autowired
     private UserCouponRepository userCouponRepository;
 
-    @Test
-    @DisplayName("Redisson 분산 락을 적용하면 동시에 쿠폰을 발급해도 총 수량을 초과하지 않는다")
-    void issueCouponWithDistributedLockConcurrencyTest() throws InterruptedException {
+    @ParameterizedTest
+    @ValueSource(ints = {300, 500, 700, 1000, 2000})
+    @DisplayName("Redisson 분산 락 요청 수 증가 테스트")
+    void issueCouponWithDistributedLockTrafficIncreaseTest(int requestCount) throws InterruptedException {
         // 테스트용 쿠폰 생성
         Coupon coupon = couponRepository.save(
                 Coupon.builder()
-                        .name("distributedLock 동시성 테스트 쿠폰")
+                        .name("distributedLock 요청 수 증가 테스트 쿠폰")
                         .discountRate(10)
                         .totalQuantity(100)
                         .build()
         );
 
-        // 동시에 쿠폰 발급을 요청할 사용자 수
-        int requestCount = 300;
+        // application 테스트에서는 스레드 풀 크기를 고정하고 총 요청 수만 증가시킨다.
+        int threadPoolSize = 32;
 
         // 동시에 실행할 스레드 풀 생성
-        ExecutorService executorService = Executors.newFixedThreadPool(32);
+        ExecutorService executorService = Executors.newFixedThreadPool(threadPoolSize);
 
         // 모든 스레드가 같은 시점에 시작하도록 대기
         CountDownLatch startLatch = new CountDownLatch(1);
@@ -69,7 +71,8 @@ class CouponIssueDistributedLockConcurrencyTest {
         // 분산 락 획득 실패 횟수 기록
         AtomicInteger lockFailCount = new AtomicInteger();
 
-        long startTime = System.currentTimeMillis();
+        // 쿠폰 소진과 락 획득 실패 외 예상하지 못한 실패 횟수 기록
+        AtomicInteger otherFailCount = new AtomicInteger();
 
         // 여러 사용자가 같은 쿠폰을 동시에 발급받는 상황 생성
         for (int i = 1; i <= requestCount; i++) {
@@ -89,14 +92,13 @@ class CouponIssueDistributedLockConcurrencyTest {
                     // 예외가 발생하면 실패 수 증가
                     failCount.incrementAndGet();
 
-                    // 쿠폰 소진으로 실패한 요청인지 확인
+                    // 쿠폰 소진 실패, 분산 락 획득 실패, 기타 실패를 구분
                     if (isCouponException(e, CouponErrorCode.COUPON_QUANTITY_EXHAUSTED)) {
                         soldOutFailCount.incrementAndGet();
-                    }
-
-                    // 분산 락 획득 실패로 실패한 요청인지 확인
-                    if (isCouponException(e, CouponErrorCode.COUPON_ISSUE_LOCK_FAILED)) {
+                    } else if (isCouponException(e, CouponErrorCode.COUPON_ISSUE_LOCK_FAILED)) {
                         lockFailCount.incrementAndGet();
+                    } else {
+                        otherFailCount.incrementAndGet();
                     }
                 } finally {
                     // 성공하든 실패하든 작업 완료 알림
@@ -105,16 +107,22 @@ class CouponIssueDistributedLockConcurrencyTest {
             });
         }
 
+        // 작업 등록이 끝난 뒤 실제 동시 실행 시간만 측정한다.
+        long startTime = System.nanoTime();
+
         // 대기 중인 스레드들을 동시에 시작
         startLatch.countDown();
 
         // 모든 스레드의 작업이 끝날 때까지 대기
-        assertThat(doneLatch.await(30, TimeUnit.SECONDS)).isTrue();
+        boolean completed = doneLatch.await(60, TimeUnit.SECONDS);
+
+        long endTime = System.nanoTime();
+        long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
 
         // 테스트 종료 후 스레드 풀 종료
         executorService.shutdown();
 
-        long endTime = System.currentTimeMillis();
+        assertThat(completed).isTrue();
 
         // 테스트 종료 후 쿠폰 상태 재조회
         Coupon foundCoupon = couponRepository.findById(coupon.getId()).orElseThrow();
@@ -122,17 +130,19 @@ class CouponIssueDistributedLockConcurrencyTest {
         // 실제 저장된 UserCoupon 개수 조회
         long issuedUserCouponCount = userCouponRepository.countByCouponId(coupon.getId());
 
-        System.out.println("========== DISTRIBUTED LOCK 쿠폰 동시성 테스트 결과 ==========");
+        System.out.println("========== DISTRIBUTED LOCK 요청 수 증가 테스트 결과 ==========");
         System.out.println("총 요청 수 = " + requestCount);
+        System.out.println("스레드 풀 크기 = " + threadPoolSize);
         System.out.println("성공 수 = " + successCount.get());
         System.out.println("실패 수 = " + failCount.get());
         System.out.println("쿠폰 소진 실패 수 = " + soldOutFailCount.get());
         System.out.println("분산 락 획득 실패 수 = " + lockFailCount.get());
+        System.out.println("기타 실패 수 = " + otherFailCount.get());
         System.out.println("쿠폰 총 수량 = " + foundCoupon.getTotalQuantity());
         System.out.println("쿠폰 잔여 수량 = " + foundCoupon.getRemainingQuantity());
         System.out.println("실제 UserCoupon 발급 개수 = " + issuedUserCouponCount);
         System.out.println("기대 잔여 수량 = " + (foundCoupon.getTotalQuantity() - issuedUserCouponCount));
-        System.out.println("전체 처리 시간(ms) = " + (endTime - startTime));
+        System.out.println("전체 처리 시간(ms) = " + elapsedMillis);
         System.out.println("==========================================================");
 
         // 실제 발급 개수는 쿠폰 총 수량과 일치
@@ -142,6 +152,26 @@ class CouponIssueDistributedLockConcurrencyTest {
         // 성공 수는 쿠폰 총 수량과 일치
         assertThat(successCount.get())
                 .isEqualTo(foundCoupon.getTotalQuantity());
+
+        // 실패 수는 전체 요청 수에서 성공 수를 뺀 값과 일치
+        assertThat(failCount.get())
+                .isEqualTo(requestCount - successCount.get());
+
+        // 실패 원인 합계는 전체 실패 수와 일치해야 한다.
+        assertThat(soldOutFailCount.get() + lockFailCount.get() + otherFailCount.get())
+                .isEqualTo(failCount.get());
+
+        // 분산 락 획득 실패는 없어야 한다.
+        assertThat(lockFailCount.get())
+                .isZero();
+
+        // 쿠폰 소진과 락 획득 실패 외 기타 실패는 없어야 한다.
+        assertThat(otherFailCount.get())
+                .isZero();
+
+        // 실패한 요청은 전부 쿠폰 소진 실패여야 한다.
+        assertThat(soldOutFailCount.get())
+                .isEqualTo(failCount.get());
 
         // 쿠폰 잔여 수량은 0
         assertThat(foundCoupon.getRemainingQuantity())
