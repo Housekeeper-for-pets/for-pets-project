@@ -2,6 +2,7 @@ package com.forpets.global.exception;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.forpets.domain.post.exception.PostErrorCode;
+import com.forpets.domain.review.exception.ReviewErrorCode;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.global.common.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -83,6 +84,26 @@ public class GlobalExceptionHandler {
                 .orElse(CommonErrorCode.VALIDATION_FAILED.getMessage());
 
         log.warn("[ValidationException] message={}, path={}", message, request.getRequestURI());
+
+        if (request.getRequestURI().startsWith("/api/reviews")) {
+            ErrorCode errorCode = CommonErrorCode.VALIDATION_FAILED;
+            for (var fieldError : exception.getBindingResult().getFieldErrors()) {
+                if ("rating".equals(fieldError.getField())) {
+                    errorCode = ReviewErrorCode.INVALID_RATING;
+                    message = fieldError.getDefaultMessage();
+                    break;
+                }
+                if ("reviewComment".equals(fieldError.getField())) {
+                    errorCode = ReviewErrorCode.INVALID_REVIEW_COMMENT;
+                    message = fieldError.getDefaultMessage();
+                    break;
+                }
+            }
+
+            return ResponseEntity
+                    .status(errorCode.getStatus())
+                    .body(ApiResponse.fail(ErrorResponse.of(errorCode, message, request.getRequestURI())));
+        }
 
         return ResponseEntity
                 .badRequest()
