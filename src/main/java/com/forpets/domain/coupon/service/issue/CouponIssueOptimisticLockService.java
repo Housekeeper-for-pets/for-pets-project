@@ -17,10 +17,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CouponIssueOptimisticLockService {
 
     // 낙관적 락 충돌 발생 시 최대 재시도 횟수
-    private static final int MAX_RETRY_COUNT = 30;
+    private static final int MAX_RETRY_COUNT = 20;
 
     // 재시도 전 대기 시간(ms)
-    private static final long RETRY_BACKOFF_MILLIS = 10L;
+    private static final long RETRY_BACKOFF_MILLIS = 6L;
 
     // 테스트 결과 출력용 실제 재시도 횟수
     private final AtomicInteger actualRetryCount = new AtomicInteger();
@@ -29,8 +29,6 @@ public class CouponIssueOptimisticLockService {
 
     // 낙관적 락 충돌이 발생하면 새로운 트랜잭션으로 쿠폰 발급을 재시도
     public IssueCouponResponse issue(Long userId, Long couponId) {
-        RuntimeException lastOptimisticLockException = null;
-
         // 각 시도마다 CouponService의 @Transactional 메서드를 다시 호출해 새 트랜잭션으로 처리
         for (int attempt = 1; attempt <= MAX_RETRY_COUNT; attempt++) {
             try {
@@ -41,15 +39,18 @@ public class CouponIssueOptimisticLockService {
                     throw e;
                 }
 
-                // 낙관적 락 충돌이면 실제 재시도 횟수를 기록하고 잠시 대기 후 다시 조회부터 재시도
+                // 낙관적 락 충돌이면 실제 재시도 횟수를 기록
                 actualRetryCount.incrementAndGet();
-                lastOptimisticLockException = e;
-                sleepBeforeRetry();
+
+                // 마지막 시도에서는 더 이상 대기하지 않고 반복문 종료 후 실패 예외로 변환
+                if (attempt < MAX_RETRY_COUNT) {
+                    sleepBeforeRetry();
+                }
             }
         }
 
-        // 최대 재시도 횟수를 넘기면 마지막 낙관적 락 예외를 그대로 전파
-        throw lastOptimisticLockException;
+        // 최대 재시도 횟수를 모두 사용해도 성공하지 못하면 비즈니스 예외로 변환
+        throw new CouponException(CouponErrorCode.COUPON_ISSUE_LOCK_FAILED);
     }
 
     // 테스트 시작 전 실제 재시도 횟수 초기화
