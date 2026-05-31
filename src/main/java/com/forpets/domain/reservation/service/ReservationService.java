@@ -4,7 +4,6 @@ import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
-import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
@@ -33,8 +32,6 @@ import com.forpets.domain.settlement.service.SettlementService;
 import com.forpets.global.embed.HasTimeSlotInfo;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.entity.TimeSlotInfo;
-import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
 import com.forpets.global.monitoring.TrackExecutionTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +40,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -53,8 +49,6 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class ReservationService {
     private static final int DEPOSIT_RATIO = 20;
-    private static final long PAYMENT_EXPIRE_HOURS = 2L;
-    private static final String EXPIRE_REFUND_REASON = "예약 결제 제한 시간 초과";
 
     private final ReservationRepository reservationRepository;
     private final ReservationPetRepository reservationPetRepository;
@@ -270,7 +264,7 @@ public class ReservationService {
             paymentRefundService.expireNonPaidPayments(reservationId);
 
             // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
-            handlePostCancellation(reservation);
+            handleCancellation(reservation);
 
             return toResponseDto(reservation);
         }
@@ -293,43 +287,11 @@ public class ReservationService {
 
         paymentRefundService.refundWithPenalty(reservationId, request.cancelReason(), canceledBy);
         paymentRefundService.expireNonPaidPayments(reservationId);
-        handlePostCancellation(reservation);
+        handleCancellation(reservation);
         return toResponseDto(reservation);
     }
 
-    /*
-    예약 만료 처리
-    PENDING 예약이 생성 후 2시간을 넘기면 EXPIRED로 닫고 이미 결제된 금액을 환불한다.
-     */
-    @Transactional
-    public int expirePendingReservations(LocalDateTime now) {
-        LocalDateTime deadline = now.minusHours(PAYMENT_EXPIRE_HOURS);
-        List<Reservation> expiredTargets = reservationRepository.findAllByStatusAndCreatedAtBefore(
-                ReservationStatus.PENDING, deadline);
-
-        expiredTargets.forEach(this::expireReservation);
-
-        if (!expiredTargets.isEmpty()) {
-            log.info("[예약 만료] 처리 건수={}", expiredTargets.size());
-        }
-
-        return expiredTargets.size();
-    }
-
-    private void expireReservation(Reservation reservation) {
-        reservation.expire();
-        paymentRefundService.refundPaidPayments(reservation.getId(), EXPIRE_REFUND_REASON);
-        paymentRefundService.expireNonPaidPayments(reservation.getId());
-        handlePostCancellation(reservation);
-
-        // careRequest 도 restore 해줌
-        // 수동 취소에서도 Pending 으로 돌아가는걸 방지하기 위해 expireReservation 으로 위치 이동시킴
-        if (reservation.getSource() == ReservationSource.CARE_REQUEST){
-            careRequestRepository.findById(reservation.getSourceId()).ifPresent(CareRequest::restoreToPending);
-        }
-    }
-
-
+    // 예약 만료 처리는 ReservationExpireScheduler + ReservationExpireService 로 이동
 
     // transaction 아닌 애들 ==========
 
@@ -516,11 +478,16 @@ public class ReservationService {
     /*
     취소 후속 처리
     - Proposal 출처: ACCEPTED → PENDING 복원 (다른 제안 채택 가능)
+    - CareRequest 출처: ACCEPT -> PENDING 복원
      */
-    private void handlePostCancellation(Reservation reservation) {
+    private void handleCancellation(Reservation reservation) {
         if (reservation.getSource() == ReservationSource.PROPOSAL) {
-            proposalRepository.findById(reservation.getSourceId()).ifPresent(Proposal::restoreToPending);
+            proposalRepository.findById(reservation.getSourceId())
+                    .ifPresent(Proposal::restoreToPending);
+            return;
         }
+        careRequestRepository.findById(reservation.getSourceId())
+                .ifPresent(CareRequest::restoreToPending);
     }
 
     /*
