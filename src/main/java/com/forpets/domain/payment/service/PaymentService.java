@@ -20,6 +20,7 @@ import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
+import com.forpets.domain.reservation.service.ReservationLockService;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.global.monitoring.TrackExecutionTime;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +45,7 @@ public class PaymentService {
     private final PaymentMerchantUidGenerator merchantUidGenerator;
     private final PortOnePaymentClient portOnePaymentClient;
     private final ReservationService reservationService;
-    private final PaymentLockService paymentLockService;
+    private final ReservationLockService reservationLockService;
     private final CouponService couponService;
 
     /*
@@ -101,7 +102,7 @@ public class PaymentService {
 
         validatePaymentOwner(memberId, payment);
 
-        return paymentLockService.executeWithReservationLock(
+        return reservationLockService.executeWithReservationLock(
                 payment.getReservationId(), () -> confirmPayment(payment));
     }
 
@@ -111,7 +112,7 @@ public class PaymentService {
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-        return paymentLockService.executeWithReservationLock(
+        return reservationLockService.executeWithReservationLock(
                 payment.getReservationId(), () -> confirmPayment(payment));
     }
 
@@ -120,7 +121,7 @@ public class PaymentService {
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-        return paymentLockService.executeWithReservationLock(payment.getReservationId(), () -> {
+        return reservationLockService.executeWithReservationLock(payment.getReservationId(), () -> {
             if (!payment.isFailable()) {
                 return PaymentResponseDto.from(payment);
             }

@@ -249,46 +249,48 @@ public class ReservationService {
     @TrackExecutionTime("reservation.cancel")
     @Transactional
     public ReservationResponseDto cancel(Long memberId, Long reservationId, CancelReservationRequest request) {
-        Reservation reservation = findById(reservationId);
-        validateParty(memberId, reservation);
-        validateCancelable(reservation);
+        return reservationLockService.executeWithReservationLock(reservationId, () -> {
+            Reservation reservation = findById(reservationId);
+            validateParty(memberId, reservation);
+            validateCancelable(reservation);
 
-        CanceledBy canceledBy = reservation.isGuardian(memberId) ? CanceledBy.GUARDIAN : CanceledBy.SITTER;
+            CanceledBy canceledBy = reservation.isGuardian(memberId) ? CanceledBy.GUARDIAN : CanceledBy.SITTER;
 
-        // reservation 이 Pending 인 경우: 그냥.. 환불해주면 됨
-        if (reservation.isPending()){
+            // reservation 이 Pending 인 경우: 그냥.. 환불해주면 됨
+            if (reservation.isPending()){
+                reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
+                log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
+
+                paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
+                paymentRefundService.expireNonPaidPayments(reservationId);
+
+                // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
+                handleCancellation(reservation);
+
+                return toResponseDto(reservation);
+            }
+
+            //  reservation 이 Confirmed 가 된 경우
+            //  : 어쩔 수 없는 일이 아니라면 무조건 위약금을 물게 됨
+
+            // 어쩔수 없는 일인지? -> 관리자 검토 후 위약금 안 물게 해줄 수도 있고 아닐 수도 있어요...
+            if (request.cancelCategory() == CancelCategory.UNAVOIDABLE) {
+                reservation.requestCancel(request.cancelReason(), request.cancelCategory(), canceledBy);
+                log.info("[취소 요청] UNAVOIDABLE 관리자 검토 대기 reservationId={}, 취소주체={}",
+                        reservationId, canceledBy);
+                return toResponseDto(reservation);
+            }
+
+            // 그냥 취소하는거면? -> 위약금 차감 후 취소
             reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
-            log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
+            log.info("[예약 취소] CONFIRMED 위약금 차감 취소 reservationId={}, 취소주체={}, 사유={}",
+                    reservationId, canceledBy, request.cancelReason());
 
-            paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
+            paymentRefundService.refundWithPenalty(reservationId, request.cancelReason(), canceledBy);
             paymentRefundService.expireNonPaidPayments(reservationId);
-
-            // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
             handleCancellation(reservation);
-
             return toResponseDto(reservation);
-        }
-
-        //  reservation 이 Confirmed 가 된 경우
-        //  : 어쩔 수 없는 일이 아니라면 무조건 위약금을 물게 됨
-
-        // 어쩔수 없는 일인지? -> 관리자 검토 후 위약금 안 물게 해줄 수도 있고 아닐 수도 있어요...
-        if (request.cancelCategory() == CancelCategory.UNAVOIDABLE) {
-            reservation.requestCancel(request.cancelReason(), request.cancelCategory(), canceledBy);
-            log.info("[취소 요청] UNAVOIDABLE 관리자 검토 대기 reservationId={}, 취소주체={}",
-                    reservationId, canceledBy);
-            return toResponseDto(reservation);
-        }
-
-        // 그냥 취소하는거면? -> 위약금 차감 후 취소
-        reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
-        log.info("[예약 취소] CONFIRMED 위약금 차감 취소 reservationId={}, 취소주체={}, 사유={}",
-                reservationId, canceledBy, request.cancelReason());
-
-        paymentRefundService.refundWithPenalty(reservationId, request.cancelReason(), canceledBy);
-        paymentRefundService.expireNonPaidPayments(reservationId);
-        handleCancellation(reservation);
-        return toResponseDto(reservation);
+        });
     }
 
     // 예약 만료 처리는 ReservationExpireScheduler + ReservationExpireService 로 이동

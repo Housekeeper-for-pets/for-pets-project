@@ -71,6 +71,16 @@ public class Reservation extends BaseEntity {
     @Column
     private LocalDateTime expiredAt;
 
+    /*
+    낙관적 락(Optimistic Lock)용 버전 컬럼.
+    UPDATE 시 JPA 가 자동으로 version 을 +1 하고, WHERE 절에 기존 version 을 끼워넣음.
+    동시에 두 트랜잭션이 같은 reservation 을 수정하면 한쪽은 OptimisticLockException 으로 실패한다.
+    (Reservation Lock 으로 1차 직렬화 + @Version 으로 마지막 방어선)
+     */
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @Builder
     private Reservation(Long guardianId, Long sitterMemberId, Long sitterProfileId,
                         CareType careType, ReservationSource source, Long sourceId) {

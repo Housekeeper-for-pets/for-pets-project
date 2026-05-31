@@ -14,6 +14,7 @@ import com.forpets.domain.reservation.entity.ReservationPayment;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
+import com.forpets.domain.reservation.service.ReservationLockService;
 import com.forpets.domain.settlement.entity.SettlementType;
 import com.forpets.domain.settlement.service.SettlementService;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class PaymentRefundService {
     private final PortOnePaymentClient portOnePaymentClient;
     private final CouponService couponService;
     private final PaymentLockService paymentLockService;
+    private final ReservationLockService reservationLockService;
     private final SettlementService settlementService;
 
 
@@ -52,7 +54,7 @@ public class PaymentRefundService {
         Payment payment = paymentRepository.findByMerchantUid(merchantUid)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-        paymentLockService.executeWithReservationLock(payment.getReservationId(), () -> {
+        reservationLockService.executeWithReservationLock(payment.getReservationId(), () -> {
             if (!payment.isPaid()) {
                 return null;
             }
