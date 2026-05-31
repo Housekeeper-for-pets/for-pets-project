@@ -56,6 +56,8 @@ public class ReservationExpireScheduler {
         }
 
         int success = 0;
+        int skipped = 0;
+        int failed = 0;
 
         for (Reservation reservation : targets) {
             Long reservationId = reservation.getId();
@@ -64,13 +66,26 @@ public class ReservationExpireScheduler {
                     reservationExpireService.expireOne(reservationId);
                     return null;
                 });
-                log.info("[ReservationExpireScheduler] 만료 처리 성공 reservationId={}",reservationId);
                 success++;
+            } catch (ReservationException e) {
+                if (e.getErrorCode() == ReservationErrorCode.RESERVATION_LOCK_FAILED) {
+                    // 다른 요청(결제 confirm, cancel 등)이 처리 중 -> 양보, 다음 주기 재시도
+                    log.info("[ReservationExpireScheduler] Lock 획득 실패, 다음 주기 재시도 reservationId={}",
+                            reservationId);
+                    skipped++;
+                } else {
+                    log.error("[ReservationExpireScheduler] 만료 처리 실패 reservationId={}",
+                            reservationId, e);
+                    failed++;
+                }
             } catch (Exception e) {
-                log.error("[ReservationExpireScheduler] 만료 처리 실패 reservationId={}", reservationId, e);
+                log.error("[ReservationExpireScheduler] 만료 처리 실패 reservationId={}",
+                        reservationId, e);
+                failed++;
             }
         }
 
-        log.info("[ReservationExpireScheduler] 만료 처리 결과 대상={}, 성공={}", targets.size(), success);
+        log.info("[ReservationExpireScheduler] 만료 처리 결과 대상={}, 성공={}, 스킵={}, 실패={}",
+                targets.size(), success, skipped, failed);
     }
 }
