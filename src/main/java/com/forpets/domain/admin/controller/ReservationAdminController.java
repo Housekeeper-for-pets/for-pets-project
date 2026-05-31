@@ -2,7 +2,6 @@ package com.forpets.domain.admin.controller;
 
 import com.forpets.domain.admin.service.ReservationAdminService;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
-import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -29,20 +28,20 @@ public class ReservationAdminController {
     /**
      * 불가피한 취소 요청 승인 → 전액 환불 + CANCELED
      */
-    @PatchMapping("/{reservationId}/cancel-approve")
-    public ResponseEntity<ApiResponse<ReservationResponseDto>> approveCancelRequest(
+    @PostMapping("/{reservationId}/approve")
+    public ResponseEntity<ApiResponse<ReservationResponseDto>> approve(
             @PathVariable Long reservationId) {
         return ResponseEntity.ok(
-                ApiResponse.success(adminReservationService.approveCancelRequest(reservationId)));
+                ApiResponse.success(adminReservationService.approve(reservationId)));
     }
 
     /**
      * 불가피한 취소 요청 거절 → CONFIRMED 복원
      */
-    @PatchMapping("/{reservationId}/cancel-reject")
-    public ResponseEntity<ApiResponse<ReservationResponseDto>> rejectCancelRequest(
+    @PostMapping("/{reservationId}/reject")
+    public ResponseEntity<ApiResponse<ReservationResponseDto>> reject(
             @PathVariable Long reservationId) {
         return ResponseEntity.ok(
-                ApiResponse.success(adminReservationService.rejectCancelRequest(reservationId)));
+                ApiResponse.success(adminReservationService.reject(reservationId)));
     }
 }

@@ -126,7 +126,7 @@ public class SitterService {
         // 캐시 히트 시 DB 조회 0회, 미스 시 SitterCacheService 내부에서만 조회
         SitterResponseDto result = sitterCacheService.getSitterById(sitterId);
         if (result.approvalStatus() != SitterApprovalStatus.APPROVED) {
-            throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);
+            throw new SitterException(SitterErrorCode.SITTER_NOT_FOUND);
         }
         return result;
     }
@@ -149,8 +149,7 @@ public class SitterService {
     @CacheEvict(cacheNames = "sitters", allEntries = true, cacheManager = "longTtlCacheManager")
     public SitterResponseDto update(Long memberId, UpdateSitterRequest request) {
         Member member = memberService.findById(memberId);
-        SitterProfile sitter = findByMemberId(memberId);
-        validateApproved(sitter);
+        SitterProfile sitter = findApprovedByMemberId(memberId);
 
         sitter.update(
                 request.introduction(),
@@ -172,8 +171,7 @@ public class SitterService {
     @CacheEvict(cacheNames = "sitters", allEntries = true, cacheManager = "longTtlCacheManager")
     public SitterResponseDto updateStatus(Long memberId, UpdateSitterStatusRequest request) {
         Member member = memberService.findById(memberId);
-        SitterProfile sitter = findByMemberId(memberId);
-        validateApproved(sitter);
+        SitterProfile sitter = findApprovedByMemberId(memberId);
 
         sitter.changeStatus(request.status());
 
@@ -245,6 +243,18 @@ public class SitterService {
                 && condition.minPrice() > condition.maxPrice()) {
             throw new SitterException(SitterErrorCode.INVALID_SEARCH_CONDITION);
         }
+    }
+
+    public SitterProfile findApprovedByMemberId(Long memberId){
+        SitterProfile sitter = findByMemberId(memberId);
+        validateApproved(sitter);
+        return sitter;
+    }
+
+    public SitterProfile findApprovedById(Long sitterId){
+        SitterProfile sitter = findById(sitterId);
+        validateApproved(sitter);
+        return sitter;
     }
 
     public SitterProfile findByMemberId(Long memberId){

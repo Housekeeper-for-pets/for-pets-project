@@ -15,6 +15,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     List<Reservation> findAllBySitterMemberId(Long sitterMemberId);
 
+    List<Reservation> findAllBySitterMemberIdOrGuardianId(Long sitterMemberId, Long guardianId);
+
     List<Reservation> findAllBySitterProfileIdAndStatus(Long sitterProfileId, ReservationStatus status);
 
     List<Reservation> findAllByStatusAndCreatedAtBefore(ReservationStatus status, LocalDateTime createdAt);

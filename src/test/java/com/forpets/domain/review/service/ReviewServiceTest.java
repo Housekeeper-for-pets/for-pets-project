@@ -1,0 +1,232 @@
+package com.forpets.domain.review.service;
+
+import com.forpets.domain.reservation.entity.Reservation;
+import com.forpets.domain.reservation.entity.ReservationSource;
+import com.forpets.domain.reservation.entity.ReservationStatus;
+import com.forpets.domain.reservation.repository.ReservationRepository;
+import com.forpets.domain.review.dto.CreateReviewRequest;
+import com.forpets.domain.review.dto.ReviewResponse;
+import com.forpets.domain.review.entity.Review;
+import com.forpets.domain.review.exception.ReviewErrorCode;
+import com.forpets.domain.review.exception.ReviewException;
+import com.forpets.domain.review.repository.ReviewRepository;
+import com.forpets.global.common.CareType;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
+
+@ExtendWith(MockitoExtension.class)
+class ReviewServiceTest {
+
+    @InjectMocks
+    private ReviewService reviewService;
+
+    @Mock
+    private ReviewRepository reviewRepository;
+
+    @Mock
+    private ReservationRepository reservationRepository;
+
+    private final Long guardianId = 1L;
+    private final Long sitterMemberId = 2L;
+    private final Long otherMemberId = 3L;
+    private final Long reservationId = 100L;
+    private Reservation completedReservation;
+    private Reservation pendingReservation;
+
+    @BeforeEach
+    void setUp() {
+        completedReservation = createReservation();
+        completedReservation.confirm();
+        completedReservation.complete();
+
+        pendingReservation = createReservation();
+    }
+
+    @Nested
+    @DisplayName("리뷰 작성")
+    class CreateReviewTest {
+
+        @Test
+        @DisplayName("[성공] 보호자가 COMPLETED 예약에 리뷰를 작성한다")
+        void create_review_success() {
+            // given
+            CreateReviewRequest request = new CreateReviewRequest(
+                    reservationId,
+                    "정말 세심하게 돌봐주셔서 만족했습니다.",
+                    5
+            );
+
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(completedReservation));
+            given(reviewRepository.existsByReservationId(reservationId)).willReturn(false);
+            given(reviewRepository.save(any(Review.class))).willAnswer(invocation -> {
+                Review review = invocation.getArgument(0);
+                ReflectionTestUtils.setField(review, "id", 10L);
+                return review;
+            });
+
+            // when
+            ReviewResponse response = reviewService.create(guardianId, request);
+
+            // then
+            assertThat(response.id()).isEqualTo(10L);
+            assertThat(response.reservationId()).isEqualTo(reservationId);
+            assertThat(response.reviewerId()).isEqualTo(guardianId);
+            assertThat(response.revieweeId()).isEqualTo(sitterMemberId);
+            assertThat(response.rating()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("[실패] 예약이 없으면 RESERVATION_NOT_FOUND를 반환한다")
+        void create_review_reservation_not_found() {
+            // given
+            CreateReviewRequest request = validRequest();
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.create(guardianId, request))
+                    .isInstanceOf(ReviewException.class)
+                    .satisfies(ex -> assertThat(((ReviewException) ex).getErrorCode())
+                            .isEqualTo(ReviewErrorCode.RESERVATION_NOT_FOUND));
+            then(reviewRepository).should(never()).existsByReservationId(any());
+        }
+
+        @Test
+        @DisplayName("[실패] COMPLETED 상태가 아니면 RESERVATION_NOT_COMPLETED를 반환한다")
+        void create_review_reservation_not_completed() {
+            // given
+            CreateReviewRequest request = validRequest();
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(pendingReservation));
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.create(guardianId, request))
+                    .isInstanceOf(ReviewException.class)
+                    .satisfies(ex -> assertThat(((ReviewException) ex).getErrorCode())
+                            .isEqualTo(ReviewErrorCode.RESERVATION_NOT_COMPLETED));
+            then(reviewRepository).should(never()).existsByReservationId(any());
+        }
+
+        @Test
+        @DisplayName("[실패] 보호자가 아니면 NOT_RESERVATION_GUARDIAN을 반환한다")
+        void create_review_not_guardian() {
+            // given
+            CreateReviewRequest request = validRequest();
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(completedReservation));
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.create(otherMemberId, request))
+                    .isInstanceOf(ReviewException.class)
+                    .satisfies(ex -> assertThat(((ReviewException) ex).getErrorCode())
+                            .isEqualTo(ReviewErrorCode.NOT_RESERVATION_GUARDIAN));
+            then(reviewRepository).should(never()).existsByReservationId(any());
+        }
+
+        @Test
+        @DisplayName("[실패] 리뷰가 이미 있으면 REVIEW_ALREADY_EXISTS를 반환한다")
+        void create_review_already_exists() {
+            // given
+            CreateReviewRequest request = validRequest();
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(completedReservation));
+            given(reviewRepository.existsByReservationId(reservationId)).willReturn(true);
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.create(guardianId, request))
+                    .isInstanceOf(ReviewException.class)
+                    .satisfies(ex -> assertThat(((ReviewException) ex).getErrorCode())
+                            .isEqualTo(ReviewErrorCode.REVIEW_ALREADY_EXISTS));
+            then(reviewRepository).should(never()).save(any());
+        }
+
+        @Test
+        @DisplayName("[실패] 평점이 범위를 벗어나면 INVALID_RATING을 반환한다")
+        void create_review_invalid_rating() {
+            // given
+            CreateReviewRequest request = new CreateReviewRequest(
+                    reservationId,
+                    "정말 세심하게 돌봐주셔서 만족했습니다.",
+                    6
+            );
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(completedReservation));
+            given(reviewRepository.existsByReservationId(reservationId)).willReturn(false);
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.create(guardianId, request))
+                    .isInstanceOf(ReviewException.class)
+                    .satisfies(ex -> assertThat(((ReviewException) ex).getErrorCode())
+                            .isEqualTo(ReviewErrorCode.INVALID_RATING));
+            then(reviewRepository).should(never()).save(any());
+        }
+
+        @Test
+        @DisplayName("[실패] 리뷰 내용이 공백이면 INVALID_REVIEW_COMMENT를 반환한다")
+        void create_review_invalid_comment() {
+            // given
+            CreateReviewRequest request = new CreateReviewRequest(reservationId, "          ", 5);
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(completedReservation));
+            given(reviewRepository.existsByReservationId(reservationId)).willReturn(false);
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.create(guardianId, request))
+                    .isInstanceOf(ReviewException.class)
+                    .satisfies(ex -> assertThat(((ReviewException) ex).getErrorCode())
+                            .isEqualTo(ReviewErrorCode.INVALID_REVIEW_COMMENT));
+            then(reviewRepository).should(never()).save(any());
+        }
+
+        @Test
+        @DisplayName("[실패] 금칙어가 포함되면 CONTAIN_BAD_WORD를 반환한다")
+        void create_review_contain_bad_word() {
+            // given
+            CreateReviewRequest request = new CreateReviewRequest(
+                    reservationId,
+                    "진짜 씨발 별로였어요 다시는 안맡길거에요",
+                    1
+            );
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(completedReservation));
+            given(reviewRepository.existsByReservationId(reservationId)).willReturn(false);
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.create(guardianId, request))
+                    .isInstanceOf(ReviewException.class)
+                    .satisfies(ex -> assertThat(((ReviewException) ex).getErrorCode())
+                            .isEqualTo(ReviewErrorCode.CONTAIN_BAD_WORD));
+            then(reviewRepository).should(never()).save(any());
+        }
+    }
+
+    private Reservation createReservation() {
+        Reservation reservation = Reservation.builder()
+                .guardianId(guardianId)
+                .sitterMemberId(sitterMemberId)
+                .sitterProfileId(50L)
+                .careType(CareType.VISIT)
+                .source(ReservationSource.CARE_REQUEST)
+                .sourceId(70L)
+                .build();
+        ReflectionTestUtils.setField(reservation, "id", reservationId);
+        return reservation;
+    }
+
+    private CreateReviewRequest validRequest() {
+        return new CreateReviewRequest(
+                reservationId,
+                "정말 세심하게 돌봐주셔서 만족했습니다.",
+                5
+        );
+    }
+}

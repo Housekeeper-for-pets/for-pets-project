@@ -2,11 +2,9 @@ package com.forpets.domain.proposal.service;
 
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
-import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.exception.PostErrorCode;
 import com.forpets.domain.post.exception.PostException;
-import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.service.PostService;
 import com.forpets.domain.proposal.dto.CreateProposalRequest;
 import com.forpets.domain.proposal.dto.ProposalResponseDto;
@@ -22,8 +20,6 @@ import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.service.SitterService;
-import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -59,7 +55,7 @@ public class ProposalService {
         validatePostOpen(post);
         validateNotOwnPost(memberId, post);
 
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         validateNoDuplicate(postId, sitter.getId());
         validateApproved(sitter);
         // 정책 수정으로 CONFIRMED 예약이 있어도 Proposal 은 언제든 받을 수 있음
@@ -109,7 +105,7 @@ public class ProposalService {
     시터 본인의 제안만 조회
      */
     public List<ProposalResponseDto> getMyProposals(Long memberId) {
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
 
         return proposalRepository.findAllBySitterProfileId(sitter.getId()).stream()
                 .map(ProposalResponseDto::from)
@@ -148,13 +144,15 @@ public class ProposalService {
 //        Post post = findPost(proposal.getPostId());
         Post post = postService.findById(proposal.getPostId());
 
-        SitterProfile sitterProfile = sitterService.findById(proposal.getSitterProfileId());
+        SitterProfile sitterProfile = sitterService.findApprovedById(proposal.getSitterProfileId());
         validatePostAuthor(memberId, post);
+        // accept 가능한 예약이 존재하는 시점은 어차피 OPEN 밖에 없다
         validatePostOpen(post);
 
         List<PostPet> postPets = postService.findPetsByPostId(post.getId());
         List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(post.getId());
 
+        // 어차피 한 예약이 확정되고 나면 겹치는 예약들은 withdraw 처리 되니까 이 로직이 실행 될 일은 없음
         if (reservationService.hasConfirmedConflict(sitterProfile.getId(), postTimeSlots)) {
             throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
         }
@@ -197,7 +195,7 @@ public class ProposalService {
         Proposal proposal = findById(proposalId);
         validatePending(proposal);
 
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         validateProposalOwner(sitter.getId(), proposal);
 
         proposal.withdraw();
@@ -210,14 +208,6 @@ public class ProposalService {
     public Proposal findById(Long proposalId) {
         return proposalRepository.findById(proposalId)
                 .orElseThrow(() -> new ProposalException(ProposalErrorCode.PROPOSAL_NOT_FOUND));
-    }
-
-    /*
-    PostService에서 사용 — 공고 수정 시 PENDING/ACCEPTED Proposal 존재 여부 확인
-     */
-    public boolean existsPendingOrAcceptedByPostId(Long postId) {
-        return proposalRepository.existsByPostIdAndStatusIn(
-                postId, List.of(ProposalStatus.PENDING, ProposalStatus.ACCEPTED));
     }
 
     private void validatePostOpen(Post post) {
@@ -270,7 +260,7 @@ public class ProposalService {
 
     private void validateProposalOwner(Long sitterProfileId, Proposal proposal) {
         if (!proposal.isOwnedBySitter(sitterProfileId)) {
-            throw new ProposalException(ProposalErrorCode.NOT_PROPOSAL_PARTY);
+            throw new ProposalException(ProposalErrorCode.NOT_PROPOSAL_OWNER);
         }
     }
 
@@ -284,15 +274,6 @@ public class ProposalService {
                 .filter(p -> !p.getId().equals(acceptedProposalId))
                 .forEach(Proposal::reject);
     }
-
-    /*
-    PostService 와 ProposalService 사이에 순환참조 발생
-    -> ProposalService 에서 PostRepository 를 직접 참조하도록 함
-     */
-//    private Post findPost(Long postId) {
-//        return postRepository.findById(postId)
-//                .orElseThrow(() -> new BusinessException(CommonErrorCode.POST_NOT_FOUND));
-//    }
 
     private void validateApproved(SitterProfile sitter) {
         if (!sitter.isApproved()) throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);

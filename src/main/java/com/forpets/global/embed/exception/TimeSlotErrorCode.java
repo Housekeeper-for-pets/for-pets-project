@@ -13,7 +13,7 @@ public enum TimeSlotErrorCode implements ErrorCode {
     TIME_SLOT_REQUIRED(HttpStatus.BAD_REQUEST, "TIME_SLOT_REQUIRED", "TimeSlot 은 최소 하나 등록이 필요합니다."),
     TIMESLOT_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "TIMESLOT_LIMIT_EXCEEDED", "TimeSlot 은 공고, 요청 당 30개만 가능합니다."),
     PAST_DATE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "PAST_DATE_NOT_ALLOWED", "과거 날짜를 추가할 수 없습니다."),
-    DUPLICATE_TIME_SLOT(HttpStatus.BAD_REQUEST, "DUPLICATE_TIME_SLOT", "TimeSlot 이 중복됩니다."),
+    DUPLICATE_TIME_SLOT(HttpStatus.CONFLICT, "DUPLICATE_TIME_SLOT", "TimeSlot 이 중복됩니다."),
 
     ;
 
