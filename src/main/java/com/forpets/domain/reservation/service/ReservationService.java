@@ -447,13 +447,19 @@ public class ReservationService {
 
         paymentRefundService.refundPaidPayments(reservationId, "시터의 다른 예약 확정으로 인한 자동 취소");
 
-        if (rp.isSitterPaid()){
-            rp.sitterRefund();
-        }
+        // ReservationService.refundIfPaid
+        // -> paymentRefundService.refundPaidPayments
+        // -> paymentRefundService.refund
+        // -> paymentRefundService.restoreReservationPayment 를 호출하는데 이 메서드에서 이미 ReservationPayment 의
+        // XXXPaid 를 다시 Refund 하는 로직이 포함되어있음 == 아래는 중복 로직이므로 주석처리
 
-        if (rp.isGuardianPaid()){
-            rp.guardianRefund();
-        }
+//        if (rp.isSitterPaid()){
+//            rp.sitterRefund();
+//        }
+//
+//        if (rp.isGuardianPaid()){
+//            rp.guardianRefund();
+//        }
     }
 
     /*
