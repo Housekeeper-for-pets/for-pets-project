@@ -4,15 +4,26 @@ import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.review.dto.CreateReviewRequest;
+import com.forpets.domain.review.dto.ReviewPageResponse;
 import com.forpets.domain.review.dto.ReviewResponse;
 import com.forpets.domain.review.entity.Review;
 import com.forpets.domain.review.exception.ReviewErrorCode;
 import com.forpets.domain.review.exception.ReviewException;
 import com.forpets.domain.review.repository.ReviewRepository;
+import com.forpets.domain.sitter.entity.SitterProfile;
+import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
+import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.vane.badwordfiltering.BadWordFiltering;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +37,7 @@ public class ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final ReservationRepository reservationRepository;
+    private final SitterProfileRepository sitterProfileRepository;
     private final BadWordFiltering badWordFiltering = new BadWordFiltering();
 
     @Transactional
@@ -60,6 +72,28 @@ public class ReviewService {
         validateNotDeleted(review);
 
         review.delete();
+    }
+
+    public ReviewPageResponse getSitterReviews(Long sitterId, int page, int size, String sort) {
+        validatePageRequest(page, size);
+        validateSortField(sort);
+
+        SitterProfile sitterProfile = sitterProfileRepository.findById(sitterId)
+                .orElseThrow(() -> new SitterException(SitterErrorCode.SITTER_NOT_FOUND));
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sort));
+        Page<Review> reviewPage = reviewRepository.findAllByRevieweeIdAndDeletedFalse(
+                sitterProfile.getMemberId(), pageable);
+
+        return ReviewPageResponse.of(
+                reviewPage.getContent().stream()
+                        .map(ReviewResponse::from)
+                        .toList(),
+                reviewPage.getTotalElements(),
+                reviewPage.getTotalPages(),
+                reviewPage.getNumber(),
+                reviewPage.getSize()
+        );
     }
 
     private void validateCompleted(Reservation reservation) {
@@ -116,6 +150,25 @@ public class ReviewService {
     private void validateNotDeleted(Review review) {
         if (review.isDeleted()) {
             throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_DELETED);
+        }
+    }
+
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "createdAt", "rating"
+    );
+
+    private void validateSortField(String sort) {
+        if (!ALLOWED_SORT_FIELDS.contains(sort)) {
+            throw new SitterException(SitterErrorCode.INVALID_SORT_FIELD);
+        }
+    }
+
+    private void validatePageRequest(int page, int size) {
+        if (page < 0) {
+            throw new SitterException(SitterErrorCode.INVALID_PAGE_REQUEST);
+        }
+        if (size < 1 || size > 50) {
+            throw new SitterException(SitterErrorCode.INVALID_PAGE_REQUEST);
         }
     }
 }

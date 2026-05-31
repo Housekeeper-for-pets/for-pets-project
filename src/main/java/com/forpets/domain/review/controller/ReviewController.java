@@ -1,6 +1,7 @@
 package com.forpets.domain.review.controller;
 
 import com.forpets.domain.review.dto.CreateReviewRequest;
+import com.forpets.domain.review.dto.ReviewPageResponse;
 import com.forpets.domain.review.dto.ReviewResponse;
 import com.forpets.domain.review.service.ReviewService;
 import com.forpets.global.common.ApiResponse;
@@ -15,6 +16,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -38,5 +41,15 @@ public class ReviewController {
             @PathVariable Long reviewId) {
         reviewService.delete(currentMember.id(), reviewId);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @GetMapping("/sitters/{sitterId}")
+    public ResponseEntity<ApiResponse<ReviewPageResponse>> getSitterReviews(
+            @PathVariable Long sitterId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sort) {
+        return ResponseEntity.ok(ApiResponse.success(
+                reviewService.getSitterReviews(sitterId, page, size, sort)));
     }
 }
