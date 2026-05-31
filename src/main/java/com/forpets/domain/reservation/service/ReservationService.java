@@ -262,7 +262,7 @@ public class ReservationService {
                 log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
 
                 paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
-                paymentRefundService.expireNonPaidPayments(reservationId);
+                paymentRefundService.cancelNonPaidPayments(reservationId, request.cancelReason());
 
                 // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
                 handleCancellation(reservation);
@@ -287,7 +287,7 @@ public class ReservationService {
                     reservationId, canceledBy, request.cancelReason());
 
             paymentRefundService.refundWithPenalty(reservationId, request.cancelReason(), canceledBy);
-            paymentRefundService.expireNonPaidPayments(reservationId);
+            paymentRefundService.cancelNonPaidPayments(reservationId, request.cancelReason());
             handleCancellation(reservation);
             return toResponseDto(reservation);
         });

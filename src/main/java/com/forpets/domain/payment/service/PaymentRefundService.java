@@ -150,7 +150,7 @@ public class PaymentRefundService {
 
     /*
      * 창을 열기만 하고 결제하진 않은 건(READY/PENDING)을  EXPIRED 처리
-     * refundPaidPayments()랑 같이 호출하기
+     * 예약 만료(Expire) 흐름에서 호출 — 시간 초과로 무효화되는 케이스
      */
     @Transactional
     public void expireNonPaidPayments(Long reservationId) {
@@ -162,6 +162,24 @@ public class PaymentRefundService {
             restoreCouponIfUsed(payment);
             log.info("[PaymentRefundService] 미결제 Payment 만료 처리 paymentId={}, reservationId={}, 기존상태={}",
                     payment.getId(), payment.getReservationId(), payment.getStatus());
+        });
+    }
+
+    /*
+     * 창을 열기만 하고 결제하진 않은 건(READY/PENDING)을 CANCELED 처리
+     * 예약 취소(Cancel) 흐름에서 호출 — 사용자 의도로 무효화되는 케이스
+     * EXPIRED 와 의미상 분리해서 통계/추적 시 혼동을 방지한다
+     */
+    @Transactional
+    public void cancelNonPaidPayments(Long reservationId, String reason) {
+        List<Payment> nonPaidPayments = paymentRepository.findAllByReservationIdAndStatusIn(
+                reservationId, List.of(PaymentStatus.READY, PaymentStatus.PENDING));
+
+        nonPaidPayments.forEach(payment -> {
+            payment.cancel(reason, null);
+            restoreCouponIfUsed(payment);
+            log.info("[PaymentRefundService] 미결제 Payment 취소 처리 paymentId={}, reservationId={}, 사유={}",
+                    payment.getId(), payment.getReservationId(), reason);
         });
     }
 
