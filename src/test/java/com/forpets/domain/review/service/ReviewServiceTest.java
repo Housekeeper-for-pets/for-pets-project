@@ -5,22 +5,33 @@ import com.forpets.domain.reservation.entity.ReservationSource;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.review.dto.CreateReviewRequest;
+import com.forpets.domain.review.dto.ReviewPageResponse;
 import com.forpets.domain.review.dto.ReviewResponse;
 import com.forpets.domain.review.entity.Review;
 import com.forpets.domain.review.exception.ReviewErrorCode;
 import com.forpets.domain.review.exception.ReviewException;
 import com.forpets.domain.review.repository.ReviewRepository;
+import com.forpets.domain.sitter.entity.PossiblePetSize;
+import com.forpets.domain.sitter.entity.PossiblePetType;
+import com.forpets.domain.sitter.entity.SitterProfile;
+import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
+import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.global.common.CareType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,10 +53,14 @@ class ReviewServiceTest {
     @Mock
     private ReservationRepository reservationRepository;
 
+    @Mock
+    private SitterProfileRepository sitterProfileRepository;
+
     private final Long guardianId = 1L;
     private final Long sitterMemberId = 2L;
     private final Long otherMemberId = 3L;
     private final Long reservationId = 100L;
+    private final Long sitterId = 50L;
     private Reservation completedReservation;
     private Reservation pendingReservation;
 
@@ -276,6 +291,95 @@ class ReviewServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("시터 리뷰 목록 조회")
+    class GetSitterReviewsTest {
+
+        @Test
+        @DisplayName("[성공] 시터 프로필 ID로 삭제되지 않은 리뷰 목록을 조회한다")
+        void get_sitter_reviews_success() {
+            // given
+            SitterProfile sitterProfile = createSitterProfile();
+            Review review = createReview(10L, guardianId);
+
+            given(sitterProfileRepository.findById(sitterId)).willReturn(Optional.of(sitterProfile));
+            given(reviewRepository.findAllByRevieweeIdAndDeletedFalse(any(), any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of(review)));
+
+            // when
+            ReviewPageResponse response = reviewService.getSitterReviews(sitterId, 0, 10, "createdAt");
+
+            // then
+            assertThat(response.content()).hasSize(1);
+            assertThat(response.content().get(0).revieweeId()).isEqualTo(sitterMemberId);
+            assertThat(response.totalElements()).isEqualTo(1);
+            assertThat(response.currentPage()).isEqualTo(0);
+            assertThat(response.size()).isEqualTo(1);
+
+            ArgumentCaptor<Long> revieweeIdCaptor = ArgumentCaptor.forClass(Long.class);
+            then(reviewRepository).should()
+                    .findAllByRevieweeIdAndDeletedFalse(revieweeIdCaptor.capture(), any(Pageable.class));
+            assertThat(revieweeIdCaptor.getValue()).isEqualTo(sitterMemberId);
+        }
+
+        @Test
+        @DisplayName("[성공] 리뷰가 없으면 빈 페이지를 반환한다")
+        void get_sitter_reviews_empty() {
+            // given
+            SitterProfile sitterProfile = createSitterProfile();
+            given(sitterProfileRepository.findById(sitterId)).willReturn(Optional.of(sitterProfile));
+            given(reviewRepository.findAllByRevieweeIdAndDeletedFalse(any(), any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of()));
+
+            // when
+            ReviewPageResponse response = reviewService.getSitterReviews(sitterId, 0, 10, "createdAt");
+
+            // then
+            assertThat(response.content()).isEmpty();
+            assertThat(response.totalElements()).isZero();
+        }
+
+        @Test
+        @DisplayName("[실패] 시터 프로필이 없으면 SITTER_NOT_FOUND를 반환한다")
+        void get_sitter_reviews_sitter_not_found() {
+            // given
+            given(sitterProfileRepository.findById(sitterId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, 0, 10, "createdAt"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+        }
+
+        @Test
+        @DisplayName("[실패] page가 음수이면 INVALID_PAGE_REQUEST를 반환한다")
+        void get_sitter_reviews_invalid_page() {
+            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, -1, 10, "createdAt"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+        }
+
+        @Test
+        @DisplayName("[실패] size가 허용 범위를 벗어나면 INVALID_PAGE_REQUEST를 반환한다")
+        void get_sitter_reviews_invalid_size() {
+            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, 0, 51, "createdAt"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+        }
+
+        @Test
+        @DisplayName("[실패] sort가 허용되지 않은 필드이면 INVALID_SORT_FIELD를 반환한다")
+        void get_sitter_reviews_invalid_sort() {
+            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, 0, 10, "updatedAt"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_SORT_FIELD));
+        }
+    }
+
     private Reservation createReservation() {
         Reservation reservation = Reservation.builder()
                 .guardianId(guardianId)
@@ -307,5 +411,18 @@ class ReviewServiceTest {
                 .build();
         ReflectionTestUtils.setField(review, "id", reviewId);
         return review;
+    }
+
+    private SitterProfile createSitterProfile() {
+        SitterProfile sitterProfile = SitterProfile.builder()
+                .memberId(sitterMemberId)
+                .introduction("반려동물을 세심하게 돌보는 시터입니다.")
+                .experienceYears(3)
+                .possiblePetType(PossiblePetType.ALL)
+                .possiblePetSize(PossiblePetSize.ALL)
+                .pricePerHour(15000)
+                .build();
+        ReflectionTestUtils.setField(sitterProfile, "id", sitterId);
+        return sitterProfile;
     }
 }
