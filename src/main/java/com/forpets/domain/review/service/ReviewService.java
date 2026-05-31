@@ -51,6 +51,17 @@ public class ReviewService {
         return ReviewResponse.from(review);
     }
 
+    @Transactional
+    public void delete(Long memberId, Long reviewId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ReviewException(ReviewErrorCode.REVIEW_NOT_FOUND));
+
+        validateAuthor(memberId, review);
+        validateNotDeleted(review);
+
+        review.delete();
+    }
+
     private void validateCompleted(Reservation reservation) {
         if (reservation.getStatus() != ReservationStatus.COMPLETED) {
             throw new ReviewException(ReviewErrorCode.RESERVATION_NOT_COMPLETED);
@@ -93,6 +104,18 @@ public class ReviewService {
     private void validateBadWord(String reviewComment) {
         if (badWordFiltering.check(reviewComment)) {
             throw new ReviewException(ReviewErrorCode.CONTAIN_BAD_WORD);
+        }
+    }
+
+    private void validateAuthor(Long memberId, Review review) {
+        if (!review.isAuthor(memberId)) {
+            throw new ReviewException(ReviewErrorCode.NOT_REVIEW_AUTHOR);
+        }
+    }
+
+    private void validateNotDeleted(Review review) {
+        if (review.isDeleted()) {
+            throw new ReviewException(ReviewErrorCode.REVIEW_ALREADY_DELETED);
         }
     }
 }

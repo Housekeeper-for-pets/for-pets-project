@@ -57,4 +57,8 @@ public class Review extends BaseEntity {
     public void delete() {
         this.deleted = true;
     }
+
+    public boolean isAuthor(Long memberId) {
+        return this.reviewerId.equals(memberId);
+    }
 }
