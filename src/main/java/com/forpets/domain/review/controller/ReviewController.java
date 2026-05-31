@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,5 +30,13 @@ public class ReviewController {
             @RequestBody @Valid CreateReviewRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(reviewService.create(currentMember.id(), request)));
+    }
+
+    @DeleteMapping("/{reviewId}")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @LoginUser CurrentMember currentMember,
+            @PathVariable Long reviewId) {
+        reviewService.delete(currentMember.id(), reviewId);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

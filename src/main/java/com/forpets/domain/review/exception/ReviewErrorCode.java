@@ -15,7 +15,10 @@ public enum ReviewErrorCode implements ErrorCode {
     REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "REVIEW_ALREADY_EXISTS", "이미 리뷰가 존재합니다."),
     INVALID_RATING(HttpStatus.BAD_REQUEST, "INVALID_RATING", "평점은 1점 이상 5점 이하로 입력해주세요."),
     INVALID_REVIEW_COMMENT(HttpStatus.BAD_REQUEST, "INVALID_REVIEW_COMMENT", "리뷰 내용은 필수이며 10자 이상 500자 이하로 입력해주세요."),
-    CONTAIN_BAD_WORD(HttpStatus.BAD_REQUEST, "CONTAIN_BAD_WORD", "리뷰 내용에 금칙어가 포함되어 있습니다.");
+    CONTAIN_BAD_WORD(HttpStatus.BAD_REQUEST, "CONTAIN_BAD_WORD", "리뷰 내용에 금칙어가 포함되어 있습니다."),
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_NOT_FOUND", "리뷰를 찾을 수 없습니다."),
+    NOT_REVIEW_AUTHOR(HttpStatus.FORBIDDEN, "NOT_REVIEW_AUTHOR", "리뷰 작성자만 삭제할 수 있습니다."),
+    REVIEW_ALREADY_DELETED(HttpStatus.BAD_REQUEST, "REVIEW_ALREADY_DELETED", "이미 삭제된 리뷰입니다.");
 
     private final HttpStatus status;
     private final String code;

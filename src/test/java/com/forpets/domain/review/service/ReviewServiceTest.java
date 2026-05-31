@@ -209,6 +209,73 @@ class ReviewServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("리뷰 삭제")
+    class DeleteReviewTest {
+
+        @Test
+        @DisplayName("[성공] 작성자가 리뷰를 soft delete로 삭제한다")
+        void delete_review_success() {
+            // given
+            Long reviewId = 10L;
+            Review review = createReview(reviewId, guardianId);
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+
+            // when
+            reviewService.delete(guardianId, reviewId);
+
+            // then
+            assertThat(review.isDeleted()).isTrue();
+            then(reviewRepository).should(never()).save(any());
+        }
+
+        @Test
+        @DisplayName("[실패] 리뷰가 없으면 REVIEW_NOT_FOUND를 반환한다")
+        void delete_review_not_found() {
+            // given
+            Long reviewId = 10L;
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.delete(guardianId, reviewId))
+                    .isInstanceOf(ReviewException.class)
+                    .satisfies(ex -> assertThat(((ReviewException) ex).getErrorCode())
+                            .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+        }
+
+        @Test
+        @DisplayName("[실패] 작성자가 아니면 NOT_REVIEW_AUTHOR를 반환한다")
+        void delete_review_not_author() {
+            // given
+            Long reviewId = 10L;
+            Review review = createReview(reviewId, guardianId);
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.delete(otherMemberId, reviewId))
+                    .isInstanceOf(ReviewException.class)
+                    .satisfies(ex -> assertThat(((ReviewException) ex).getErrorCode())
+                            .isEqualTo(ReviewErrorCode.NOT_REVIEW_AUTHOR));
+            assertThat(review.isDeleted()).isFalse();
+        }
+
+        @Test
+        @DisplayName("[실패] 이미 삭제된 리뷰이면 REVIEW_ALREADY_DELETED를 반환한다")
+        void delete_review_already_deleted() {
+            // given
+            Long reviewId = 10L;
+            Review review = createReview(reviewId, guardianId);
+            review.delete();
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.delete(guardianId, reviewId))
+                    .isInstanceOf(ReviewException.class)
+                    .satisfies(ex -> assertThat(((ReviewException) ex).getErrorCode())
+                            .isEqualTo(ReviewErrorCode.REVIEW_ALREADY_DELETED));
+        }
+    }
+
     private Reservation createReservation() {
         Reservation reservation = Reservation.builder()
                 .guardianId(guardianId)
@@ -228,5 +295,17 @@ class ReviewServiceTest {
                 "정말 세심하게 돌봐주셔서 만족했습니다.",
                 5
         );
+    }
+
+    private Review createReview(Long reviewId, Long reviewerId) {
+        Review review = Review.builder()
+                .reservationId(reservationId)
+                .reviewerId(reviewerId)
+                .revieweeId(sitterMemberId)
+                .reviewComment("정말 세심하게 돌봐주셔서 만족했습니다.")
+                .rating(5)
+                .build();
+        ReflectionTestUtils.setField(review, "id", reviewId);
+        return review;
     }
 }
