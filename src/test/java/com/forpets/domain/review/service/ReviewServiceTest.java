@@ -307,7 +307,7 @@ class ReviewServiceTest {
                     .willReturn(new PageImpl<>(List.of(review)));
 
             // when
-            ReviewPageResponse response = reviewService.getSitterReviews(sitterId, 0, 10, "createdAt");
+            ReviewPageResponse response = reviewService.getSitterReviews(sitterId, 0, 10, "createdAt", "desc");
 
             // then
             assertThat(response.content()).hasSize(1);
@@ -332,7 +332,7 @@ class ReviewServiceTest {
                     .willReturn(new PageImpl<>(List.of()));
 
             // when
-            ReviewPageResponse response = reviewService.getSitterReviews(sitterId, 0, 10, "createdAt");
+            ReviewPageResponse response = reviewService.getSitterReviews(sitterId, 0, 10, "createdAt", "desc");
 
             // then
             assertThat(response.content()).isEmpty();
@@ -346,7 +346,7 @@ class ReviewServiceTest {
             given(sitterProfileRepository.findById(sitterId)).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, 0, 10, "createdAt"))
+            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, 0, 10, "createdAt", "desc"))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
                             .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
@@ -355,7 +355,7 @@ class ReviewServiceTest {
         @Test
         @DisplayName("[실패] page가 음수이면 INVALID_PAGE_REQUEST를 반환한다")
         void get_sitter_reviews_invalid_page() {
-            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, -1, 10, "createdAt"))
+            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, -1, 10, "createdAt", "desc"))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
                             .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
@@ -364,7 +364,7 @@ class ReviewServiceTest {
         @Test
         @DisplayName("[실패] size가 허용 범위를 벗어나면 INVALID_PAGE_REQUEST를 반환한다")
         void get_sitter_reviews_invalid_size() {
-            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, 0, 51, "createdAt"))
+            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, 0, 51, "createdAt", "desc"))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
                             .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
@@ -373,7 +373,16 @@ class ReviewServiceTest {
         @Test
         @DisplayName("[실패] sort가 허용되지 않은 필드이면 INVALID_SORT_FIELD를 반환한다")
         void get_sitter_reviews_invalid_sort() {
-            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, 0, 10, "updatedAt"))
+            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, 0, 10, "updatedAt", "desc"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_SORT_FIELD));
+        }
+
+        @Test
+        @DisplayName("[실패] direction이 asc/desc가 아니면 INVALID_SORT_FIELD를 반환한다")
+        void get_sitter_reviews_invalid_direction() {
+            assertThatThrownBy(() -> reviewService.getSitterReviews(sitterId, 0, 10, "rating", "random"))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
                             .isEqualTo(SitterErrorCode.INVALID_SORT_FIELD));
