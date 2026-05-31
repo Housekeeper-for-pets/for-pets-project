@@ -74,14 +74,17 @@ public class ReviewService {
         review.delete();
     }
 
-    public ReviewPageResponse getSitterReviews(Long sitterId, int page, int size, String sort) {
+    public ReviewPageResponse getSitterReviews(Long sitterId, int page, int size, String sort, String direction) {
         validatePageRequest(page, size);
         validateSortField(sort);
+        validateSortDirection(direction);
 
         SitterProfile sitterProfile = sitterProfileRepository.findById(sitterId)
                 .orElseThrow(() -> new SitterException(SitterErrorCode.SITTER_NOT_FOUND));
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sort));
+        Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction)
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
         Page<Review> reviewPage = reviewRepository.findAllByRevieweeIdAndDeletedFalse(
                 sitterProfile.getMemberId(), pageable);
 
@@ -157,8 +160,18 @@ public class ReviewService {
             "createdAt", "rating"
     );
 
+    private static final Set<String> ALLOWED_SORT_DIRECTIONS = Set.of(
+            "asc", "desc"
+    );
+
     private void validateSortField(String sort) {
         if (!ALLOWED_SORT_FIELDS.contains(sort)) {
+            throw new SitterException(SitterErrorCode.INVALID_SORT_FIELD);
+        }
+    }
+
+    private void validateSortDirection(String direction) {
+        if (!ALLOWED_SORT_DIRECTIONS.contains(direction.toLowerCase())) {
             throw new SitterException(SitterErrorCode.INVALID_SORT_FIELD);
         }
     }

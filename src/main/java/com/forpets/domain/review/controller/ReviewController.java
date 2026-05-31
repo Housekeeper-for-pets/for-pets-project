@@ -48,8 +48,9 @@ public class ReviewController {
             @PathVariable Long sitterId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sort) {
+            @RequestParam(defaultValue = "createdAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction) {
         return ResponseEntity.ok(ApiResponse.success(
-                reviewService.getSitterReviews(sitterId, page, size, sort)));
+                reviewService.getSitterReviews(sitterId, page, size, sort, direction)));
     }
 }
