@@ -37,11 +37,11 @@ class ReservationLockServiceTest {
         // given
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.setIfAbsent(
-                eq("lock:reservation:confirm:" + sitterProfileId),
+                eq("lock:sitter:" + sitterProfileId),
                 any(String.class),
                 any(Duration.class)))
                 .willReturn(true);
-        given(valueOperations.get(eq("lock:reservation:confirm:" + sitterProfileId)))
+        given(valueOperations.get(eq("lock:sitter:" + sitterProfileId)))
                 .willReturn(null); // lockValue 불일치 → delete 호출 안 됨 (정상 동작에선 일치하지만 Mock이라 상관없음)
 
         AtomicBoolean taskExecuted = new AtomicBoolean(false);
@@ -63,7 +63,7 @@ class ReservationLockServiceTest {
     @DisplayName("[성공] 락 획득 후 정상적으로 락 해제 확인")
     void lock_test_02() {
         // given
-        String lockKey = "lock:reservation:confirm:" + sitterProfileId;
+        String lockKey = "lock:sitter:" + sitterProfileId;
 
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.setIfAbsent(eq(lockKey), any(String.class), any(Duration.class)))
@@ -87,7 +87,7 @@ class ReservationLockServiceTest {
         // given
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.setIfAbsent(
-                eq("lock:reservation:confirm:" + sitterProfileId),
+                eq("lock:sitter:" + sitterProfileId),
                 any(String.class),
                 any(Duration.class)))
                 .willReturn(false);
@@ -104,7 +104,7 @@ class ReservationLockServiceTest {
     @DisplayName("[실패] task 실행 중 예외 발생해도 락은 해제됨")
     void lock_test_04() {
         // given
-        String lockKey = "lock:reservation:confirm:" + sitterProfileId;
+        String lockKey = "lock:sitter:" + sitterProfileId;
 
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.setIfAbsent(eq(lockKey), any(String.class), any(Duration.class)))
@@ -128,7 +128,7 @@ class ReservationLockServiceTest {
         // given
         given(stringRedisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.setIfAbsent(
-                eq("lock:reservation:confirm:" + sitterProfileId),
+                eq("lock:sitter:" + sitterProfileId),
                 any(String.class),
                 any(Duration.class)))
                 .willReturn(null); // Redis 연결 문제 등으로 null 반환
