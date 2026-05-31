@@ -126,6 +126,8 @@ services:
       BASE_URL: http://app:8080
       K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
       K6_PROMETHEUS_RW_TREND_STATS: avg,p(95),p(99),min,max
+      K6_PROMETHEUS_RW_FLUSH_PERIOD: 10s       # 추가
+      K6_PROMETHEUS_RW_HTTP_TIMEOUT: 30s       # 추가
     depends_on:
       - app
       - prometheus
