@@ -109,8 +109,8 @@ class AiReviewSummaryServiceTest {
     }
 
     @Test
-    @DisplayName("[실패] AI가 입력에 없는 reviewId를 반환하면 저장하지 않는다")
-    void generate_review_summary_invalid_used_review_ids() {
+    @DisplayName("[성공] AI가 입력에 없는 reviewId를 반환하면 입력 리뷰 ID로 보정한다")
+    void generate_review_summary_normalize_invalid_used_review_ids() {
         // given
         List<ReviewSource> reviews = reviews();
         AiPromptTemplate promptTemplate = promptTemplate(PromptCategory.SMALL_DOG);
@@ -123,14 +123,25 @@ class AiReviewSummaryServiceTest {
         given(aiReviewSummaryClient.generate(anyString()))
                 .willReturn(new AiReviewSummaryClient.AiReviewSummaryResult(
                         response(List.of(9999L)), "stub-review-summary"));
+        given(summaryRepository.findBySitterId(sitterId)).willReturn(Optional.empty());
+        given(summaryRepository.save(any(SitterReviewSummary.class)))
+                .willAnswer(invocation -> {
+                    SitterReviewSummary saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", 10L);
+                    return saved;
+                });
 
-        // when & then
-        assertThatThrownBy(() -> aiReviewSummaryService.generateReviewSummary(sitterId))
-                .isInstanceOf(AiReviewSummaryException.class)
-                .satisfies(ex -> assertThat(((AiReviewSummaryException) ex).getErrorCode())
-                        .isEqualTo(AiReviewSummaryErrorCode.INVALID_AI_RESPONSE));
+        // when
+        aiReviewSummaryService.generateReviewSummary(sitterId);
 
-        then(summaryRepository).should(never()).save(any());
+        // then
+        then(summaryReviewRepository).should().saveAll(argThat(usedReviews -> {
+            List<SitterReviewSummaryReview> savedReviews = (List<SitterReviewSummaryReview>) usedReviews;
+            List<Long> savedReviewIds = savedReviews.stream()
+                    .map(SitterReviewSummaryReview::getReviewId)
+                    .toList();
+            return savedReviewIds.containsAll(List.of(1001L, 1002L, 1003L));
+        }));
     }
 
     private List<ReviewSource> reviews() {

@@ -55,11 +55,11 @@ public class AiReviewSummaryService {
 
         // AI 응답은 저장 전에 스키마와 근거 리뷰 ID를 검증해 환각성 데이터를 막는다.
         AiReviewSummaryClient.AiReviewSummaryResult result = aiReviewSummaryClient.generate(prompt);
-        validateAiResponse(result.response(), reviews);
+        SitterReviewSummaryResponse response = validateAndNormalizeAiResponse(result.response(), reviews);
 
-        SitterReviewSummary generated = toEntity(sitterId, result, promptTemplate);
+        SitterReviewSummary generated = toEntity(sitterId, response, result.model(), promptTemplate);
         SitterReviewSummary saved = saveOrReplace(sitterId, generated);
-        replaceUsedReviews(saved.getId(), result.response().usedReviewIds());
+        replaceUsedReviews(saved.getId(), response.usedReviewIds());
 
         return SitterReviewSummaryDto.from(saved, objectMapper);
     }
@@ -106,7 +106,7 @@ public class AiReviewSummaryService {
         return template.replace("{reviews}", toJson(reviews));
     }
 
-    private void validateAiResponse(SitterReviewSummaryResponse response, List<ReviewSource> reviews) {
+    private SitterReviewSummaryResponse validateAndNormalizeAiResponse(SitterReviewSummaryResponse response, List<ReviewSource> reviews) {
         if (!StringUtils.hasText(response.summary())
                 || response.sentiment() == null
                 || response.confidenceScore() == null
@@ -117,17 +117,36 @@ public class AiReviewSummaryService {
             throw new AiReviewSummaryException(AiReviewSummaryErrorCode.INVALID_AI_RESPONSE);
         }
 
-        Set<Long> sourceReviewIds = reviews.stream()
+        List<Long> sourceReviewIds = reviews.stream()
                 .map(ReviewSource::reviewId)
-                .collect(Collectors.toSet());
+                .toList();
+        Set<Long> sourceReviewIdSet = Set.copyOf(sourceReviewIds);
 
-        if (!sourceReviewIds.containsAll(response.usedReviewIds())) {
-            throw new AiReviewSummaryException(AiReviewSummaryErrorCode.INVALID_AI_RESPONSE, "요약에 사용된 리뷰 ID가 입력 리뷰 목록과 일치하지 않습니다.");
-        }
+        List<Long> normalizedUsedReviewIds = response.usedReviewIds().stream()
+                .filter(sourceReviewIdSet::contains)
+                .distinct()
+                .toList();
 
         if (containsForbiddenExpression(response.summary())) {
             throw new AiReviewSummaryException(AiReviewSummaryErrorCode.INVALID_AI_RESPONSE, "근거 없는 의료/자격 표현이 포함되어 있습니다.");
         }
+
+        if (normalizedUsedReviewIds.size() == response.usedReviewIds().size()) {
+            return response;
+        }
+
+        // 모델이 reviewId를 잘못 생성한 경우에도 요약 근거는 입력 리뷰 목록으로 제한한다.
+        return new SitterReviewSummaryResponse(
+                response.summary(),
+                response.strengths(),
+                response.cautions(),
+                response.recommendedFor(),
+                response.keywords(),
+                response.sentiment(),
+                response.confidenceScore(),
+                response.reviewCount(),
+                sourceReviewIds
+        );
     }
 
     private boolean containsForbiddenExpression(String value) {
@@ -137,9 +156,8 @@ public class AiReviewSummaryService {
                 || value.contains("자격증 보유");
     }
 
-    private SitterReviewSummary toEntity(Long sitterId, AiReviewSummaryClient.AiReviewSummaryResult result,
+    private SitterReviewSummary toEntity(Long sitterId, SitterReviewSummaryResponse response, String model,
                                          AiPromptTemplate promptTemplate) {
-        SitterReviewSummaryResponse response = result.response();
         return SitterReviewSummary.builder()
                 .sitterId(sitterId)
                 .summary(response.summary())
@@ -151,7 +169,7 @@ public class AiReviewSummaryService {
                 .confidenceScore(response.confidenceScore())
                 .reviewCount(response.reviewCount())
                 .aiGenerated(true)
-                .model(result.model())
+                .model(model)
                 .promptVersion(promptTemplate.getPromptVersion())
                 .summaryStatus(SummaryStatus.FRESH)
                 .build();
