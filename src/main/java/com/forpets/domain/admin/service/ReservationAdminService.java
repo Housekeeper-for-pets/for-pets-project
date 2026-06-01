@@ -41,7 +41,7 @@ public class ReservationAdminService {
 
     // 요청 승인
     @Transactional
-    public ReservationResponseDto approveCancelRequest(Long reservationId) {
+    public ReservationResponseDto approve(Long reservationId) {
         Reservation reservation = findById(reservationId);
         validateCancelRequested(reservation);
 
@@ -60,7 +60,7 @@ public class ReservationAdminService {
 
     // 요청 거절
     @Transactional
-    public ReservationResponseDto rejectCancelRequest(Long reservationId) {
+    public ReservationResponseDto reject(Long reservationId) {
         Reservation reservation = findById(reservationId);
         validateCancelRequested(reservation);
 

@@ -10,19 +10,14 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const STRATEGY = __ENV.STRATEGY || 'pessimistic';
 const COUPON_ID = __ENV.COUPON_ID || '1';
 
-// 임계값 탐색에서 찾은 전략별 안전한 VU로 설정
-// ex) pessimistic이 VU 300까지 안전했다면 FIXED_VUS=300
-const FIXED_VUS = Number(__ENV.FIXED_VUS || 300);
-
-// 정합성 검증은 쿠폰 수량만큼만 요청 (100개 쿠폰 → 300명이 경쟁)
-// 쿠폰 수량보다 많아야 경쟁 상황이 만들어짐
-const REQUEST_COUNT = Number(__ENV.REQUEST_COUNT || 300);
-
 const PASSWORD = __ENV.TEST_USER_PASSWORD || 'test1234!';
 const TEST_USER_EMAIL_PREFIX = __ENV.TEST_USER_EMAIL_PREFIX || 'k6-user-';
 const TEST_USER_EMAIL_DOMAIN = __ENV.TEST_USER_EMAIL_DOMAIN || 'test.com';
 const TEST_USER_START_INDEX = Number(__ENV.TEST_USER_START_INDEX || 1);
 const RUN_ID = __ENV.RUN_ID || `${Date.now()}`;
+
+// 임계값 탐색은 최대 VU 500 + 여유분
+const TOKEN_COUNT = Number(__ENV.TOKEN_COUNT || 600);
 
 const endpointMap = {
     'no-lock':     `/api/test/coupons/${COUPON_ID}/issue/no-lock`,
@@ -36,35 +31,41 @@ if (!endpointMap[STRATEGY]) {
 }
 
 const TARGET_URL = `${BASE_URL}${endpointMap[STRATEGY]}`;
-const SUMMARY_URL = `${BASE_URL}/api/test/coupons/${COUPON_ID}/summary`;
 
 // =============================================
-// 시나리오: fixed VU (정합성 검증)
-// 각 VU가 정확히 1번씩만 요청 → 총 REQUEST_COUNT건 요청
+// 시나리오: ramp-up (임계값 탐색)
 // =============================================
 export const options = {
     setupTimeout: '15m',
 
     scenarios: {
-        coupon_concurrency: {
-            executor: 'per-vu-iterations',
-            vus: FIXED_VUS,
-            iterations: 1,
-            maxDuration: '5m',
+        coupon_threshold: {
+            executor: 'ramping-vus',
+            startVUs: 0,
+            stages: [
+                { duration: '30s', target: 50  },  // 웜업
+                { duration: '1m',  target: 100 },  // 저부하 — 쿠폰 수량과 동일
+                { duration: '1m',  target: 200 },  // 중부하 — 쿠폰 수량의 2배
+                { duration: '1m',  target: 300 },  // 고부하 — 쿠폰 수량의 3배 (목표 구간)
+                { duration: '1m',  target: 500 },  // 최대   — 한계 탐색
+                { duration: '30s', target: 0   },  // 복구
+            ],
+            gracefulRampDown: '30s',
         },
     },
 
     thresholds: {
-        // 정합성 검증 핵심: 500 에러 0건
-        coupon_500_errors:        ['count==0'],
-        coupon_unexpected_errors: ['count==0'],
+        coupon_500_errors: ['count==0'],
+        coupon_unexpected_errors: [
+            { threshold: 'count<100', abortOnFail: true, delayAbortEval: '30s' }
+        ],
     },
 
     tags: {
         strategy: STRATEGY,
         coupon_id: String(COUPON_ID),
         run_id: RUN_ID,
-        test_type: 'concurrency',
+        test_type: 'threshold',
     },
 };
 
@@ -98,18 +99,17 @@ const couponErrorRate = new Rate('coupon_error_rate');
 // Setup: 토큰 사전 발급
 // =============================================
 export function setup() {
-    console.log('========== [concurrency] setup 시작 ==========');
-    console.log(`strategy     = ${STRATEGY}`);
-    console.log(`couponId     = ${COUPON_ID}`);
-    console.log(`targetUrl    = ${TARGET_URL}`);
-    console.log(`fixedVUs     = ${FIXED_VUS}`);
-    console.log(`requestCount = ${REQUEST_COUNT}`);
-    console.log(`runId        = ${RUN_ID}`);
-    console.log('===============================================');
+    console.log('========== [threshold] setup 시작 ==========');
+    console.log(`strategy   = ${STRATEGY}`);
+    console.log(`couponId   = ${COUPON_ID}`);
+    console.log(`targetUrl  = ${TARGET_URL}`);
+    console.log(`tokenCount = ${TOKEN_COUNT}`);
+    console.log(`runId      = ${RUN_ID}`);
+    console.log('=============================================');
 
     const tokens = [];
 
-    for (let i = 0; i < REQUEST_COUNT; i++) {
+    for (let i = 0; i < TOKEN_COUNT; i++) {
         const userIndex = TEST_USER_START_INDEX + i;
         const email = `${TEST_USER_EMAIL_PREFIX}${userIndex}@${TEST_USER_EMAIL_DOMAIN}`;
 
@@ -136,16 +136,11 @@ export function setup() {
 }
 
 // =============================================
-// 메인 요청 — VU당 1번만 실행
+// 메인 요청
 // =============================================
 export default function (data) {
-    const token = data.tokens[exec.vu.idInTest - 1];
-
-    if (!token) {
-        couponUnexpectedErrors.add(1);
-        console.error(`토큰 없음: vuId=${exec.vu.idInTest}`);
-        return;
-    }
+    // 임계값 탐색은 duration 동안 반복되므로 토큰을 순환 사용
+    const token = data.tokens[exec.scenario.iterationInTest % data.tokens.length];
 
     const res = http.post(
         TARGET_URL,
@@ -160,7 +155,7 @@ export default function (data) {
                 strategy: STRATEGY,
                 coupon_id: String(COUPON_ID),
                 run_id: RUN_ID,
-                test_type: 'concurrency',
+                test_type: 'threshold',
             },
         }
     );
@@ -177,53 +172,10 @@ export default function (data) {
 }
 
 // =============================================
-// Teardown: /summary API로 정합성 검증
-// =============================================
-export function teardown(data) {
-    // ADMIN 토큰으로 summary 조회 (첫 번째 토큰 사용 또는 별도 ADMIN 토큰 설정)
-    const adminToken = __ENV.ADMIN_TOKEN || data.tokens[0];
-
-    const res = http.get(
-        SUMMARY_URL,
-        {
-            headers: {
-                Authorization: `Bearer ${adminToken}`,
-                'Content-Type': 'application/json',
-            },
-        }
-    );
-
-    if (res.status !== 200) {
-        console.error(`[summary] 조회 실패: status=${res.status}`);
-        return;
-    }
-
-    const body = parseJson(res.body);
-    const summary = body?.data;
-
-    console.log('========== [concurrency] 정합성 검증 결과 ==========');
-    console.log(`strategy              = ${STRATEGY}`);
-    console.log(`couponId              = ${COUPON_ID}`);
-    console.log(`totalQuantity         = ${summary?.totalQuantity}`);
-    console.log(`remainingQuantity     = ${summary?.remainingQuantity}`);
-    console.log(`issuedCount           = ${summary?.issuedCount}`);
-    console.log(`quantityNotExceeded   = ${summary?.quantityNotExceeded}`);
-    console.log(`remainingQuantityMatched = ${summary?.remainingQuantityMatched}`);
-    console.log(`consistent            = ${summary?.consistent}`);
-    console.log('====================================================');
-
-    // 정합성 최종 판단
-    if (summary?.consistent) {
-        console.log('✅ 정합성 검증 통과: 초과 발급 없음');
-    } else {
-        console.error('❌ 정합성 검증 실패: 초과 발급 발생');
-    }
-}
-
-// =============================================
 // 응답 분류
 // =============================================
 function classifyResponse(res) {
+    // Error Rate 집계 — 5xx 여부
     couponErrorRate.add(res.status >= 500);
 
     if (res.status === 201) {
@@ -246,12 +198,12 @@ function classifyResponse(res) {
 
     if (res.status >= 500) {
         couponServerErrors.add(1);
-        console.error(`[500 error] status=${res.status}, body=${res.body}`);
+        console.error(`[500] vu=${exec.scenario.activeVUs}, status=${res.status}`);
         return;
     }
 
     couponUnexpectedErrors.add(1);
-    console.error(`[unexpected] status=${res.status}, body=${res.body}`);
+    console.error(`[unexpected] vu=${exec.scenario.activeVUs}, status=${res.status}`);
 }
 
 // =============================================
@@ -273,59 +225,48 @@ export function handleSummary(data) {
     const unexpected  = m.coupon_unexpected_errors?.values?.count ?? 0;
     const errorRate   = ((m.coupon_error_rate?.values?.rate ?? 0) * 100).toFixed(2);
 
-    const threshold500   = m.coupon_500_errors?.thresholds?.['count==0']?.ok ?? false;
-    const thresholdUnexp = m.coupon_unexpected_errors?.thresholds?.['count==0']?.ok ?? false;
+    const threshold500    = m.coupon_500_errors?.thresholds?.['count==0']?.ok ?? false;
+    const thresholdUnexp  = m.coupon_unexpected_errors?.thresholds?.['count==0']?.ok ?? false;
+    const allPassed       = threshold500 && thresholdUnexp;
 
     const line = '='.repeat(60);
     const sep  = '-'.repeat(60);
 
     console.log('\n' + line);
-    console.log(' 쿠폰 발급 정합성 검증 결과');
+    console.log(' 쿠폰 발급 임계값 탐색 결과');
     console.log(line);
-    console.log(` strategy     : ${STRATEGY}`);
-    console.log(` couponId     : ${COUPON_ID}`);
-    console.log(` fixedVUs     : ${FIXED_VUS}`);
-    console.log(` requestCount : ${REQUEST_COUNT}`);
-    console.log(` runId        : ${RUN_ID}`);
+    console.log(` strategy   : ${STRATEGY}`);
+    console.log(` couponId   : ${COUPON_ID}`);
+    console.log(` runId      : ${RUN_ID}`);
     console.log(sep);
 
     console.log(' [응답 시간]');
-    console.log(`   avg         : ${avgMs.toFixed(2)} ms`);
-    console.log(`   p95         : ${p95Ms.toFixed(2)} ms`);
-    console.log(`   p99         : ${p99Ms.toFixed(2)} ms`);
-    console.log(`   max         : ${maxMs.toFixed(2)} ms`);
+    console.log(`   avg      : ${avgMs.toFixed(2)} ms`);
+    console.log(`   p95      : ${p95Ms.toFixed(2)} ms`);
+    console.log(`   p99      : ${p99Ms.toFixed(2)} ms`);
+    console.log(`   max      : ${maxMs.toFixed(2)} ms`);
     console.log(sep);
 
     console.log(' [요청 분류]');
-    console.log(`   전체 요청         : ${totalReqs}`);
-    console.log(`   발급 성공 (201)   : ${issued201}`);
-    console.log(`   쿠폰 소진         : ${soldOut}`);
-    console.log(`   lock 실패         : ${lockFailed}`);
-    console.log(`   500 에러          : ${err500}`);
-    console.log(`   예상치 못한 에러  : ${unexpected}`);
-    console.log(`   error rate        : ${errorRate} %`);
+    console.log(`   전체 요청       : ${totalReqs}`);
+    console.log(`   발급 성공 (201) : ${issued201}`);
+    console.log(`   쿠폰 소진       : ${soldOut}`);
+    console.log(`   lock 실패       : ${lockFailed}`);
+    console.log(`   500 에러        : ${err500}`);
+    console.log(`   예상치 못한 에러: ${unexpected}`);
+    console.log(`   error rate      : ${errorRate} %`);
     console.log(sep);
 
     console.log(' [임계값 판정]');
-    console.log(`   500 에러 0건      : ${threshold500   ? '✅ PASS' : '❌ FAIL'}`);
-    console.log(`   예상치 못한 에러  : ${thresholdUnexp ? '✅ PASS' : '❌ FAIL'}`);
+    console.log(`   500 에러 0건    : ${threshold500   ? '✅ PASS' : '❌ FAIL'}`);
+    console.log(`   예상치 못한 에러: ${thresholdUnexp ? '✅ PASS' : '❌ FAIL'}`);
     console.log(sep);
 
-    console.log(' [정합성 판정]');
-    const issuedOk   = issued201 <= 100;
-    const noErr500   = err500 === 0;
-    const noLockFail = lockFailed === 0;
-
-    console.log(`   발급 수 ≤ 100     : ${issuedOk   ? `✅ ${issued201}건` : `❌ ${issued201}건 (초과 발급!)`}`);
-    console.log(`   500 에러 없음     : ${noErr500   ? '✅ PASS' : `❌ FAIL (${err500}건)`}`);
-    console.log(`   lock 실패 없음    : ${noLockFail ? '✅ PASS' : `⚠  ${lockFailed}건 발생`}`);
-    console.log(sep);
-
-    const allPassed = issuedOk && noErr500;
-    if (allPassed) {
-        console.log(` ✅ 정합성 검증 통과 — 초과 발급 없음`);
+    if (err500 === 0 && unexpected === 0) {
+        console.log(' ✅ 전 구간 500 에러 없음 — VU 500까지 안전');
     } else {
-        console.log(` ❌ 정합성 검증 실패 — 결과를 확인하세요`);
+        console.log(` ❌ 에러 발생 — 500 에러: ${err500}건, 예상치 못한 에러: ${unexpected}건`);
+        console.log('    → 에러 발생 직전 VU 구간을 정합성 검증의 FIXED_VUS 기준으로 사용할 것');
     }
 
     console.log(line + '\n');

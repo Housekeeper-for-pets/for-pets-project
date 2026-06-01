@@ -32,8 +32,6 @@ import com.forpets.domain.settlement.service.SettlementService;
 import com.forpets.global.embed.HasTimeSlotInfo;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.entity.TimeSlotInfo;
-import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
 import com.forpets.global.monitoring.TrackExecutionTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +40,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -52,8 +49,6 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class ReservationService {
     private static final int DEPOSIT_RATIO = 20;
-    private static final long PAYMENT_EXPIRE_HOURS = 2L;
-    private static final String EXPIRE_REFUND_REASON = "예약 결제 제한 시간 초과";
 
     private final ReservationRepository reservationRepository;
     private final ReservationPetRepository reservationPetRepository;
@@ -143,14 +138,24 @@ public class ReservationService {
     /*
     내 예약 목록 조회
      */
-    public List<ReservationResponseDto> getMyReservations(Long memberId) {
-        List<Reservation> asGuardian = reservationRepository.findAllByGuardianId(memberId);
-        List<Reservation> asSitter = reservationRepository.findAllBySitterMemberId(memberId);
+    public List<ReservationResponseDto> getMyReservations(Long memberId, ReservationRole roleAs) {
+        List<Reservation> reservationList;
+        // roleAs 값 검증은 따로 하지 않고 만약에 guardian, sitter 이외의 값이 들어오면 그냥 all list return
+        if (roleAs == ReservationRole.GUARDIAN){
+            reservationList = reservationRepository.findAllByGuardianId(memberId);
+        }else if (roleAs == ReservationRole.SITTER){
+            reservationList = reservationRepository.findAllBySitterMemberId(memberId);
+        }else{
+            reservationList = reservationRepository.findAllBySitterMemberIdOrGuardianId(memberId, memberId);
+        }
 
-        List<Reservation> all = new ArrayList<>(asGuardian);
-        all.addAll(asSitter);
+//        List<Reservation> asGuardian = reservationRepository.findAllByGuardianId(memberId);
+//        List<Reservation> asSitter = reservationRepository.findAllBySitterMemberId(memberId);
+//
+//        List<Reservation> all = new ArrayList<>(asGuardian);
+//        all.addAll(asSitter);
 
-        return all.stream()
+        return reservationList.stream()
                 .sorted(Comparator.comparing(Reservation::getCreatedAt).reversed())
                 .map(this::toResponseDto)
                 .toList();
@@ -244,81 +249,51 @@ public class ReservationService {
     @TrackExecutionTime("reservation.cancel")
     @Transactional
     public ReservationResponseDto cancel(Long memberId, Long reservationId, CancelReservationRequest request) {
-        Reservation reservation = findById(reservationId);
-        validateParty(memberId, reservation);
-        validateCancelable(reservation);
+        return reservationLockService.executeWithReservationLock(reservationId, () -> {
+            Reservation reservation = findById(reservationId);
+            validateParty(memberId, reservation);
+            validateCancelable(reservation);
 
-        CanceledBy canceledBy = reservation.isGuardian(memberId) ? CanceledBy.GUARDIAN : CanceledBy.SITTER;
+            CanceledBy canceledBy = reservation.isGuardian(memberId) ? CanceledBy.GUARDIAN : CanceledBy.SITTER;
 
-        // reservation 이 Pending 인 경우: 그냥.. 환불해주면 됨
-        if (reservation.isPending()){
+            // reservation 이 Pending 인 경우: 그냥.. 환불해주면 됨
+            if (reservation.isPending()){
+                reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
+                log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
+
+                paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
+                paymentRefundService.cancelNonPaidPayments(reservationId, request.cancelReason());
+
+                // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
+                handleCancellation(reservation);
+
+                return toResponseDto(reservation);
+            }
+
+            //  reservation 이 Confirmed 가 된 경우
+            //  : 어쩔 수 없는 일이 아니라면 무조건 위약금을 물게 됨
+
+            // 어쩔수 없는 일인지? -> 관리자 검토 후 위약금 안 물게 해줄 수도 있고 아닐 수도 있어요...
+            if (request.cancelCategory() == CancelCategory.UNAVOIDABLE) {
+                reservation.requestCancel(request.cancelReason(), request.cancelCategory(), canceledBy);
+                log.info("[취소 요청] UNAVOIDABLE 관리자 검토 대기 reservationId={}, 취소주체={}",
+                        reservationId, canceledBy);
+                return toResponseDto(reservation);
+            }
+
+            // 그냥 취소하는거면? -> 위약금 차감 후 취소
             reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
-            log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
+            log.info("[예약 취소] CONFIRMED 위약금 차감 취소 reservationId={}, 취소주체={}, 사유={}",
+                    reservationId, canceledBy, request.cancelReason());
 
-            paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
-            paymentRefundService.expireNonPaidPayments(reservationId);
-
-            // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
-            handlePostCancellation(reservation);
-
+            paymentRefundService.refundWithPenalty(reservationId, request.cancelReason(), canceledBy);
+            paymentRefundService.cancelNonPaidPayments(reservationId, request.cancelReason());
+            handleCancellation(reservation);
             return toResponseDto(reservation);
-        }
-
-        //  reservation 이 Confirmed 가 된 경우
-        //  : 어쩔 수 없는 일이 아니라면 무조건 위약금을 물게 됨
-
-        // 어쩔수 없는 일인지? -> 관리자 검토 후 위약금 안 물게 해줄 수도 있고 아닐 수도 있어요...
-        if (request.cancelCategory() == CancelCategory.UNAVOIDABLE) {
-            reservation.requestCancel(request.cancelReason(), request.cancelCategory(), canceledBy);
-            log.info("[취소 요청] UNAVOIDABLE 관리자 검토 대기 reservationId={}, 취소주체={}",
-                    reservationId, canceledBy);
-            return toResponseDto(reservation);
-        }
-
-        // 그냥 취소하는거면? -> 위약금 차감 후 취소
-        reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
-        log.info("[예약 취소] CONFIRMED 위약금 차감 취소 reservationId={}, 취소주체={}, 사유={}",
-                reservationId, canceledBy, request.cancelReason());
-
-        paymentRefundService.refundWithPenalty(reservationId, request.cancelReason(), canceledBy);
-        paymentRefundService.expireNonPaidPayments(reservationId);
-        handlePostCancellation(reservation);
-        return toResponseDto(reservation);
+        });
     }
 
-    /*
-    예약 만료 처리
-    PENDING 예약이 생성 후 2시간을 넘기면 EXPIRED로 닫고 이미 결제된 금액을 환불한다.
-     */
-    @Transactional
-    public int expirePendingReservations(LocalDateTime now) {
-        LocalDateTime deadline = now.minusHours(PAYMENT_EXPIRE_HOURS);
-        List<Reservation> expiredTargets = reservationRepository.findAllByStatusAndCreatedAtBefore(
-                ReservationStatus.PENDING, deadline);
-
-        expiredTargets.forEach(this::expireReservation);
-
-        if (!expiredTargets.isEmpty()) {
-            log.info("[예약 만료] 처리 건수={}", expiredTargets.size());
-        }
-
-        return expiredTargets.size();
-    }
-
-    private void expireReservation(Reservation reservation) {
-        reservation.expire();
-        paymentRefundService.refundPaidPayments(reservation.getId(), EXPIRE_REFUND_REASON);
-        paymentRefundService.expireNonPaidPayments(reservation.getId());
-        handlePostCancellation(reservation);
-
-        // careRequest 도 restore 해줌
-        // 수동 취소에서도 Pending 으로 돌아가는걸 방지하기 위해 expireReservation 으로 위치 이동시킴
-        if (reservation.getSource() == ReservationSource.CARE_REQUEST){
-            careRequestRepository.findById(reservation.getSourceId()).ifPresent(CareRequest::restoreToPending);
-        }
-    }
-
-
+    // 예약 만료 처리는 ReservationExpireScheduler + ReservationExpireService 로 이동
 
     // transaction 아닌 애들 ==========
 
@@ -472,13 +447,19 @@ public class ReservationService {
 
         paymentRefundService.refundPaidPayments(reservationId, "시터의 다른 예약 확정으로 인한 자동 취소");
 
-        if (rp.isSitterPaid()){
-            rp.sitterRefund();
-        }
+        // ReservationService.refundIfPaid
+        // -> paymentRefundService.refundPaidPayments
+        // -> paymentRefundService.refund
+        // -> paymentRefundService.restoreReservationPayment 를 호출하는데 이 메서드에서 이미 ReservationPayment 의
+        // XXXPaid 를 다시 Refund 하는 로직이 포함되어있음 == 아래는 중복 로직이므로 주석처리
 
-        if (rp.isGuardianPaid()){
-            rp.guardianRefund();
-        }
+//        if (rp.isSitterPaid()){
+//            rp.sitterRefund();
+//        }
+//
+//        if (rp.isGuardianPaid()){
+//            rp.guardianRefund();
+//        }
     }
 
     /*
@@ -505,11 +486,16 @@ public class ReservationService {
     /*
     취소 후속 처리
     - Proposal 출처: ACCEPTED → PENDING 복원 (다른 제안 채택 가능)
+    - CareRequest 출처: ACCEPT -> PENDING 복원
      */
-    private void handlePostCancellation(Reservation reservation) {
+    private void handleCancellation(Reservation reservation) {
         if (reservation.getSource() == ReservationSource.PROPOSAL) {
-            proposalRepository.findById(reservation.getSourceId()).ifPresent(Proposal::restoreToPending);
+            proposalRepository.findById(reservation.getSourceId())
+                    .ifPresent(Proposal::restoreToPending);
+            return;
         }
+        careRequestRepository.findById(reservation.getSourceId())
+                .ifPresent(CareRequest::restoreToPending);
     }
 
     /*

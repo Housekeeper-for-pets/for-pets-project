@@ -195,11 +195,11 @@ class ReservationServiceTest {
         void reservation_test_01() {
             // given
             given(reservationRepository.findAllByGuardianId(member1Id)).willReturn(List.of(reservation));
-            given(reservationRepository.findAllBySitterMemberId(member1Id)).willReturn(List.of());
+//            given(reservationRepository.findAllBySitterMemberId(member1Id)).willReturn(List.of());
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            List<ReservationResponseDto> result = reservationService.getMyReservations(member1Id);
+            List<ReservationResponseDto> result = reservationService.getMyReservations(member1Id, ReservationRole.GUARDIAN);
 
             // then
             assertThat(result).hasSize(1);
@@ -210,12 +210,12 @@ class ReservationServiceTest {
         @DisplayName("[성공] 시터로 참여한 예약 목록 조회 성공")
         void reservation_test_02() {
             // given
-            given(reservationRepository.findAllByGuardianId(member2Id)).willReturn(List.of());
+//            given(reservationRepository.findAllByGuardianId(member2Id)).willReturn(List.of());
             given(reservationRepository.findAllBySitterMemberId(member2Id)).willReturn(List.of(reservation));
             stubToResponseDto(reservationId, reservation, payment);
 
             // when
-            List<ReservationResponseDto> result = reservationService.getMyReservations(member2Id);
+            List<ReservationResponseDto> result = reservationService.getMyReservations(member2Id, ReservationRole.SITTER);
 
             // then
             assertThat(result).hasSize(1);
@@ -571,6 +571,17 @@ class ReservationServiceTest {
                 "병원에 입원하게 되어 어쩔 수 없이 취소합니다", CancelCategory.UNAVOIDABLE
         );
 
+        @BeforeEach
+        void setUpReservationLock() {
+            // cancel() 이 reservationLockService.executeWithReservationLock 으로 감싸져 있어서
+            // 람다를 그대로 실행하도록 stub
+            given(reservationLockService.executeWithReservationLock(any(), any()))
+                    .willAnswer(invocation -> {
+                        Supplier<?> task = invocation.getArgument(1);
+                        return task.get();
+                    });
+        }
+
         // ── PENDING 취소 ──
 
         @Test
@@ -594,7 +605,7 @@ class ReservationServiceTest {
             then(paymentRefundService).should()
                     .refundPaidPayments(reservationId, personalCancelRequest.cancelReason());
             then(paymentRefundService).should()
-                    .expireNonPaidPayments(reservationId);
+                    .cancelNonPaidPayments(reservationId, personalCancelRequest.cancelReason());
             // 위약금 환불은 호출되면 안 됨
             then(paymentRefundService).should(never())
                     .refundWithPenalty(any(), any(), any());
@@ -641,7 +652,7 @@ class ReservationServiceTest {
             then(paymentRefundService).should()
                     .refundWithPenalty(reservationId, personalCancelRequest.cancelReason(), CanceledBy.SITTER);
             then(paymentRefundService).should()
-                    .expireNonPaidPayments(reservationId);
+                    .cancelNonPaidPayments(reservationId, personalCancelRequest.cancelReason());
             // 전액환불은 호출되면 안 됨
             then(paymentRefundService).should(never())
                     .refundPaidPayments(any(), any());
@@ -696,7 +707,7 @@ class ReservationServiceTest {
             then(paymentRefundService).should(never())
                     .refundWithPenalty(any(), any(), any());
             then(paymentRefundService).should(never())
-                    .expireNonPaidPayments(any());
+                    .cancelNonPaidPayments(any(), any());
         }
 
         @Test
@@ -817,49 +828,5 @@ class ReservationServiceTest {
         }
     }
 
-    // ========================================================
-    // 예약 만료 — Scheduler
-    // ========================================================
-    @Nested
-    @DisplayName("예약 만료 — Scheduler")
-    class ExpireTest {
-
-        @Test
-        @DisplayName("[성공] 2시간 초과 PENDING 예약 만료 처리")
-        void reservation_test_27() {
-            // given
-            LocalDateTime now = LocalDateTime.of(2026, 5, 22, 15, 0);
-            given(reservationRepository.findAllByStatusAndCreatedAtBefore(
-                    ReservationStatus.PENDING, now.minusHours(2)))
-                    .willReturn(List.of(reservation));
-
-            // when
-            int result = reservationService.expirePendingReservations(now);
-
-            // then
-            assertThat(result).isEqualTo(1);
-            assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.EXPIRED);
-            then(paymentRefundService).should()
-                    .refundPaidPayments(reservationId, "예약 결제 제한 시간 초과");
-        }
-
-        @Test
-        @DisplayName("[성공] Proposal 출처 예약 만료 시 ACCEPTED → PENDING 복원")
-        void reservation_test_28() {
-            // given
-            LocalDateTime now = LocalDateTime.of(2026, 5, 22, 15, 0);
-            given(reservationRepository.findAllByStatusAndCreatedAtBefore(
-                    ReservationStatus.PENDING, now.minusHours(2)))
-                    .willReturn(List.of(proposalReservation));
-            given(proposalRepository.findById(proposalId)).willReturn(Optional.of(proposal));
-
-            // when
-            int result = reservationService.expirePendingReservations(now);
-
-            // then
-            assertThat(result).isEqualTo(1);
-            assertThat(proposalReservation.getStatus()).isEqualTo(ReservationStatus.EXPIRED);
-            assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.PENDING);
-        }
-    }
+    // 예약 만료 (expireOne) 단일 처리 테스트는 ReservationExpireServiceTest 로 이동
 }

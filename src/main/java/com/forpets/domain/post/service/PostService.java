@@ -69,7 +69,7 @@ public class PostService {
     @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public PostResponseDto create(Long memberId, CreatePostRequest request) {
         Member member = memberService.findById(memberId);
-        List<Pet> pets = validateAndGetPets(memberId, request.petIds());
+        List<Pet> pets = petService.validateAndGetPets(memberId, request.petIds());
         timeSlotValidator.validate(request.timeSlots());
 
         Post post = postRepository.save(Post.builder()
@@ -106,7 +106,7 @@ public class PostService {
         validateOpen(post);
         validateNoActiveProposal(postId);
 
-        List<Pet> pets = validateAndGetPets(memberId, request.petIds());
+        List<Pet> pets = petService.validateAndGetPets(memberId, request.petIds());
         timeSlotValidator.validate(request.timeSlots());
 
         post.update(
@@ -251,17 +251,17 @@ public class PostService {
     반려동물 존재 여부 + 본인 소유 검증
     PetService.findById로 존재 확인 후 본인 소유 검증
      */
-    private List<Pet> validateAndGetPets(Long memberId, List<Long> petIds) {
-        return petIds.stream()
-                .map(petId -> {
-                    Pet pet = petService.findById(petId);
-                    if (!pet.getMemberId().equals(memberId)) {
-                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
-                    }
-                    return pet;
-                })
-                .toList();
-    }
+//    private List<Pet> validateAndGetPets(Long memberId, List<Long> petIds) {
+//        return petIds.stream()
+//                .map(petId -> {
+//                    Pet pet = petService.findById(petId);
+//                    if (!pet.getMemberId().equals(memberId)) {
+//                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
+//                    }
+//                    return pet;
+//                })
+//                .toList();
+//    }
 
     private void validateAuthor(Long memberId, Post post) {
         if (!post.isOwnedBy(memberId)) {
@@ -274,19 +274,6 @@ public class PostService {
             throw new PostException(PostErrorCode.POST_NOT_OPEN);
         }
     }
-
-    /*
-    PENDING 또는 ACCEPTED Proposal이 있으면 수정, 상태변경, 삭제 불가
-
-    MVP 정책이 원래 PENDING Proposal만 있으면 상태 변경, 삭제 가능이었는데
-    그냥 구분하지 않고 모든 요청을 다 REJECT 처리 다 해야 상태 변경, 삭제 가능하도록 하는게 깔끔할듯
-     */
-    // 순환참조........
-//    private void validateNoActiveProposal(Long postId) {
-//         if (proposalService.existsPendingOrAcceptedByPostId(postId)) {
-//             throw new BusinessException(CommonErrorCode.HAS_ACTIVE_PROPOSAL);
-//         }
-//    }
 
     private void validateNoActiveProposal(Long postId) {
         if (proposalRepository.existsByPostIdAndStatusIn(
@@ -326,22 +313,5 @@ public class PostService {
         }
 
         return postTimeSlotRepository.saveAll(postTimeSlots);
-    }
-
-//    public List<PostResponseDto> getTest() {
-//        return postRepository.findAll().stream()
-//                .map(post -> PostResponseDto.from(
-//                        post,
-//                        postPetRepository.findAllByPostId(post.getId()),
-//                        postTimeSlotRepository.findAllByPostIdOrderByTimeSlotInfoSequence(post.getId())
-//                ))
-//                .toList();
-//    }
-
-    public boolean existsActivePostByPetId(Long petId) {
-        return postRepository.existsByPetIdAndStatusIn(
-                petId,
-                List.of(PostStatus.OPEN)
-        );
     }
 }
