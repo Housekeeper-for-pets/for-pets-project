@@ -1,5 +1,6 @@
 package com.forpets.domain.review.repository;
 
+import com.forpets.domain.review.dto.MyReceivedReviewResponse;
 import com.forpets.domain.review.dto.MyWrittenReviewResponse;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
@@ -57,6 +58,42 @@ public class ReviewQueryRepository {
                 .join(sitterProfile).on(member.id.eq(sitterProfile.memberId))
                 .where(
                         review.reviewerId.eq(reviewerId),
+                        review.deleted.isFalse()
+                )
+                .fetchOne();
+
+        return new PageImpl<>(content, pageable, count != null ? count : 0L);
+    }
+
+    public Page<MyReceivedReviewResponse> findMyReceivedReviews(Long revieweeId, Pageable pageable) {
+        List<MyReceivedReviewResponse> content = queryFactory
+                .select(Projections.constructor(
+                        MyReceivedReviewResponse.class,
+                        review.id,
+                        review.reservationId,
+                        review.reviewerId,
+                        member.nickname,
+                        review.rating,
+                        review.reviewComment,
+                        review.createdAt
+                ))
+                .from(review)
+                .join(member).on(review.reviewerId.eq(member.id))
+                .where(
+                        review.revieweeId.eq(revieweeId),
+                        review.deleted.isFalse()
+                )
+                .orderBy(getOrderSpecifiers(pageable))
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        Long count = queryFactory
+                .select(review.count())
+                .from(review)
+                .join(member).on(review.reviewerId.eq(member.id))
+                .where(
+                        review.revieweeId.eq(revieweeId),
                         review.deleted.isFalse()
                 )
                 .fetchOne();
