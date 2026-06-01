@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-@Profile("!ai")
+@Profile("!ai & !openai")
 public class StubAiChatClient implements AiChatClient {
 
     @Override

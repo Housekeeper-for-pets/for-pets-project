@@ -17,16 +17,17 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@Profile("openai")
-public class OpenAiChatClient implements AiChatClient {
+@Profile("ai")
+public class GeminiChatClient implements AiChatClient {
 
-    private static final String CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String CONDITION_SYSTEM_MESSAGE = """
+    private static final String GEMINI_URL_TEMPLATE =
+            "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s";
+    private static final String CONDITION_SYSTEM_INSTRUCTION = """
             당신은 ForPets의 시터 추천 조건 추출기입니다.
             사용자 문장에서 지역, 반려동물 타입, 크기, 가격, 케어 고민만 JSON으로 추출하세요.
-            모르면 null을 사용하고, enum은 서버가 제공한 값만 사용하세요.
+            모르면 null을 사용하고 enum은 서버가 제공한 값만 사용하세요.
             """;
-    private static final String ANSWER_SYSTEM_MESSAGE = """
+    private static final String ANSWER_SYSTEM_INSTRUCTION = """
             당신은 ForPets의 시터 추천 도우미입니다.
             제공된 후보 시터 데이터 안에서만 추천하고, DB에 없는 사실이나 의료 행위 가능 여부는 만들지 마세요.
             답변은 한국어로 간결하게 작성하세요.
@@ -39,10 +40,10 @@ public class OpenAiChatClient implements AiChatClient {
     private final Integer maxTokens;
     private final Double temperature;
 
-    public OpenAiChatClient(
+    public GeminiChatClient(
             ObjectMapper objectMapper,
-            @Value("${OPENAI_API_KEY:}") String apiKey,
-            @Value("${forpets.ai.openai.model:gpt-4o-mini}") String model,
+            @Value("${GEMINI_API_KEY:}") String apiKey,
+            @Value("${forpets.ai.gemini.model:gemini-2.5-flash-lite}") String model,
             @Value("${forpets.ai.chat.max-tokens:700}") Integer maxTokens,
             @Value("${forpets.ai.chat.temperature:0.3}") Double temperature
     ) {
@@ -61,8 +62,8 @@ public class OpenAiChatClient implements AiChatClient {
         }
 
         try {
-            String content = requestContent(buildConditionRequest(message));
-            ConditionResponse response = objectMapper.readValue(content, ConditionResponse.class);
+            String content = requestContent(CONDITION_SYSTEM_INSTRUCTION, buildConditionPrompt(message), 0.1, 300, true);
+            ConditionResponse response = objectMapper.readValue(stripMarkdownFence(content), ConditionResponse.class);
             return response.toCondition();
         } catch (Exception exception) {
             return AiSitterSearchCondition.empty();
@@ -79,43 +80,50 @@ public class OpenAiChatClient implements AiChatClient {
         }
 
         try {
-            return requestContent(buildAnswerRequest(message, condition, candidates));
+            return requestContent(ANSWER_SYSTEM_INSTRUCTION, buildAnswerPrompt(message, condition, candidates), temperature, maxTokens, false);
         } catch (Exception exception) {
             return "조건에 맞는 시터 " + candidates.size() + "명을 찾았어요. 추천 후보 목록에서 리뷰 요약과 가능 시간을 확인해보세요.";
         }
     }
 
-    private String requestContent(Map<String, Object> requestBody) {
+    private String requestContent(String systemInstruction, String prompt, Double temperature, Integer maxTokens, boolean jsonResponse) throws Exception {
         String rawResponse = restClient.post()
-                .uri(CHAT_COMPLETIONS_URL)
+                .uri(GEMINI_URL_TEMPLATE.formatted(model, apiKey))
                 .contentType(MediaType.APPLICATION_JSON)
-                .header("Authorization", "Bearer " + apiKey)
-                .body(requestBody)
+                .body(buildRequest(systemInstruction, prompt, temperature, maxTokens, jsonResponse))
                 .retrieve()
                 .body(String.class);
 
-        try {
-            return objectMapper.readTree(rawResponse)
-                    .path("choices")
-                    .path(0)
-                    .path("message")
-                    .path("content")
-                    .asText();
-        } catch (Exception exception) {
-            return "";
-        }
+        return objectMapper.readTree(rawResponse)
+                .path("candidates")
+                .path(0)
+                .path("content")
+                .path("parts")
+                .path(0)
+                .path("text")
+                .asText();
     }
 
-    private Map<String, Object> buildConditionRequest(String message) {
+    private Map<String, Object> buildRequest(
+            String systemInstruction,
+            String prompt,
+            Double temperature,
+            Integer maxTokens,
+            boolean jsonResponse
+    ) {
+        Map<String, Object> generationConfig = jsonResponse
+                ? Map.of("temperature", temperature, "maxOutputTokens", maxTokens, "responseMimeType", "application/json")
+                : Map.of("temperature", temperature, "maxOutputTokens", maxTokens);
+
         return Map.of(
-                "model", model,
-                "temperature", 0.1,
-                "max_tokens", 300,
-                "response_format", Map.of("type", "json_object"),
-                "messages", List.of(
-                        Map.of("role", "system", "content", CONDITION_SYSTEM_MESSAGE),
-                        Map.of("role", "user", "content", buildConditionPrompt(message))
-                )
+                "systemInstruction", Map.of(
+                        "parts", List.of(Map.of("text", systemInstruction))
+                ),
+                "contents", List.of(Map.of(
+                        "role", "user",
+                        "parts", List.of(Map.of("text", prompt))
+                )),
+                "generationConfig", generationConfig
         );
     }
 
@@ -134,22 +142,6 @@ public class OpenAiChatClient implements AiChatClient {
                   "concern": "string | null"
                 }
                 """.formatted(message);
-    }
-
-    private Map<String, Object> buildAnswerRequest(
-            String message,
-            AiSitterSearchCondition condition,
-            List<RecommendedSitterDto> candidates
-    ) {
-        return Map.of(
-                "model", model,
-                "temperature", temperature,
-                "max_tokens", maxTokens,
-                "messages", List.of(
-                        Map.of("role", "system", "content", ANSWER_SYSTEM_MESSAGE),
-                        Map.of("role", "user", "content", buildAnswerPrompt(message, condition, candidates))
-                )
-        );
     }
 
     private String buildAnswerPrompt(
@@ -177,6 +169,13 @@ public class OpenAiChatClient implements AiChatClient {
         } catch (Exception exception) {
             return message;
         }
+    }
+
+    private String stripMarkdownFence(String content) {
+        return content
+                .replace("```json", "")
+                .replace("```", "")
+                .trim();
     }
 
     private record ConditionResponse(

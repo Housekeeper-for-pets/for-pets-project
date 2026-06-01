@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@Profile("ai")
+@Profile("openai")
 public class OpenAiReviewSummaryClient implements AiReviewSummaryClient {
 
     private static final String CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
