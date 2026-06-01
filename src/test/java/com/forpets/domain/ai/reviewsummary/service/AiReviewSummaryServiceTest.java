@@ -144,6 +144,38 @@ class AiReviewSummaryServiceTest {
         }));
     }
 
+    @Test
+    @DisplayName("[성공] AI 호출이 실패해도 리뷰 원문 기반 fallback 요약을 저장한다")
+    void generate_review_summary_fallback_when_ai_failed() {
+        // given
+        List<ReviewSource> reviews = reviews();
+        AiPromptTemplate promptTemplate = promptTemplate(PromptCategory.SMALL_DOG);
+
+        given(sitterProfileRepository.existsById(sitterId)).willReturn(true);
+        given(reviewSourceProvider.findRecentReviewsBySitterId(sitterId, 20)).willReturn(reviews);
+        given(promptTemplateRepository.findFirstByFeatureAndCategoryAndActiveTrueOrderByIdDesc(
+                "SITTER_REVIEW_SUMMARY", PromptCategory.SMALL_DOG))
+                .willReturn(Optional.of(promptTemplate));
+        given(aiReviewSummaryClient.generate(anyString()))
+                .willThrow(new AiReviewSummaryException(AiReviewSummaryErrorCode.AI_REVIEW_SUMMARY_FAILED));
+        given(summaryRepository.findBySitterId(sitterId)).willReturn(Optional.empty());
+        given(summaryRepository.save(any(SitterReviewSummary.class)))
+                .willAnswer(invocation -> {
+                    SitterReviewSummary saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", 10L);
+                    return saved;
+                });
+
+        // when
+        SitterReviewSummaryDto result = aiReviewSummaryService.generateReviewSummary(sitterId);
+
+        // then
+        assertThat(result.aiGenerated()).isFalse();
+        assertThat(result.model()).isEqualTo("fallback-review-summary");
+        assertThat(result.summary()).contains("리뷰");
+        then(summaryReviewRepository).should().saveAll(anyList());
+    }
+
     private List<ReviewSource> reviews() {
         return List.of(
                 new ReviewSource(1001L, 5, "말티즈가 낯을 많이 가리는데 천천히 적응시켜주셨어요."),
