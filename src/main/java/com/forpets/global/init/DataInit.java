@@ -463,24 +463,15 @@ public class DataInit implements CommandLineRunner {
             }
         }
 
-        // 프론트 AI 리뷰 요약 확인용 데이터
-        // local seed 기준 /sitters/5 화면에서 바로 리뷰 목록과 AI 요약 생성을 확인할 수 있도록 구성한다.
-        SitterProfile aiReviewDemoSitter = allSitters.get(4);
-        saveCompletedReservationReview(member1, aiReviewDemoSitter, pet1,
-                "2026-04-01", "10:00", "13:00", 45000,
-                "말티즈가 낯을 많이 가리는데 천천히 적응시켜주시고 사진도 자주 보내주셔서 안심됐습니다.", 5);
-        saveCompletedReservationReview(member3, aiReviewDemoSitter, pet11,
-                "2026-04-05", "14:00", "17:00", 48000,
-                "분리불안이 있는 포메라니안을 차분하게 돌봐주셨어요. 산책 강도도 무리하지 않게 맞춰주셨습니다.", 5);
-        saveCompletedReservationReview(member5, aiReviewDemoSitter, pet15,
-                "2026-04-09", "09:00", "12:00", 50000,
-                "응답이 빠르고 케어 후 아이 상태를 자세히 알려주셔서 좋았습니다. 소형견 케어에 익숙해 보였어요.", 5);
-        saveCompletedReservationReview(member1, aiReviewDemoSitter, pet2,
-                "2026-04-12", "16:00", "19:00", 42000,
-                "사진 공유가 꼼꼼했고 낯가림 있는 아이를 억지로 만지지 않고 기다려주셔서 만족했습니다.", 4);
-        saveCompletedReservationReview(member5, aiReviewDemoSitter, pet13,
-                "2026-04-16", "11:00", "15:00", 62000,
-                "전반적으로 만족했습니다. 다만 대형견보다는 소형견 케어 후기가 더 잘 맞는 시터님이라는 인상을 받았습니다.", 4);
+        saveAiReviewDemoData(
+                allSitters,
+                List.of(
+                        new DemoReviewGuardian(member1, pet1),
+                        new DemoReviewGuardian(member2, pet10),
+                        new DemoReviewGuardian(member3, pet11),
+                        new DemoReviewGuardian(member5, pet15)
+                )
+        );
 
         // =============================================
         // ★ 신규 Post 21개 (총 30개)
@@ -1049,6 +1040,46 @@ public class DataInit implements CommandLineRunner {
         );
     }
 
+    private void saveAiReviewDemoData(List<SitterProfile> sitters, List<DemoReviewGuardian> guardians) {
+        String[] comments = {
+                "말티즈가 낯을 많이 가리는데 천천히 적응시켜주시고 사진도 자주 보내주셔서 안심됐습니다.",
+                "분리불안이 있는 아이를 차분하게 돌봐주셨어요. 산책 강도도 무리하지 않게 맞춰주셨습니다.",
+                "응답이 빠르고 케어 후 아이 상태를 자세히 알려주셔서 좋았습니다. 소형견 케어에 익숙해 보였어요.",
+                "사진 공유가 꼼꼼했고 낯가림 있는 아이를 억지로 만지지 않고 기다려주셔서 만족했습니다.",
+                "전반적으로 만족했습니다. 다만 대형견보다는 소형견 케어 후기가 더 잘 맞는 시터님이라는 인상을 받았습니다."
+        };
+
+        int reviewIndex = 0;
+        for (SitterProfile sitter : sitters) {
+            int savedCount = 0;
+            for (DemoReviewGuardian guardian : guardians) {
+                if (guardian.member().getId().equals(sitter.getMemberId())) {
+                    continue;
+                }
+
+                LocalDate careDate = LocalDate.of(2026, 4, 1).plusDays(reviewIndex);
+                int startHour = 9 + (reviewIndex % 5);
+                saveCompletedReservationReview(
+                        guardian.member(),
+                        sitter,
+                        guardian.pet(),
+                        careDate.toString(),
+                        String.format("%02d:00", startHour),
+                        String.format("%02d:00", startHour + 3),
+                        40000 + (reviewIndex % 6) * 5000,
+                        comments[reviewIndex % comments.length],
+                        reviewIndex % 5 == 4 ? 4 : 5
+                );
+
+                reviewIndex++;
+                savedCount++;
+                if (savedCount >= 3) {
+                    break;
+                }
+            }
+        }
+    }
+
     private void saveCompletedReservationReview(Member guardian, SitterProfile sitter, Pet pet,
                                                 String careDate, String startTime, String endTime,
                                                 int price, String reviewComment, int rating) {
@@ -1078,5 +1109,8 @@ public class DataInit implements CommandLineRunner {
                 .reviewComment(reviewComment)
                 .rating(rating)
                 .build());
+    }
+
+    private record DemoReviewGuardian(Member member, Pet pet) {
     }
 }
