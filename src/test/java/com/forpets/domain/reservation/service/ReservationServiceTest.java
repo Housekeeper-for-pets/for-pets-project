@@ -439,14 +439,8 @@ class ReservationServiceTest {
     @DisplayName("케어 완료 — PATCH /api/reservations/{reservationId}/complete")
     class CompleteTest {
 
-        @BeforeEach
-        void setUpReservationLock() {
-            given(reservationLockService.executeWithReservationLock(any(), any()))
-                    .willAnswer(invocation -> {
-                        Supplier<?> task = invocation.getArgument(1);
-                        return task.get();
-                    });
-        }
+        // complete() 는 @DistributedLock 어노테이션으로 락을 잡으므로
+        // 단위 테스트(AOP 미적용)에서는 별도 stub 불필요
 
         @Test
         @DisplayName("[성공] 시터가 CONFIRMED 예약 완료 처리 성공")
@@ -571,16 +565,8 @@ class ReservationServiceTest {
                 "병원에 입원하게 되어 어쩔 수 없이 취소합니다", CancelCategory.UNAVOIDABLE
         );
 
-        @BeforeEach
-        void setUpReservationLock() {
-            // cancel() 이 reservationLockService.executeWithReservationLock 으로 감싸져 있어서
-            // 람다를 그대로 실행하도록 stub
-            given(reservationLockService.executeWithReservationLock(any(), any()))
-                    .willAnswer(invocation -> {
-                        Supplier<?> task = invocation.getArgument(1);
-                        return task.get();
-                    });
-        }
+        // cancel() 은 @DistributedLock 어노테이션으로 락을 잡으므로
+        // 단위 테스트(AOP 미적용)에서는 별도 stub 불필요
 
         // ── PENDING 취소 ──
 
