@@ -8,6 +8,8 @@ import com.forpets.domain.carelog.exception.CareLogErrorCode;
 import com.forpets.domain.carelog.exception.CareLogException;
 import com.forpets.domain.carelog.repository.CareLogImageRepository;
 import com.forpets.domain.carelog.repository.CareLogRepository;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
+import com.forpets.domain.notification.event.NotificationEvent;
 import com.forpets.domain.notification.service.NotificationService;
 import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationStatus;
@@ -32,7 +34,8 @@ public class CareLogService {
     private final CareLogRepository careLogRepository;
     private final CareLogImageRepository careLogImageRepository;
     private final ReservationRepository reservationRepository;
-    private final NotificationService notificationService;
+
+    private final NotificationMessageBroker notificationBroker;
 
     @Transactional
     public CareLogResponse create(Long sitterMemberId, Long reservationId,
@@ -76,15 +79,16 @@ public class CareLogService {
         log.info("{} => 케어일지 등록 -> reservationId={}, sitterMemberId={}, imageCount={}", NAME, reservationId, sitterMemberId, images.size());
 
         // SSE로 보호자에게 실시간 알림
-        notificationService.notify(
-                reservation.getGuardianId(),
-                sitterMemberId,
-                SseEventType.CARE_LOG,
-                "시터님이 케어 일지를 등록했습니다.",
-                careLog.getId(),
-                "CARE_LOG"
+        notificationBroker.publish(
+                NotificationEvent.of(
+                        reservation.getGuardianId(),
+                        sitterMemberId,
+                        SseEventType.CARE_LOG,
+                        "시터님이 케어 일지를 등록했습니다.",
+                        careLog.getId(),
+                        "CARE_LOG"
+                )
         );
-
         return CareLogResponse.from(careLog, images);
     }
 
