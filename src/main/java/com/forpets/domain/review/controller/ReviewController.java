@@ -1,6 +1,7 @@
 package com.forpets.domain.review.controller;
 
 import com.forpets.domain.review.dto.CreateReviewRequest;
+import com.forpets.domain.review.dto.MyReceivedReviewPageResponse;
 import com.forpets.domain.review.dto.MyWrittenReviewPageResponse;
 import com.forpets.domain.review.dto.ReviewPageResponse;
 import com.forpets.domain.review.dto.ReviewResponse;
@@ -64,5 +65,16 @@ public class ReviewController {
             @RequestParam(defaultValue = "desc") String direction) {
         return ResponseEntity.ok(ApiResponse.success(
                 reviewService.getMyWrittenReviews(currentMember.id(), page, size, sort, direction)));
+    }
+
+    @GetMapping("/me/received")
+    public ResponseEntity<ApiResponse<MyReceivedReviewPageResponse>> getMyReceivedReviews(
+            @LoginUser CurrentMember currentMember,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction) {
+        return ResponseEntity.ok(ApiResponse.success(
+                reviewService.getMyReceivedReviews(currentMember.id(), page, size, sort, direction)));
     }
 }

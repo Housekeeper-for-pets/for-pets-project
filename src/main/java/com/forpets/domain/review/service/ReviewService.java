@@ -4,6 +4,8 @@ import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.review.dto.CreateReviewRequest;
+import com.forpets.domain.review.dto.MyReceivedReviewPageResponse;
+import com.forpets.domain.review.dto.MyReceivedReviewResponse;
 import com.forpets.domain.review.dto.MyWrittenReviewPageResponse;
 import com.forpets.domain.review.dto.MyWrittenReviewResponse;
 import com.forpets.domain.review.dto.ReviewPageResponse;
@@ -114,6 +116,25 @@ public class ReviewService {
         Page<MyWrittenReviewResponse> reviewPage = reviewQueryRepository.findMyWrittenReviews(memberId, pageable);
 
         return MyWrittenReviewPageResponse.of(
+                reviewPage.getContent(),
+                reviewPage.getTotalElements(),
+                reviewPage.getTotalPages(),
+                reviewPage.getNumber(),
+                reviewPage.getSize()
+        );
+    }
+
+    public MyReceivedReviewPageResponse getMyReceivedReviews(Long memberId, int page, int size,
+                                                             String sort, String direction) {
+        validatePageRequest(page, size);
+        validateSortField(sort);
+        validateSortDirection(direction);
+
+        Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
+        Page<MyReceivedReviewResponse> reviewPage = reviewQueryRepository.findMyReceivedReviews(memberId, pageable);
+
+        return MyReceivedReviewPageResponse.of(
                 reviewPage.getContent(),
                 reviewPage.getTotalElements(),
                 reviewPage.getTotalPages(),
