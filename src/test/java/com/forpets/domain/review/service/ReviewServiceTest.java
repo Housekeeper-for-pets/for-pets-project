@@ -5,6 +5,8 @@ import com.forpets.domain.reservation.entity.ReservationSource;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.review.dto.CreateReviewRequest;
+import com.forpets.domain.review.dto.MyReceivedReviewPageResponse;
+import com.forpets.domain.review.dto.MyReceivedReviewResponse;
 import com.forpets.domain.review.dto.MyWrittenReviewPageResponse;
 import com.forpets.domain.review.dto.MyWrittenReviewResponse;
 import com.forpets.domain.review.dto.ReviewPageResponse;
@@ -515,6 +517,134 @@ class ReviewServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("내가 받은 리뷰 목록 조회")
+    class GetMyReceivedReviewsTest {
+
+        @Test
+        @DisplayName("[성공] SITTER가 받은 리뷰 목록을 조회한다")
+        void get_my_received_reviews_sitter_success() {
+            // given
+            MyReceivedReviewResponse receivedReview = createMyReceivedReviewResponse(10L, guardianId);
+            given(reviewQueryRepository.findMyReceivedReviews(any(), any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of(receivedReview), PageRequest.of(0, 10), 1));
+
+            // when
+            MyReceivedReviewPageResponse response = reviewService.getMyReceivedReviews(
+                    sitterMemberId, 0, 10, "createdAt", "DESC");
+
+            // then
+            assertThat(response.content()).hasSize(1);
+            assertThat(response.content().get(0).reviewerId()).isEqualTo(guardianId);
+            assertThat(response.content().get(0).reviewerNickname()).isEqualTo("보호자닉네임");
+            assertThat(response.totalElements()).isEqualTo(1);
+            assertThat(response.currentPage()).isEqualTo(0);
+            assertThat(response.size()).isEqualTo(10);
+
+            ArgumentCaptor<Long> revieweeIdCaptor = ArgumentCaptor.forClass(Long.class);
+            then(reviewQueryRepository).should()
+                    .findMyReceivedReviews(revieweeIdCaptor.capture(), any(Pageable.class));
+            assertThat(revieweeIdCaptor.getValue()).isEqualTo(sitterMemberId);
+        }
+
+        @Test
+        @DisplayName("[성공] MEMBER가 호출하면 빈 페이지를 반환한다")
+        void get_my_received_reviews_member_empty() {
+            // given
+            given(reviewQueryRepository.findMyReceivedReviews(any(), any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+            // when
+            MyReceivedReviewPageResponse response = reviewService.getMyReceivedReviews(
+                    guardianId, 0, 10, "createdAt", "desc");
+
+            // then
+            assertThat(response.content()).isEmpty();
+            assertThat(response.totalElements()).isZero();
+
+            ArgumentCaptor<Long> revieweeIdCaptor = ArgumentCaptor.forClass(Long.class);
+            then(reviewQueryRepository).should()
+                    .findMyReceivedReviews(revieweeIdCaptor.capture(), any(Pageable.class));
+            assertThat(revieweeIdCaptor.getValue()).isEqualTo(guardianId);
+        }
+
+        @Test
+        @DisplayName("[성공] 받은 리뷰가 없으면 빈 페이지를 반환한다")
+        void get_my_received_reviews_empty() {
+            // given
+            given(reviewQueryRepository.findMyReceivedReviews(any(), any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+            // when
+            MyReceivedReviewPageResponse response = reviewService.getMyReceivedReviews(
+                    sitterMemberId, 0, 10, "createdAt", "desc");
+
+            // then
+            assertThat(response.content()).isEmpty();
+            assertThat(response.totalElements()).isZero();
+        }
+
+        @Test
+        @DisplayName("[실패] page가 음수이면 INVALID_PAGE_REQUEST를 반환한다")
+        void get_my_received_reviews_invalid_page() {
+            assertThatThrownBy(() -> reviewService.getMyReceivedReviews(
+                    sitterMemberId, -1, 10, "createdAt", "desc"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+        }
+
+        @Test
+        @DisplayName("[실패] size가 0이면 INVALID_PAGE_REQUEST를 반환한다")
+        void get_my_received_reviews_zero_size() {
+            assertThatThrownBy(() -> reviewService.getMyReceivedReviews(
+                    sitterMemberId, 0, 0, "createdAt", "desc"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+        }
+
+        @Test
+        @DisplayName("[실패] size가 51이면 INVALID_PAGE_REQUEST를 반환한다")
+        void get_my_received_reviews_too_large_size() {
+            assertThatThrownBy(() -> reviewService.getMyReceivedReviews(
+                    sitterMemberId, 0, 51, "createdAt", "desc"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+        }
+
+        @Test
+        @DisplayName("[실패] sort가 허용되지 않은 필드이면 INVALID_SORT_FIELD를 반환한다")
+        void get_my_received_reviews_invalid_sort() {
+            assertThatThrownBy(() -> reviewService.getMyReceivedReviews(
+                    sitterMemberId, 0, 10, "updatedAt", "desc"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_SORT_FIELD));
+        }
+
+        @Test
+        @DisplayName("[실패] direction이 허용되지 않은 값이면 INVALID_SORT_FIELD를 반환한다")
+        void get_my_received_reviews_invalid_direction() {
+            assertThatThrownBy(() -> reviewService.getMyReceivedReviews(
+                    sitterMemberId, 0, 10, "createdAt", "ascending"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_SORT_FIELD));
+        }
+
+        @Test
+        @DisplayName("[실패] direction이 한글 값이면 INVALID_SORT_FIELD를 반환한다")
+        void get_my_received_reviews_korean_invalid_direction() {
+            assertThatThrownBy(() -> reviewService.getMyReceivedReviews(
+                    sitterMemberId, 0, 10, "createdAt", "내림차순"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_SORT_FIELD));
+        }
+    }
+
     private Reservation createReservation() {
         Reservation reservation = Reservation.builder()
                 .guardianId(guardianId)
@@ -568,6 +698,18 @@ class ReviewServiceTest {
                 revieweeId,
                 "시터닉네임",
                 sitterId,
+                5,
+                "정말 세심하게 돌봐주셔서 만족했습니다.",
+                null
+        );
+    }
+
+    private MyReceivedReviewResponse createMyReceivedReviewResponse(Long reviewId, Long reviewerId) {
+        return new MyReceivedReviewResponse(
+                reviewId,
+                reservationId,
+                reviewerId,
+                "보호자닉네임",
                 5,
                 "정말 세심하게 돌봐주셔서 만족했습니다.",
                 null
