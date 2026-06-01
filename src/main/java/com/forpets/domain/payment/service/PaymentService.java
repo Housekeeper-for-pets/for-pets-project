@@ -4,11 +4,7 @@ import com.forpets.domain.coupon.dto.CouponApplyResult;
 import com.forpets.domain.coupon.service.CouponService;
 import com.forpets.domain.payment.client.PortOnePaymentClient;
 import com.forpets.domain.payment.client.PortOnePaymentResult;
-import com.forpets.domain.payment.dto.ConfirmPaymentRequest;
-import com.forpets.domain.payment.dto.ConfirmPaymentResponse;
-import com.forpets.domain.payment.dto.CreatePaymentRequest;
-import com.forpets.domain.payment.dto.FailPaymentRequest;
-import com.forpets.domain.payment.dto.PaymentResponseDto;
+import com.forpets.domain.payment.dto.*;
 import com.forpets.domain.payment.entity.*;
 import com.forpets.domain.payment.exception.PaymentErrorCode;
 import com.forpets.domain.payment.exception.PaymentException;
@@ -22,6 +18,7 @@ import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.service.ReservationLockService;
 import com.forpets.domain.reservation.service.ReservationService;
+import com.forpets.global.aspect.DistributedLock;
 import com.forpets.global.monitoring.TrackExecutionTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +49,7 @@ public class PaymentService {
     결제 요청 생성
     PET-129 범위에서는 PortOne 승인 전 READY 상태의 결제 요청만 생성한다.
      */
+    @DistributedLock(key = "'reservation:' + #request.reservationId")
     @Transactional
     public PaymentResponseDto create(Long memberId, CreatePaymentRequest request) {
         Reservation reservation = findReservation(request.reservationId());
