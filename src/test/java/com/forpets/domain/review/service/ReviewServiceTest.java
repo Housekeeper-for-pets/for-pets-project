@@ -5,11 +5,14 @@ import com.forpets.domain.reservation.entity.ReservationSource;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.review.dto.CreateReviewRequest;
+import com.forpets.domain.review.dto.MyWrittenReviewPageResponse;
+import com.forpets.domain.review.dto.MyWrittenReviewResponse;
 import com.forpets.domain.review.dto.ReviewPageResponse;
 import com.forpets.domain.review.dto.ReviewResponse;
 import com.forpets.domain.review.entity.Review;
 import com.forpets.domain.review.exception.ReviewErrorCode;
 import com.forpets.domain.review.exception.ReviewException;
+import com.forpets.domain.review.repository.ReviewQueryRepository;
 import com.forpets.domain.review.repository.ReviewRepository;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
@@ -28,6 +31,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -49,6 +53,9 @@ class ReviewServiceTest {
 
     @Mock
     private ReviewRepository reviewRepository;
+
+    @Mock
+    private ReviewQueryRepository reviewQueryRepository;
 
     @Mock
     private ReservationRepository reservationRepository;
@@ -389,6 +396,125 @@ class ReviewServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("내가 작성한 리뷰 목록 조회")
+    class GetMyWrittenReviewsTest {
+
+        @Test
+        @DisplayName("[성공] MEMBER가 작성한 리뷰 목록을 조회한다")
+        void get_my_written_reviews_member_success() {
+            // given
+            MyWrittenReviewResponse writtenReview = createMyWrittenReviewResponse(10L, sitterMemberId);
+            given(reviewQueryRepository.findMyWrittenReviews(any(), any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of(writtenReview), PageRequest.of(0, 10), 1));
+
+            // when
+            MyWrittenReviewPageResponse response = reviewService.getMyWrittenReviews(
+                    guardianId, 0, 10, "createdAt", "desc");
+
+            // then
+            assertThat(response.content()).hasSize(1);
+            assertThat(response.content().get(0).revieweeNickname()).isEqualTo("시터닉네임");
+            assertThat(response.content().get(0).sitterProfileId()).isEqualTo(sitterId);
+            assertThat(response.totalElements()).isEqualTo(1);
+            assertThat(response.currentPage()).isEqualTo(0);
+            assertThat(response.size()).isEqualTo(10);
+
+            ArgumentCaptor<Long> reviewerIdCaptor = ArgumentCaptor.forClass(Long.class);
+            then(reviewQueryRepository).should()
+                    .findMyWrittenReviews(reviewerIdCaptor.capture(), any(Pageable.class));
+            assertThat(reviewerIdCaptor.getValue()).isEqualTo(guardianId);
+        }
+
+        @Test
+        @DisplayName("[성공] SITTER도 보호자로서 작성한 리뷰 목록을 조회한다")
+        void get_my_written_reviews_sitter_success() {
+            // given
+            MyWrittenReviewResponse writtenReview = createMyWrittenReviewResponse(11L, otherMemberId);
+            given(reviewQueryRepository.findMyWrittenReviews(any(), any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of(writtenReview), PageRequest.of(0, 10), 1));
+
+            // when
+            MyWrittenReviewPageResponse response = reviewService.getMyWrittenReviews(
+                    sitterMemberId, 0, 10, "rating", "asc");
+
+            // then
+            assertThat(response.content()).hasSize(1);
+            assertThat(response.content().get(0).revieweeId()).isEqualTo(otherMemberId);
+
+            ArgumentCaptor<Long> reviewerIdCaptor = ArgumentCaptor.forClass(Long.class);
+            then(reviewQueryRepository).should()
+                    .findMyWrittenReviews(reviewerIdCaptor.capture(), any(Pageable.class));
+            assertThat(reviewerIdCaptor.getValue()).isEqualTo(sitterMemberId);
+        }
+
+        @Test
+        @DisplayName("[성공] 내가 작성한 리뷰가 없으면 빈 페이지를 반환한다")
+        void get_my_written_reviews_empty() {
+            // given
+            given(reviewQueryRepository.findMyWrittenReviews(any(), any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+            // when
+            MyWrittenReviewPageResponse response = reviewService.getMyWrittenReviews(
+                    guardianId, 0, 10, "createdAt", "desc");
+
+            // then
+            assertThat(response.content()).isEmpty();
+            assertThat(response.totalElements()).isZero();
+        }
+
+        @Test
+        @DisplayName("[실패] page가 음수이면 INVALID_PAGE_REQUEST를 반환한다")
+        void get_my_written_reviews_invalid_page() {
+            assertThatThrownBy(() -> reviewService.getMyWrittenReviews(
+                    guardianId, -1, 10, "createdAt", "desc"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+        }
+
+        @Test
+        @DisplayName("[실패] size가 0이면 INVALID_PAGE_REQUEST를 반환한다")
+        void get_my_written_reviews_zero_size() {
+            assertThatThrownBy(() -> reviewService.getMyWrittenReviews(
+                    guardianId, 0, 0, "createdAt", "desc"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+        }
+
+        @Test
+        @DisplayName("[실패] size가 51이면 INVALID_PAGE_REQUEST를 반환한다")
+        void get_my_written_reviews_too_large_size() {
+            assertThatThrownBy(() -> reviewService.getMyWrittenReviews(
+                    guardianId, 0, 51, "createdAt", "desc"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_PAGE_REQUEST));
+        }
+
+        @Test
+        @DisplayName("[실패] sort가 허용되지 않은 필드이면 INVALID_SORT_FIELD를 반환한다")
+        void get_my_written_reviews_invalid_sort() {
+            assertThatThrownBy(() -> reviewService.getMyWrittenReviews(
+                    guardianId, 0, 10, "updatedAt", "desc"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_SORT_FIELD));
+        }
+
+        @Test
+        @DisplayName("[실패] direction이 허용되지 않은 값이면 INVALID_SORT_FIELD를 반환한다")
+        void get_my_written_reviews_invalid_direction() {
+            assertThatThrownBy(() -> reviewService.getMyWrittenReviews(
+                    guardianId, 0, 10, "createdAt", "random"))
+                    .isInstanceOf(SitterException.class)
+                    .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
+                            .isEqualTo(SitterErrorCode.INVALID_SORT_FIELD));
+        }
+    }
+
     private Reservation createReservation() {
         Reservation reservation = Reservation.builder()
                 .guardianId(guardianId)
@@ -433,5 +559,18 @@ class ReviewServiceTest {
                 .build();
         ReflectionTestUtils.setField(sitterProfile, "id", sitterId);
         return sitterProfile;
+    }
+
+    private MyWrittenReviewResponse createMyWrittenReviewResponse(Long reviewId, Long revieweeId) {
+        return new MyWrittenReviewResponse(
+                reviewId,
+                reservationId,
+                revieweeId,
+                "시터닉네임",
+                sitterId,
+                5,
+                "정말 세심하게 돌봐주셔서 만족했습니다.",
+                null
+        );
     }
 }
