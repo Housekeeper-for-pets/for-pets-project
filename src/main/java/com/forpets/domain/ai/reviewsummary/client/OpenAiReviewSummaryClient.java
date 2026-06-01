@@ -1,6 +1,5 @@
 package com.forpets.domain.ai.reviewsummary.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.forpets.domain.ai.reviewsummary.dto.SitterReviewSummaryResponse;
 import com.forpets.domain.ai.reviewsummary.exception.AiReviewSummaryErrorCode;
@@ -53,6 +52,7 @@ public class OpenAiReviewSummaryClient implements AiReviewSummaryClient {
         }
 
         try {
+            // 프론트 응답값을 신뢰하지 않고, 서버에서 만든 프롬프트만 OpenAI에 전달한다.
             String rawResponse = restClient.post()
                     .uri(CHAT_COMPLETIONS_URL)
                     .contentType(MediaType.APPLICATION_JSON)

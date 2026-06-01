@@ -1040,6 +1040,7 @@ public class DataInit implements CommandLineRunner {
         );
     }
 
+    // 프론트에서 모든 시터 상세 화면의 리뷰 목록과 AI 요약 갱신을 확인할 수 있는 local seed 데이터.
     private void saveAiReviewDemoData(List<SitterProfile> sitters, List<DemoReviewGuardian> guardians) {
         String[] comments = {
                 "말티즈가 낯을 많이 가리는데 천천히 적응시켜주시고 사진도 자주 보내주셔서 안심됐습니다.",
