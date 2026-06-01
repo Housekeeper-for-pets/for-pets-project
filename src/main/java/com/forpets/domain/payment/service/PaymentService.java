@@ -141,16 +141,18 @@ public class PaymentService {
         Payment payment = paymentRepository.findByMerchantUid(request.merchantUid())
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-        validatePaymentOwner(memberId, payment);
-        validateFailable(payment);
+        return reservationLockService.executeWithReservationLock(payment.getReservationId(), () -> {
+            validatePaymentOwner(memberId, payment);
+            validateFailable(payment);
 
-        payment.fail(request.failedReason());
-        restoreCouponIfApplied(payment);
+            payment.fail(request.failedReason());
+            restoreCouponIfApplied(payment);
 
-        log.info("[PaymentService] 결제 실패 처리 paymentId={}, merchantUid={}, reason={}",
-                payment.getId(), payment.getMerchantUid(), request.failedReason());
+            log.info("[PaymentService] 결제 실패 처리 paymentId={}, merchantUid={}, reason={}",
+                    payment.getId(), payment.getMerchantUid(), request.failedReason());
 
-        return PaymentResponseDto.from(payment);
+            return PaymentResponseDto.from(payment);
+        });
     }
 
     public List<PaymentResponseDto> getMyPayments(Long memberId) {
