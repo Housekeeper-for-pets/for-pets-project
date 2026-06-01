@@ -31,6 +31,8 @@ import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
+import com.forpets.domain.review.entity.Review;
+import com.forpets.domain.review.repository.ReviewRepository;
 import com.forpets.domain.sitter.entity.*;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
@@ -69,6 +71,7 @@ public class DataInit implements CommandLineRunner {
     private final ReservationPetRepository reservationPetRepository;
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
     private final ReservationPaymentRepository reservationPaymentRepository;
+    private final ReviewRepository reviewRepository;
     private final PasswordEncoder passwordEncoder;
 
     // 루프 기반 생성에서 사용할 시드 (동일 데이터 재현 보장)
@@ -459,6 +462,16 @@ public class DataInit implements CommandLineRunner {
                         String.format("%02d:00", endHour));
             }
         }
+
+        saveAiReviewDemoData(
+                allSitters,
+                List.of(
+                        new DemoReviewGuardian(member1, pet1),
+                        new DemoReviewGuardian(member2, pet10),
+                        new DemoReviewGuardian(member3, pet11),
+                        new DemoReviewGuardian(member5, pet15)
+                )
+        );
 
         // =============================================
         // ★ 신규 Post 21개 (총 30개)
@@ -1025,5 +1038,80 @@ public class DataInit implements CommandLineRunner {
         return reservationPaymentRepository.save(
                 ReservationPayment.create(reservationId, price, (int) (price * 0.2))
         );
+    }
+
+    // 프론트에서 모든 시터 상세 화면의 리뷰 목록과 AI 요약 갱신을 확인할 수 있는 local seed 데이터.
+    private void saveAiReviewDemoData(List<SitterProfile> sitters, List<DemoReviewGuardian> guardians) {
+        String[] comments = {
+                "말티즈가 낯을 많이 가리는데 천천히 적응시켜주시고 사진도 자주 보내주셔서 안심됐습니다.",
+                "분리불안이 있는 아이를 차분하게 돌봐주셨어요. 산책 강도도 무리하지 않게 맞춰주셨습니다.",
+                "응답이 빠르고 케어 후 아이 상태를 자세히 알려주셔서 좋았습니다. 소형견 케어에 익숙해 보였어요.",
+                "사진 공유가 꼼꼼했고 낯가림 있는 아이를 억지로 만지지 않고 기다려주셔서 만족했습니다.",
+                "전반적으로 만족했습니다. 다만 대형견보다는 소형견 케어 후기가 더 잘 맞는 시터님이라는 인상을 받았습니다."
+        };
+
+        int reviewIndex = 0;
+        for (SitterProfile sitter : sitters) {
+            int savedCount = 0;
+            for (DemoReviewGuardian guardian : guardians) {
+                if (guardian.member().getId().equals(sitter.getMemberId())) {
+                    continue;
+                }
+
+                LocalDate careDate = LocalDate.of(2026, 4, 1).plusDays(reviewIndex);
+                int startHour = 9 + (reviewIndex % 5);
+                saveCompletedReservationReview(
+                        guardian.member(),
+                        sitter,
+                        guardian.pet(),
+                        careDate.toString(),
+                        String.format("%02d:00", startHour),
+                        String.format("%02d:00", startHour + 3),
+                        40000 + (reviewIndex % 6) * 5000,
+                        comments[reviewIndex % comments.length],
+                        reviewIndex % 5 == 4 ? 4 : 5
+                );
+
+                reviewIndex++;
+                savedCount++;
+                if (savedCount >= 3) {
+                    break;
+                }
+            }
+        }
+    }
+
+    private void saveCompletedReservationReview(Member guardian, SitterProfile sitter, Pet pet,
+                                                String careDate, String startTime, String endTime,
+                                                int price, String reviewComment, int rating) {
+        Reservation reservation = saveReservation(
+                guardian.getId(),
+                sitter.getMemberId(),
+                sitter.getId(),
+                CareType.VISIT,
+                ReservationSource.CARE_REQUEST,
+                0L,
+                price
+        );
+        saveReservationPet(reservation.getId(), pet);
+        saveReservationTimeSlot(reservation.getId(), careDate, startTime, endTime, 1);
+
+        ReservationPayment payment = saveReservationPayment(reservation.getId(), price);
+        payment.guardianConfirm();
+        payment.sitterConfirm();
+
+        reservation.confirm();
+        reservation.complete();
+
+        reviewRepository.save(Review.builder()
+                .reservationId(reservation.getId())
+                .reviewerId(guardian.getId())
+                .revieweeId(sitter.getMemberId())
+                .reviewComment(reviewComment)
+                .rating(rating)
+                .build());
+    }
+
+    private record DemoReviewGuardian(Member member, Pet pet) {
     }
 }

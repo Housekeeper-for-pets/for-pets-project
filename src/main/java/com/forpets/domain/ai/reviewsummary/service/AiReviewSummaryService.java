@@ -53,6 +53,7 @@ public class AiReviewSummaryService {
         AiPromptTemplate promptTemplate = findPromptTemplate(category);
         String prompt = buildPrompt(promptTemplate.getTemplate(), reviews);
 
+        // AI 응답은 저장 전에 스키마와 근거 리뷰 ID를 검증해 환각성 데이터를 막는다.
         AiReviewSummaryClient.AiReviewSummaryResult result = aiReviewSummaryClient.generate(prompt);
         validateAiResponse(result.response(), reviews);
 
