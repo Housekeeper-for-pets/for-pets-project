@@ -15,7 +15,7 @@ import java.util.function.Supplier;
 @Slf4j
 @Service
 public class ReservationLockService {
-    private static final String CONFIRM_LOCK_PREFIX = "lock:reservation:confirm:";
+    private static final String CONFIRM_LOCK_PREFIX = "lock:sitter:";
     private static final String RESERVATION_LOCK_PREFIX = "lock:reservation:";
     private static final Duration LOCK_TTL = Duration.ofSeconds(10);
 

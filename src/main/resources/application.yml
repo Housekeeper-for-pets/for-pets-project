@@ -11,6 +11,11 @@ spring:
   jpa:
     open-in-view: false
 
+  notifications:
+    broker: direct     # v0
+    # broker: redis-stream  # v1 전환 시
+    # broker: kafka          # v2 전환 시
+
   servlet:
     multipart:
       max-file-size: 10MB
