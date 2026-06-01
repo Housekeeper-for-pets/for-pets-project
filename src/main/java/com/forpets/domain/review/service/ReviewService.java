@@ -4,11 +4,14 @@ import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.review.dto.CreateReviewRequest;
+import com.forpets.domain.review.dto.MyWrittenReviewPageResponse;
+import com.forpets.domain.review.dto.MyWrittenReviewResponse;
 import com.forpets.domain.review.dto.ReviewPageResponse;
 import com.forpets.domain.review.dto.ReviewResponse;
 import com.forpets.domain.review.entity.Review;
 import com.forpets.domain.review.exception.ReviewErrorCode;
 import com.forpets.domain.review.exception.ReviewException;
+import com.forpets.domain.review.repository.ReviewQueryRepository;
 import com.forpets.domain.review.repository.ReviewRepository;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
@@ -36,6 +39,7 @@ public class ReviewService {
     private static final int MAX_COMMENT_LENGTH = 500;
 
     private final ReviewRepository reviewRepository;
+    private final ReviewQueryRepository reviewQueryRepository;
     private final ReservationRepository reservationRepository;
     private final SitterProfileRepository sitterProfileRepository;
     private final BadWordFiltering badWordFiltering = new BadWordFiltering();
@@ -92,6 +96,25 @@ public class ReviewService {
                 reviewPage.getContent().stream()
                         .map(ReviewResponse::from)
                         .toList(),
+                reviewPage.getTotalElements(),
+                reviewPage.getTotalPages(),
+                reviewPage.getNumber(),
+                reviewPage.getSize()
+        );
+    }
+
+    public MyWrittenReviewPageResponse getMyWrittenReviews(Long memberId, int page, int size,
+                                                           String sort, String direction) {
+        validatePageRequest(page, size);
+        validateSortField(sort);
+        validateSortDirection(direction);
+
+        Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
+        Page<MyWrittenReviewResponse> reviewPage = reviewQueryRepository.findMyWrittenReviews(memberId, pageable);
+
+        return MyWrittenReviewPageResponse.of(
+                reviewPage.getContent(),
                 reviewPage.getTotalElements(),
                 reviewPage.getTotalPages(),
                 reviewPage.getNumber(),
