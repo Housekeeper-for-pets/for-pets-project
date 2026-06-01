@@ -1047,7 +1047,11 @@ public class DataInit implements CommandLineRunner {
                 "분리불안이 있는 아이를 차분하게 돌봐주셨어요. 산책 강도도 무리하지 않게 맞춰주셨습니다.",
                 "응답이 빠르고 케어 후 아이 상태를 자세히 알려주셔서 좋았습니다. 소형견 케어에 익숙해 보였어요.",
                 "사진 공유가 꼼꼼했고 낯가림 있는 아이를 억지로 만지지 않고 기다려주셔서 만족했습니다.",
-                "전반적으로 만족했습니다. 다만 대형견보다는 소형견 케어 후기가 더 잘 맞는 시터님이라는 인상을 받았습니다."
+                "전반적으로 만족했습니다. 다만 대형견보다는 소형견 케어 후기가 더 잘 맞는 시터님이라는 인상을 받았습니다.",
+                "시간 약속은 잘 지켰지만 케어 일지가 조금 짧아서 아이 상태를 더 자세히 알고 싶었습니다.",
+                "응답은 빨랐지만 산책 후 사진 공유가 한 장뿐이라 다음에는 조금 더 자주 공유되면 좋겠습니다.",
+                "아이를 다정하게 봐주셨지만 활발한 대형견 산책에는 아직 조심스러워 보였습니다.",
+                "예약 진행은 매끄러웠지만 약속 시간보다 10분 늦게 도착해서 조금 아쉬웠습니다."
         };
 
         int reviewIndex = 0;
@@ -1069,7 +1073,7 @@ public class DataInit implements CommandLineRunner {
                         String.format("%02d:00", startHour + 3),
                         40000 + (reviewIndex % 6) * 5000,
                         comments[reviewIndex % comments.length],
-                        reviewIndex % 5 == 4 ? 4 : 5
+                        resolveDemoReviewRating(reviewIndex)
                 );
 
                 reviewIndex++;
@@ -1079,6 +1083,14 @@ public class DataInit implements CommandLineRunner {
                 }
             }
         }
+    }
+
+    private int resolveDemoReviewRating(int reviewIndex) {
+        return switch (reviewIndex % 9) {
+            case 5, 6, 7 -> 4;
+            case 8 -> 3;
+            default -> 5;
+        };
     }
 
     private void saveCompletedReservationReview(Member guardian, SitterProfile sitter, Pet pet,

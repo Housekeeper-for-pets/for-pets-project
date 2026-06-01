@@ -63,7 +63,7 @@ class AiSitterRecommendationToolTest {
         given(summaryRepository.findBySitterId(1L)).willReturn(Optional.of(summary()));
 
         // when
-        List<RecommendedSitterDto> result = recommendationTool.searchSitters(condition);
+        List<RecommendedSitterDto> result = recommendationTool.buildRecommendations(condition);
 
         // then
         assertThat(result).hasSize(1);

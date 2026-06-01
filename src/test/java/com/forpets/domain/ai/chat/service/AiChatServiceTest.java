@@ -45,7 +45,7 @@ class AiChatServiceTest {
         List<RecommendedSitterDto> candidates = List.of(candidate());
 
         given(aiChatClient.extractCondition(message)).willReturn(condition);
-        given(sitterRecommendationTool.searchSitters(condition)).willReturn(candidates);
+        given(sitterRecommendationTool.buildRecommendations(condition)).willReturn(candidates);
         given(aiChatClient.generateAnswer(message, condition, candidates))
                 .willReturn("마포구에서 소형견 케어가 가능한 시터를 찾았어요.");
 
@@ -55,7 +55,7 @@ class AiChatServiceTest {
         // then
         assertThat(response.answer()).contains("마포구");
         assertThat(response.recommendedSitters()).hasSize(1);
-        then(sitterRecommendationTool).should().searchSitters(condition);
+        then(sitterRecommendationTool).should().buildRecommendations(condition);
     }
 
     private RecommendedSitterDto candidate() {

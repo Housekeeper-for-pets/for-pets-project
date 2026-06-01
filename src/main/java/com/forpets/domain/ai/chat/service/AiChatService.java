@@ -21,7 +21,7 @@ public class AiChatService {
 
     public AiChatResponse chat(Long memberId, AiChatRequest request) {
         AiSitterSearchCondition condition = aiChatClient.extractCondition(request.message());
-        List<RecommendedSitterDto> candidates = sitterRecommendationTool.searchSitters(condition);
+        List<RecommendedSitterDto> candidates = sitterRecommendationTool.buildRecommendations(condition);
         String answer = aiChatClient.generateAnswer(request.message(), condition, candidates);
 
         return new AiChatResponse(answer, candidates);

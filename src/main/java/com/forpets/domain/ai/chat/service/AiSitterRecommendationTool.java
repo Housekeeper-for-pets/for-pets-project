@@ -9,6 +9,7 @@ import com.forpets.domain.ai.reviewsummary.repository.SitterReviewSummaryReposit
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterResponseDto;
 import com.forpets.domain.sitter.dto.profile.SitterSearchCondition;
+import com.forpets.domain.sitter.dto.schedule.ScheduleResponseDto;
 import com.forpets.domain.sitter.service.SitterService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -28,10 +29,10 @@ public class AiSitterRecommendationTool {
     private final ObjectMapper objectMapper;
 
     /**
-     * LLM이 직접 DB를 상상하지 않도록, 추천 후보는 반드시 기존 시터 검색 API 결과에서만 만든다.
-     * 추후 Spring AI @Tool 도입 시 이 메서드를 Tool 메서드로 그대로 노출할 수 있다.
+     * Tool 1. 조건 기반 시터 검색.
+     * LLM이 직접 DB를 상상하지 않도록 추천 후보 ID는 반드시 기존 시터 검색 API 결과에서만 가져온다.
      */
-    public List<RecommendedSitterDto> searchSitters(AiSitterSearchCondition condition) {
+    public List<SitterResponseDto> searchSitters(AiSitterSearchCondition condition) {
         SitterSearchCondition searchCondition = new SitterSearchCondition(
                 condition.region(),
                 condition.possiblePetType(),
@@ -42,14 +43,34 @@ public class AiSitterRecommendationTool {
 
         SitterPageResponse response = sitterService.searchSitters(searchCondition, 0, RECOMMENDATION_LIMIT, "createdAt");
 
-        return response.content()
+        return response.content();
+    }
+
+    /**
+     * Tool 2. 시터별 AI 리뷰 요약 조회.
+     * 저장된 요약만 사용해서 추천 답변이 실제 리뷰 근거를 벗어나지 않게 한다.
+     */
+    public SitterReviewSummary findReviewSummary(Long sitterId) {
+        return summaryRepository.findBySitterId(sitterId).orElse(null);
+    }
+
+    /**
+     * Tool 3. 시터 가능 시간 조회.
+     * 검색 API가 내려준 스케줄만 후보 DTO에 붙여 사용자가 바로 비교할 수 있게 한다.
+     */
+    public List<ScheduleResponseDto> findSchedules(SitterResponseDto sitter) {
+        return sitter.schedules();
+    }
+
+    public List<RecommendedSitterDto> buildRecommendations(AiSitterSearchCondition condition) {
+        return searchSitters(condition)
                 .stream()
                 .map(this::toRecommendedSitter)
                 .toList();
     }
 
     private RecommendedSitterDto toRecommendedSitter(SitterResponseDto sitter) {
-        SitterReviewSummary summary = summaryRepository.findBySitterId(sitter.id()).orElse(null);
+        SitterReviewSummary summary = findReviewSummary(sitter.id());
 
         return new RecommendedSitterDto(
                 sitter.id(),
@@ -64,7 +85,7 @@ public class AiSitterRecommendationTool {
                 summary == null ? null : summary.getSummary(),
                 summary == null ? List.of() : readList(summary.getStrengths()),
                 summary == null ? List.of() : readList(summary.getCautions()),
-                sitter.schedules()
+                findSchedules(sitter)
         );
     }
 
