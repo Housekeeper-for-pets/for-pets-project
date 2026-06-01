@@ -256,7 +256,10 @@ public class AiReviewSummaryService {
 
     private void replaceUsedReviews(Long summaryId, List<Long> reviewIds) {
         summaryReviewRepository.deleteAllBySummaryId(summaryId);
+        summaryReviewRepository.flush();
+
         List<SitterReviewSummaryReview> usedReviews = reviewIds.stream()
+                .distinct()
                 .map(reviewId -> SitterReviewSummaryReview.builder()
                         .summaryId(summaryId)
                         .reviewId(reviewId)

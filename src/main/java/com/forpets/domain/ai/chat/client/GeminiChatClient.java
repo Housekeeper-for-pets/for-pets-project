@@ -6,6 +6,7 @@ import com.forpets.domain.ai.chat.dto.RecommendedSitterDto;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
@@ -13,11 +14,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 @Component
 @Profile("ai")
+@Slf4j
 public class GeminiChatClient implements AiChatClient {
 
     private static final String GEMINI_URL_TEMPLATE =
@@ -82,7 +85,8 @@ public class GeminiChatClient implements AiChatClient {
         try {
             return requestContent(ANSWER_SYSTEM_INSTRUCTION, buildAnswerPrompt(message, condition, candidates), temperature, maxTokens, false);
         } catch (Exception exception) {
-            return "조건에 맞는 시터 " + candidates.size() + "명을 찾았어요. 추천 후보 목록에서 리뷰 요약과 가능 시간을 확인해보세요.";
+            log.warn("Gemini 추천 답변 생성 실패. 서버 기본 답변으로 대체합니다.", exception);
+            return buildLocalAnswer(candidates);
         }
     }
 
@@ -164,11 +168,40 @@ public class GeminiChatClient implements AiChatClient {
                     """.formatted(
                     message,
                     objectMapper.writeValueAsString(condition),
-                    objectMapper.writeValueAsString(candidates)
+                    objectMapper.writeValueAsString(toCompactCandidates(candidates))
             );
         } catch (Exception exception) {
             return message;
         }
+    }
+
+    private List<Map<String, Object>> toCompactCandidates(List<RecommendedSitterDto> candidates) {
+        return candidates.stream()
+                .map(candidate -> {
+                    Map<String, Object> compact = new LinkedHashMap<>();
+                    compact.put("sitterId", candidate.sitterId());
+                    compact.put("region", candidate.region());
+                    compact.put("experienceYears", candidate.experienceYears());
+                    compact.put("possiblePetType", candidate.possiblePetType());
+                    compact.put("possiblePetSize", candidate.possiblePetSize());
+                    compact.put("pricePerHour", candidate.pricePerHour());
+                    compact.put("reviewSummary", candidate.reviewSummary() == null ? "" : candidate.reviewSummary());
+                    compact.put("strengths", candidate.strengths());
+                    compact.put("cautions", candidate.cautions());
+                    return compact;
+                })
+                .toList();
+    }
+
+    private String buildLocalAnswer(List<RecommendedSitterDto> candidates) {
+        RecommendedSitterDto first = candidates.get(0);
+        String summary = StringUtils.hasText(first.reviewSummary())
+                ? first.reviewSummary()
+                : "리뷰 요약은 아직 없지만, 조건에 맞는 시터 후보입니다.";
+
+        return "조건에 맞는 시터 " + candidates.size() + "명을 찾았어요. "
+                + "우선 " + first.region().getDescription() + " 지역의 시터 #" + first.sitterId()
+                + "님을 추천드려요. " + summary;
     }
 
     private String stripMarkdownFence(String content) {
