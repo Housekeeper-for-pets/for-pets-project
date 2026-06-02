@@ -32,8 +32,10 @@ public class SitterCacheService {
     @Cacheable(cacheNames = "sitters", keyGenerator = "sitterCacheKeyGenerator",
             cacheManager = "longTtlCacheManager")
     public SitterPageResponse searchSitters(SitterSearchCondition condition,
-                                            int page, int size, String sort) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sort));
+                                            int page, int size, String sort, String direction) {
+        Sort.Direction sortDirection = "asc".equalsIgnoreCase(direction)
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
         return sitterProfileRepository.searchSitters(condition, pageable);
     }
 

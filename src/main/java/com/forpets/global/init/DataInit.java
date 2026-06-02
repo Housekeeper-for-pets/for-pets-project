@@ -32,6 +32,7 @@ import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
 import com.forpets.domain.review.entity.Review;
+import com.forpets.domain.review.repository.ReviewQueryRepository;
 import com.forpets.domain.review.repository.ReviewRepository;
 import com.forpets.domain.sitter.entity.*;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
@@ -72,6 +73,7 @@ public class DataInit implements CommandLineRunner {
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
     private final ReservationPaymentRepository reservationPaymentRepository;
     private final ReviewRepository reviewRepository;
+    private final ReviewQueryRepository reviewQueryRepository;
     private final PasswordEncoder passwordEncoder;
 
     // 루프 기반 생성에서 사용할 시드 (동일 데이터 재현 보장)
@@ -823,6 +825,10 @@ public class DataInit implements CommandLineRunner {
                 crResCount++;
             }
         }
+
+        // saveAiReviewDemoData는 reviewRepository.save()를 직접 호출해 ReviewService를 거치지 않으므로
+        // averageRating / reviewCount가 0인 채로 남는다. 모든 시드 데이터 삽입 후 1회 일괄 재계산한다.
+        syncAllSitterReviewStats(allSitters);
     }
 
     // ===== 상태 분포 적용 =====
@@ -1122,6 +1128,13 @@ public class DataInit implements CommandLineRunner {
                 .reviewComment(reviewComment)
                 .rating(rating)
                 .build());
+    }
+
+    private void syncAllSitterReviewStats(List<SitterProfile> sitters) {
+        for (SitterProfile sitter : sitters) {
+            var stats = reviewQueryRepository.calculateSitterReviewStats(sitter.getMemberId());
+            sitter.updateReviewStats(stats.averageRating(), (int) stats.reviewCount());
+        }
     }
 
     private record DemoReviewGuardian(Member member, Pet pet) {

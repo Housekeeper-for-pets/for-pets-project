@@ -24,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,7 +59,8 @@ class AiSitterRecommendationToolTest {
                 eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null)),
                 eq(0),
                 eq(3),
-                eq("createdAt")
+                eq("createdAt"),
+                eq("desc")
         )).willReturn(SitterPageResponse.of(List.of(sitter()), 1, 1, 0, 3));
         given(summaryRepository.findBySitterId(1L)).willReturn(Optional.of(summary()));
 
@@ -81,6 +83,8 @@ class AiSitterRecommendationToolTest {
                 PossiblePetType.DOG,
                 PossiblePetSize.SMALL,
                 15000,
+                new BigDecimal("4.5"),
+                10,
                 SitterProfileStatus.RESERVABLE,
                 SitterApprovalStatus.APPROVED,
                 null,

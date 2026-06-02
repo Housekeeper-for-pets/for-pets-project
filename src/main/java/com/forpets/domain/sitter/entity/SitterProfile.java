@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -44,6 +45,12 @@ public class SitterProfile extends BaseEntity {
 
     @Column(nullable = false)
     private int pricePerHour;
+
+    @Column(name = "average_rating", nullable = false, precision = 2, scale = 1)
+    private BigDecimal averageRating = BigDecimal.ZERO;
+
+    @Column(name = "review_count", nullable = false)
+    private int reviewCount = 0;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -93,6 +100,15 @@ public class SitterProfile extends BaseEntity {
 
     public void changeStatus(SitterProfileStatus status) {
         this.status = status;
+    }
+
+    /**
+     * 리뷰 작성/삭제 시 평균 평점과 리뷰 수를 갱신합니다.
+     * 증분이 아니라 매번 전체 재계산한 값으로 덮어씁니다. (동시성 이슈 방지)
+     */
+    public void updateReviewStats(BigDecimal averageRating, int reviewCount) {
+        this.averageRating = averageRating;
+        this.reviewCount = reviewCount;
     }
 
     public void approve(Long adminId) {
