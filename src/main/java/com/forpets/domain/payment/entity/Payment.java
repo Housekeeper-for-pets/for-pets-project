@@ -88,6 +88,15 @@ public class Payment extends BaseEntity {
     @Column(name = "raw_response", columnDefinition = "TEXT")
     private String rawResponse;
 
+    /*
+    Payment 는 ReservationLock 으로 직렬화되지만,
+    @Transactional → Lock 획득 순서 구조상 락 획득 전 stale read 가능.
+    @Version 으로 commit 시점에 마지막 방어선 (ObjectOptimisticLockingFailureException).
+     */
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @Builder
     private Payment(Long reservationId, Long memberId, PaymentRole paymentRole,
                     PaymentType paymentType, Long originalAmount, Long discountAmount,

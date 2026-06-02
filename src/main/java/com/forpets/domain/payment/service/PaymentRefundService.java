@@ -34,7 +34,6 @@ public class PaymentRefundService {
     private final ReservationPaymentRepository reservationPaymentRepository;
     private final PortOnePaymentClient portOnePaymentClient;
     private final CouponService couponService;
-    private final PaymentLockService paymentLockService;
     private final ReservationLockService reservationLockService;
     private final SettlementService settlementService;
 
@@ -75,20 +74,17 @@ public class PaymentRefundService {
      */
     @Transactional
     public void refundPaidPayments(Long reservationId, String reason) {
-        paymentLockService.executeWithReservationLock(reservationId, () -> {
-            List<Payment> paidPayments = paymentRepository.findAllByReservationIdAndStatusIn(
-                    reservationId, List.of(PaymentStatus.PAID));
+        List<Payment> paidPayments = paymentRepository.findAllByReservationIdAndStatusIn(
+                reservationId, List.of(PaymentStatus.PAID));
 
-            if (paidPayments.isEmpty()) {
-                return null;
-            }
+        if (paidPayments.isEmpty()) {
+            return;
+        }
 
-            ReservationPayment reservationPayment = reservationPaymentRepository.findByReservationId(reservationId)
-                    .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+        ReservationPayment reservationPayment = reservationPaymentRepository.findByReservationId(reservationId)
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
-            paidPayments.forEach(payment -> refund(payment, reservationPayment, reason));
-            return null;
-        });
+        paidPayments.forEach(payment -> refund(payment, reservationPayment, reason));
     }
 
     /*
@@ -186,63 +182,59 @@ public class PaymentRefundService {
 
     @Transactional
     public void refundWithPenalty(Long reservationId, String reason, CanceledBy canceledBy) {
-        paymentLockService.executeWithReservationLock(reservationId, () -> {
-            List<Payment> paidPayments = paymentRepository.findAllByReservationIdAndStatusIn(
-                    reservationId, List.of(PaymentStatus.PAID));
+        List<Payment> paidPayments = paymentRepository.findAllByReservationIdAndStatusIn(
+                reservationId, List.of(PaymentStatus.PAID));
 
-            if (paidPayments.isEmpty()) {
-                return null;
+        if (paidPayments.isEmpty()) {
+            return;
+        }
+
+        ReservationPayment reservationPayment = reservationPaymentRepository
+                .findByReservationId(reservationId)
+                .orElseThrow(() -> new ReservationException(
+                        ReservationErrorCode.RESERVATION_NOT_FOUND));
+
+        // 1단계: PG 환불 (각자 결제한 곳으로 위약금 뺀 금액 환불)
+        long penaltyAmount = 0L;
+        Long penaltySourcePaymentId = null;
+        for (Payment payment : paidPayments) {
+            if (!payment.isPaid()) continue;
+
+            long penalty = calculatePenalty(payment, canceledBy);
+            long refundAmount = payment.getFinalAmount() - penalty;
+            penaltyAmount += penalty;
+            if (penalty > 0) {
+                penaltySourcePaymentId = payment.getId();
             }
 
-            ReservationPayment reservationPayment = reservationPaymentRepository
-                    .findByReservationId(reservationId)
-                    .orElseThrow(() -> new ReservationException(
-                            ReservationErrorCode.RESERVATION_NOT_FOUND));
-
-            // 1단계: PG 환불 (각자 결제한 곳으로 위약금 뺀 금액 환불)
-            long penaltyAmount = 0L;
-            Long penaltySourcePaymentId = null;
-            for (Payment payment : paidPayments) {
-                if (!payment.isPaid()) continue;
-
-                long penalty = calculatePenalty(payment, canceledBy);
-                long refundAmount = payment.getFinalAmount() - penalty;
-                penaltyAmount += penalty;
-                if (penalty > 0) {
-                    penaltySourcePaymentId = payment.getId();
-                }
-
-                if (refundAmount > 0) {
-                    partialRefund(payment, reservationPayment, refundAmount, reason);
-                } else {
-                    // 시터가 취소한 경우, 시터 결제는 전액 위약금이라 PG 환불 0원
-                    // 상태만 REFUNDED 로 닫는다
-                    markAsRefundedWithoutPgCall(payment, reservationPayment, reason);
-                }
+            if (refundAmount > 0) {
+                partialRefund(payment, reservationPayment, refundAmount, reason);
+            } else {
+                // 시터가 취소한 경우, 시터 결제는 전액 위약금이라 PG 환불 0원
+                // 상태만 REFUNDED 로 닫는다
+                markAsRefundedWithoutPgCall(payment, reservationPayment, reason);
             }
+        }
 
-            // 2단계: 위약금을 상대방에게 보상금으로 정산
-            if (penaltyAmount > 0) {
-                Long receiverMemberId = findPenaltyReceiverMemberId(paidPayments, canceledBy);
-                SettlementType settlementType = getPenaltySettlementType(canceledBy);
-                String settlementReason = getPenaltySettlementReason(canceledBy, reason);
+        // 2단계: 위약금을 상대방에게 보상금으로 정산
+        if (penaltyAmount > 0) {
+            Long receiverMemberId = findPenaltyReceiverMemberId(paidPayments, canceledBy);
+            SettlementType settlementType = getPenaltySettlementType(canceledBy);
+            String settlementReason = getPenaltySettlementReason(canceledBy, reason);
 
-                settlementService.createPenaltySettlement(
-                        reservationId,
-                        receiverMemberId,
-                        penaltySourcePaymentId,
-                        penaltyAmount,
-                        settlementType,
-                        settlementReason
-                );
+            settlementService.createPenaltySettlement(
+                    reservationId,
+                    receiverMemberId,
+                    penaltySourcePaymentId,
+                    penaltyAmount,
+                    settlementType,
+                    settlementReason
+            );
 
-                log.info("[PaymentRefundService] 위약금 정산 예정 reservationId={}, 위약금총액={}, 취소주체={}, 보상수신자={}",
-                        reservationId, penaltyAmount, canceledBy,
-                        canceledBy == CanceledBy.GUARDIAN ? "SITTER" : "GUARDIAN");
-            }
-
-            return null;
-        });
+            log.info("[PaymentRefundService] 위약금 정산 예정 reservationId={}, 위약금총액={}, 취소주체={}, 보상수신자={}",
+                    reservationId, penaltyAmount, canceledBy,
+                    canceledBy == CanceledBy.GUARDIAN ? "SITTER" : "GUARDIAN");
+        }
     }
 
     /*

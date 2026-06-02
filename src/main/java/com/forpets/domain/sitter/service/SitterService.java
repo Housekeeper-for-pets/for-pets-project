@@ -114,12 +114,13 @@ public class SitterService {
 //        return sitterProfileRepository.searchSitters(condition, pageable);
 //    }
 
-    public SitterPageResponse searchSitters(SitterSearchCondition condition, int page, int size, String sort) {
+    public SitterPageResponse searchSitters(SitterSearchCondition condition, int page, int size, String sort, String direction) {
         validatePageRequest(page, size);
         validateSortField(sort);
+        validateSortDirection(direction);
         validatePriceRange(condition);
 
-        return sitterCacheService.searchSitters(condition, page, size, sort);
+        return sitterCacheService.searchSitters(condition, page, size, sort, direction);
     }
 
     public SitterResponseDto getSitterById(Long sitterId) {
@@ -219,14 +220,21 @@ public class SitterService {
      * API 명세 허용 필드: createdAt(기본), pricePerHour, experienceYears
      */
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
-            "createdAt", "pricePerHour", "experienceYears"
+            "createdAt", "pricePerHour", "experienceYears", "averageRating"
     );
+
+    private static final Set<String> ALLOWED_SORT_DIRECTIONS = Set.of("asc", "desc");
 
     private void validateSortField(String sort) {
         if (!ALLOWED_SORT_FIELDS.contains(sort)) {
             throw new SitterException(SitterErrorCode.INVALID_SORT_FIELD);
         }
+    }
 
+    private void validateSortDirection(String direction) {
+        if (!ALLOWED_SORT_DIRECTIONS.contains(direction.toLowerCase())) {
+            throw new SitterException(SitterErrorCode.INVALID_SORT_FIELD);
+        }
     }
 
     private void validatePageRequest(int page, int size) {
