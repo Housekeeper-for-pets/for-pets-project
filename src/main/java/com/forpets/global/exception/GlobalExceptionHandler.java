@@ -237,20 +237,20 @@ public class GlobalExceptionHandler {
                 )));
     }
 
-    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ResponseEntity<ApiResponse<Void>> handleObjectOptimisticLockingFailureException(
-            ObjectOptimisticLockingFailureException exception,
-            HttpServletRequest request)
-    {
-        log.warn("[ObjectOptimisticLockingFailureException] path={}", request.getRequestURI(), exception);
-
-        return ResponseEntity
-                .status(CommonErrorCode.CONFLICT.getStatus())
-                .body(ApiResponse.fail(ErrorResponse.of(
-                        CommonErrorCode.CONFLICT,
-                        request.getRequestURI()
-                )));
-    }
+//    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+//    public ResponseEntity<ApiResponse<Void>> handleObjectOptimisticLockingFailureException(
+//            ObjectOptimisticLockingFailureException exception,
+//            HttpServletRequest request)
+//    {
+//        log.warn("[ObjectOptimisticLockingFailureException] path={}", request.getRequestURI(), exception);
+//
+//        return ResponseEntity
+//                .status(CommonErrorCode.CONFLICT.getStatus())
+//                .body(ApiResponse.fail(ErrorResponse.of(
+//                        CommonErrorCode.CONFLICT,
+//                        request.getRequestURI()
+//                )));
+//    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(
