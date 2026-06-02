@@ -57,9 +57,9 @@ class AiSitterRecommendationToolTest {
         given(sitterService.searchSitters(
                 eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null)),
                 eq(0),
-                eq(5),
+                eq(3),
                 eq("createdAt")
-        )).willReturn(SitterPageResponse.of(List.of(sitter()), 1, 1, 0, 5));
+        )).willReturn(SitterPageResponse.of(List.of(sitter()), 1, 1, 0, 3));
         given(summaryRepository.findBySitterId(1L)).willReturn(Optional.of(summary()));
 
         // when

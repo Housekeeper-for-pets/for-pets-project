@@ -22,7 +22,7 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class AiSitterRecommendationTool {
 
-    private static final int RECOMMENDATION_LIMIT = 5;
+    private static final int RECOMMENDATION_LIMIT = 3;
 
     private final SitterService sitterService;
     private final SitterReviewSummaryRepository summaryRepository;
