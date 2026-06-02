@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.forpets.domain.ai.reviewsummary.dto.SitterReviewSummaryResponse;
 import com.forpets.domain.ai.reviewsummary.exception.AiReviewSummaryErrorCode;
 import com.forpets.domain.ai.reviewsummary.exception.AiReviewSummaryException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
@@ -16,6 +17,7 @@ import java.util.Map;
 
 @Component
 @Profile("ai")
+@Slf4j
 public class GeminiReviewSummaryClient implements AiReviewSummaryClient {
 
     private static final String GEMINI_URL_TEMPLATE =
@@ -73,12 +75,13 @@ public class GeminiReviewSummaryClient implements AiReviewSummaryClient {
         } catch (AiReviewSummaryException exception) {
             throw exception;
         } catch (Exception exception) {
+            log.warn("Gemini 리뷰 요약 응답 처리 실패. model={}, message={}", model, exception.getMessage(), exception);
             throw new AiReviewSummaryException(AiReviewSummaryErrorCode.AI_REVIEW_SUMMARY_FAILED);
         }
     }
 
     private Map<String, Object> buildRequest(String prompt) {
-        // Gemini는 responseMimeType을 지정하면 JSON 객체만 반환하도록 강하게 유도할 수 있다.
+        // Gemini JSON schema를 함께 넘겨 DTO 필드명과 타입을 강제한다.
         return Map.of(
                 "systemInstruction", Map.of(
                         "parts", List.of(Map.of("text", SYSTEM_INSTRUCTION))
@@ -90,8 +93,47 @@ public class GeminiReviewSummaryClient implements AiReviewSummaryClient {
                 "generationConfig", Map.of(
                         "temperature", temperature,
                         "maxOutputTokens", maxTokens,
-                        "responseMimeType", "application/json"
+                        "responseMimeType", "application/json",
+                        "responseSchema", buildResponseSchema()
                 )
+        );
+    }
+
+    private Map<String, Object> buildResponseSchema() {
+        return Map.of(
+                "type", "object",
+                "required", List.of(
+                        "summary",
+                        "strengths",
+                        "cautions",
+                        "recommendedFor",
+                        "keywords",
+                        "sentiment",
+                        "confidenceScore",
+                        "reviewCount",
+                        "usedReviewIds"
+                ),
+                "properties", Map.of(
+                        "summary", Map.of("type", "string"),
+                        "strengths", stringArraySchema(),
+                        "cautions", stringArraySchema(),
+                        "recommendedFor", stringArraySchema(),
+                        "keywords", stringArraySchema(),
+                        "sentiment", Map.of("type", "string", "enum", List.of("POSITIVE", "NEUTRAL", "NEGATIVE")),
+                        "confidenceScore", Map.of("type", "number"),
+                        "reviewCount", Map.of("type", "integer"),
+                        "usedReviewIds", Map.of(
+                                "type", "array",
+                                "items", Map.of("type", "integer")
+                        )
+                )
+        );
+    }
+
+    private Map<String, Object> stringArraySchema() {
+        return Map.of(
+                "type", "array",
+                "items", Map.of("type", "string")
         );
     }
 
