@@ -57,13 +57,14 @@ public class SitterController {
             @RequestParam(required = false) Integer maxPrice,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sort
+            @RequestParam(defaultValue = "createdAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction
     ) {
         SitterSearchCondition condition = new SitterSearchCondition(
                 region, possiblePetType, possiblePetSize, minPrice, maxPrice
         );
 
-        SitterPageResponse response = sitterService.searchSitters(condition, page,size,sort);
+        SitterPageResponse response = sitterService.searchSitters(condition, page, size, sort, direction);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

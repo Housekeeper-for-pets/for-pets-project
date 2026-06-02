@@ -41,7 +41,7 @@ public class AiSitterRecommendationTool {
                 condition.maxPrice()
         );
 
-        SitterPageResponse response = sitterService.searchSitters(searchCondition, 0, RECOMMENDATION_LIMIT, "createdAt");
+        SitterPageResponse response = sitterService.searchSitters(searchCondition, 0, RECOMMENDATION_LIMIT, "createdAt", "desc");
 
         return response.content();
     }

@@ -18,11 +18,12 @@ public class SitterCacheKeyGenerator implements KeyGenerator {
         int page = (int) params[1];
         int size = (int) params[2];
         String sort = (String) params[3];
+        String direction = (String) params[4];
 
-        return generate(condition, page, size, sort);
+        return generate(condition, page, size, sort, direction);
     }
 
-    public static String generate(SitterSearchCondition condition, int page, int size, String sort) {
+    public static String generate(SitterSearchCondition condition, int page, int size, String sort, String direction) {
         String source = String.join(":",
                 valueOf(condition.region()),
                 valueOf(condition.possiblePetType()),
@@ -31,7 +32,8 @@ public class SitterCacheKeyGenerator implements KeyGenerator {
                 valueOf(condition.maxPrice()),
                 String.valueOf(page),
                 String.valueOf(size),
-                valueOf(sort)
+                valueOf(sort),
+                valueOf(direction)
         );
 
         return sha256(source);
