@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @ConditionalOnProperty(
-        name = "notification.broker",
+        name = "spring.notifications.broker",
         havingValue = "direct",
         matchIfMissing = true    // 설정 없으면 기본값으로 사용
 )
