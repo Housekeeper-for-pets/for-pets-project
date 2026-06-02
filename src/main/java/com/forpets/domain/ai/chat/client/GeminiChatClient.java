@@ -1,12 +1,19 @@
 package com.forpets.domain.ai.chat.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.forpets.domain.ai.chat.dto.AiChatResponse;
 import com.forpets.domain.ai.chat.dto.AiSitterSearchCondition;
 import com.forpets.domain.ai.chat.dto.RecommendedSitterDto;
+import com.forpets.domain.ai.chat.service.AiSitterRecommendationTool;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.ToolCallbacks;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
@@ -14,9 +21,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Component
 @Profile("ai")
@@ -35,6 +47,14 @@ public class GeminiChatClient implements AiChatClient {
             제공된 후보 시터 데이터 안에서만 추천하고, DB에 없는 사실이나 의료 행위 가능 여부는 만들지 마세요.
             답변은 한국어로 간결하게 작성하세요.
             """;
+    private static final String TOOL_CALLING_SYSTEM_INSTRUCTION = """
+            당신은 ForPets의 시터 추천 도우미입니다.
+            사용자의 자연어 요청을 해결하기 위해 제공된 Tool을 직접 호출하세요.
+            Tool 결과에 없는 시터, 리뷰, 가능 시간, 의료 행위 가능 여부는 만들지 마세요.
+            추천 후보가 있으면 리뷰 요약과 가능 시간을 근거로 한국어로 간결하게 답변하세요.
+            Tool 호출 실패 컨텍스트가 있으면 사용자에게 자연스럽게 안내하세요.
+            """;
+    private static final int MAX_TOOL_CALL_TURNS = 4;
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -90,6 +110,62 @@ public class GeminiChatClient implements AiChatClient {
         }
     }
 
+    @Override
+    public AiChatResponse chatWithTools(String message, AiSitterRecommendationTool sitterRecommendationTool) {
+        if (!StringUtils.hasText(apiKey)) {
+            return AiChatClient.super.chatWithTools(message, sitterRecommendationTool);
+        }
+
+        try {
+            ToolCallback[] callbacks = ToolCallbacks.from(sitterRecommendationTool);
+            Map<String, ToolCallback> callbackByName = Arrays.stream(callbacks)
+                    .collect(Collectors.toMap(ToolCallback::getName, Function.identity()));
+            List<Map<String, Object>> contents = new ArrayList<>();
+            contents.add(userContent(message));
+            Optional<AiSitterSearchCondition> lastSearchCondition = Optional.empty();
+
+            for (int turn = 0; turn < MAX_TOOL_CALL_TURNS; turn++) {
+                JsonNode response = requestToolCallingContent(contents, callbacks);
+                List<JsonNode> functionCalls = findFunctionCalls(response);
+
+                if (functionCalls.isEmpty()) {
+                    String answer = extractText(response);
+                    List<RecommendedSitterDto> candidates = lastSearchCondition
+                            .map(sitterRecommendationTool::buildRecommendations)
+                            .orElseGet(List::of);
+                    String fallbackAnswer = candidates.isEmpty()
+                            ? "조건에 맞는 시터를 찾지 못했어요. 지역이나 반려동물 조건을 조금 넓혀서 다시 요청해보세요."
+                            : buildLocalAnswer(candidates);
+                    return new AiChatResponse(StringUtils.hasText(answer) ? answer : fallbackAnswer, candidates);
+                }
+
+                contents.add(modelContent(functionCalls));
+
+                for (JsonNode functionCall : functionCalls) {
+                    String name = functionCall.path("name").asText();
+                    String args = functionCall.path("args").isMissingNode()
+                            ? "{}"
+                            : objectMapper.writeValueAsString(functionCall.path("args"));
+                    ToolCallback callback = callbackByName.get(name);
+                    String result = callback == null
+                            ? "{\"status\":\"FAILED\",\"message\":\"등록되지 않은 Tool입니다.\"}"
+                            : callback.call(args);
+
+                    if ("searchSitters".equals(name)) {
+                        lastSearchCondition = parseSearchCondition(args);
+                    }
+
+                    contents.add(toolResponseContent(name, result));
+                }
+            }
+
+            return AiChatClient.super.chatWithTools(message, sitterRecommendationTool);
+        } catch (Exception exception) {
+            log.warn("Gemini 자동 Tool Calling 실패. 서버 오케스트레이션 fallback으로 대체합니다.", exception);
+            return AiChatClient.super.chatWithTools(message, sitterRecommendationTool);
+        }
+    }
+
     private String requestContent(String systemInstruction, String prompt, Double temperature, Integer maxTokens, boolean jsonResponse) throws Exception {
         String rawResponse = restClient.post()
                 .uri(GEMINI_URL_TEMPLATE.formatted(model, apiKey))
@@ -106,6 +182,17 @@ public class GeminiChatClient implements AiChatClient {
                 .path(0)
                 .path("text")
                 .asText();
+    }
+
+    private JsonNode requestToolCallingContent(List<Map<String, Object>> contents, ToolCallback[] callbacks) throws Exception {
+        String rawResponse = restClient.post()
+                .uri(GEMINI_URL_TEMPLATE.formatted(model, apiKey))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(buildToolCallingRequest(contents, callbacks))
+                .retrieve()
+                .body(String.class);
+
+        return objectMapper.readTree(rawResponse);
     }
 
     private Map<String, Object> buildRequest(
@@ -131,6 +218,28 @@ public class GeminiChatClient implements AiChatClient {
         );
     }
 
+    private Map<String, Object> buildToolCallingRequest(List<Map<String, Object>> contents, ToolCallback[] callbacks) {
+        return Map.of(
+                "systemInstruction", Map.of(
+                        "parts", List.of(Map.of("text", TOOL_CALLING_SYSTEM_INSTRUCTION))
+                ),
+                "contents", contents,
+                "tools", List.of(Map.of("functionDeclarations", buildFunctionDeclarations(callbacks))),
+                "toolConfig", Map.of("functionCallingConfig", Map.of("mode", "AUTO")),
+                "generationConfig", Map.of("temperature", temperature, "maxOutputTokens", maxTokens)
+        );
+    }
+
+    private List<Map<String, Object>> buildFunctionDeclarations(ToolCallback[] callbacks) {
+        return Arrays.stream(callbacks)
+                .map(callback -> Map.of(
+                        "name", callback.getName(),
+                        "description", callback.getDescription(),
+                        "parameters", toGeminiSchema(callback.getInputTypeSchema())
+                ))
+                .toList();
+    }
+
     private String buildConditionPrompt(String message) {
         return """
                 사용자 요청:
@@ -146,6 +255,122 @@ public class GeminiChatClient implements AiChatClient {
                   "concern": "string | null"
                 }
                 """.formatted(message);
+    }
+
+    private Map<String, Object> userContent(String message) {
+        return Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", message))
+        );
+    }
+
+    private Map<String, Object> modelContent(List<JsonNode> functionCalls) {
+        return Map.of(
+                "role", "model",
+                "parts", functionCalls.stream()
+                        .map(functionCall -> Map.of("functionCall", functionCall))
+                        .toList()
+        );
+    }
+
+    private Map<String, Object> toolResponseContent(String name, String result) {
+        return Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("functionResponse", Map.of(
+                        "name", name,
+                        "response", Map.of("result", parseJsonOrText(result))
+                )))
+        );
+    }
+
+    private List<JsonNode> findFunctionCalls(JsonNode response) {
+        List<JsonNode> functionCalls = new ArrayList<>();
+        JsonNode parts = response.path("candidates").path(0).path("content").path("parts");
+        if (!parts.isArray()) {
+            return functionCalls;
+        }
+
+        for (JsonNode part : parts) {
+            if (part.has("functionCall")) {
+                functionCalls.add(part.path("functionCall"));
+            }
+        }
+        return functionCalls;
+    }
+
+    private String extractText(JsonNode response) {
+        JsonNode parts = response.path("candidates").path(0).path("content").path("parts");
+        if (!parts.isArray()) {
+            return "";
+        }
+
+        for (JsonNode part : parts) {
+            String text = part.path("text").asText();
+            if (StringUtils.hasText(text)) {
+                return text;
+            }
+        }
+        return "";
+    }
+
+    private Optional<AiSitterSearchCondition> parseSearchCondition(String args) {
+        try {
+            JsonNode root = objectMapper.readTree(args);
+            JsonNode conditionNode = root.has("condition") ? root.path("condition") : root;
+            return Optional.of(objectMapper.treeToValue(conditionNode, AiSitterSearchCondition.class));
+        } catch (Exception exception) {
+            return Optional.empty();
+        }
+    }
+
+    private Object parseJsonOrText(String result) {
+        try {
+            return objectMapper.readValue(result, Object.class);
+        } catch (Exception exception) {
+            return result;
+        }
+    }
+
+    private Map<String, Object> toGeminiSchema(String schema) {
+        try {
+            return objectMapper.convertValue(convertSchema(objectMapper.readTree(schema)), new com.fasterxml.jackson.core.type.TypeReference<>() {
+            });
+        } catch (Exception exception) {
+            return Map.of("type", "OBJECT");
+        }
+    }
+
+    private JsonNode convertSchema(JsonNode schema) {
+        if (schema == null || schema.isNull()) {
+            return objectMapper.createObjectNode().put("type", "OBJECT");
+        }
+        if (schema.isArray()) {
+            ArrayNode arrayNode = objectMapper.createArrayNode();
+            schema.forEach(item -> arrayNode.add(convertSchema(item)));
+            return arrayNode;
+        }
+        if (!schema.isObject()) {
+            return schema;
+        }
+
+        ObjectNode converted = objectMapper.createObjectNode();
+        schema.fields().forEachRemaining(entry -> {
+            String fieldName = entry.getKey();
+            JsonNode value = entry.getValue();
+            if ("$schema".equals(fieldName) || "additionalProperties".equals(fieldName)) {
+                return;
+            }
+            if ("type".equals(fieldName)) {
+                converted.put("type", value.asText().toUpperCase());
+                return;
+            }
+            converted.set(fieldName, convertSchema(value));
+        });
+
+        if (!converted.has("type")) {
+            converted.put("type", "OBJECT");
+        }
+        return converted;
     }
 
     private String buildAnswerPrompt(
