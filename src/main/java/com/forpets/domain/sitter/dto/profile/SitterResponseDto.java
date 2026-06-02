@@ -4,6 +4,7 @@ import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.dto.schedule.ScheduleResponseDto;
 import com.forpets.domain.sitter.entity.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -16,6 +17,8 @@ public record SitterResponseDto(
         PossiblePetType possiblePetType,
         PossiblePetSize possiblePetSize,
         Integer pricePerHour,
+        BigDecimal averageRating,
+        Integer reviewCount,
         SitterProfileStatus status,
         SitterApprovalStatus approvalStatus,
         String rejectReason,
@@ -37,6 +40,8 @@ public record SitterResponseDto(
                 sitter.getPossiblePetType(),
                 sitter.getPossiblePetSize(),
                 sitter.getPricePerHour(),
+                sitter.getAverageRating(),
+                sitter.getReviewCount(),
                 sitter.getStatus(),
                 sitter.getApprovalStatus(),
                 sitter.getRejectReason(),
