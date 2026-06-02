@@ -4,11 +4,6 @@ import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
-import com.forpets.domain.post.entity.Post;
-import com.forpets.domain.post.entity.PostPet;
-import com.forpets.domain.post.entity.PostTimeSlot;
-import com.forpets.domain.post.repository.PostRepository;
-import com.forpets.domain.post.repository.PostTimeSlotRepository;
 import com.forpets.domain.payment.entity.Payment;
 import com.forpets.domain.payment.entity.PaymentRole;
 import com.forpets.domain.payment.entity.PaymentStatus;
@@ -16,6 +11,11 @@ import com.forpets.domain.payment.exception.PaymentErrorCode;
 import com.forpets.domain.payment.exception.PaymentException;
 import com.forpets.domain.payment.repository.PaymentRepository;
 import com.forpets.domain.payment.service.PaymentRefundService;
+import com.forpets.domain.post.entity.Post;
+import com.forpets.domain.post.entity.PostPet;
+import com.forpets.domain.post.entity.PostTimeSlot;
+import com.forpets.domain.post.repository.PostRepository;
+import com.forpets.domain.post.repository.PostTimeSlotRepository;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.repository.ProposalRepository;
@@ -29,6 +29,7 @@ import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
 import com.forpets.domain.settlement.service.SettlementService;
+import com.forpets.global.aspect.DistributedLock;
 import com.forpets.global.embed.HasTimeSlotInfo;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.entity.TimeSlotInfo;
@@ -208,36 +209,35 @@ public class ReservationService {
     케어 완료 처리
     시터만 호출 가능, CONFIRMED 상태에서만 가능
      */
+    @DistributedLock(key = "'reservation:' + #reservationId")
     @TrackExecutionTime("reservation.complete")
     @Transactional
     public ReservationResponseDto complete(Long memberId, Long reservationId) {
-        return reservationLockService.executeWithReservationLock(reservationId, () -> {
-            /*
-            시스템이 보관하고 있던 돈을 시터에게 보내주는 로직
-            - complete 를 호출한 사람 (로그인한 사람) == reservation 의 sitter 인지 확인
-            - completed 가 가능한 상태인지 (confirmed) 확인
-            - 타임슬롯 마지막 시간까지 마쳤는지 확인
-             */
-            Reservation reservation = findById(reservationId);
-            validateSitter(memberId, reservation);
-            validateConfirmed(reservation);
-            validateCareCompleted(reservationId);
+        /*
+        시스템이 보관하고 있던 돈을 시터에게 보내주는 로직
+        - complete 를 호출한 사람 (로그인한 사람) == reservation 의 sitter 인지 확인
+        - completed 가 가능한 상태인지 (confirmed) 확인
+        - 타임슬롯 마지막 시간까지 마쳤는지 확인
+         */
+        Reservation reservation = findById(reservationId);
+        validateSitter(memberId, reservation);
+        validateConfirmed(reservation);
+        validateCareCompleted(reservationId);
 
-            Payment guardianPayment = findPaidGuardianPayment(reservationId);
+        Payment guardianPayment = findPaidGuardianPayment(reservationId);
 
-            //status update
-            reservation.complete();
-            settlementService.createCareCompletionSettlement(
-                    reservation.getId(),
-                    reservation.getSitterMemberId(),
-                    guardianPayment.getId(),
-                    guardianPayment.getFinalAmount()
-            );
-            paymentRefundService.refundSitterDepositAfterCompletion(reservationId);
-            log.info("[케어 완료] reservationId={}, 시터(memberId={}) 완료 처리", reservationId, memberId);
+        //status update
+        reservation.complete();
+        settlementService.createCareCompletionSettlement(
+                reservation.getId(),
+                reservation.getSitterMemberId(),
+                guardianPayment.getId(),
+                guardianPayment.getFinalAmount()
+        );
+        paymentRefundService.refundSitterDepositAfterCompletion(reservationId);
+        log.info("[케어 완료] reservationId={}, 시터(memberId={}) 완료 처리", reservationId, memberId);
 
-            return toResponseDto(reservation);
-        });
+        return toResponseDto(reservation);
     }
 
     /*
@@ -246,51 +246,50 @@ public class ReservationService {
     예약 당사자만 취소 가능
     취소 사유 필수 (최소 10자)
      */
+    @DistributedLock(key = "'reservation:' + #reservationId")
     @TrackExecutionTime("reservation.cancel")
     @Transactional
     public ReservationResponseDto cancel(Long memberId, Long reservationId, CancelReservationRequest request) {
-        return reservationLockService.executeWithReservationLock(reservationId, () -> {
-            Reservation reservation = findById(reservationId);
-            validateParty(memberId, reservation);
-            validateCancelable(reservation);
+        Reservation reservation = findById(reservationId);
+        validateParty(memberId, reservation);
+        validateCancelable(reservation);
 
-            CanceledBy canceledBy = reservation.isGuardian(memberId) ? CanceledBy.GUARDIAN : CanceledBy.SITTER;
+        CanceledBy canceledBy = reservation.isGuardian(memberId) ? CanceledBy.GUARDIAN : CanceledBy.SITTER;
 
-            // reservation 이 Pending 인 경우: 그냥.. 환불해주면 됨
-            if (reservation.isPending()){
-                reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
-                log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
-
-                paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
-                paymentRefundService.cancelNonPaidPayments(reservationId, request.cancelReason());
-
-                // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
-                handleCancellation(reservation);
-
-                return toResponseDto(reservation);
-            }
-
-            //  reservation 이 Confirmed 가 된 경우
-            //  : 어쩔 수 없는 일이 아니라면 무조건 위약금을 물게 됨
-
-            // 어쩔수 없는 일인지? -> 관리자 검토 후 위약금 안 물게 해줄 수도 있고 아닐 수도 있어요...
-            if (request.cancelCategory() == CancelCategory.UNAVOIDABLE) {
-                reservation.requestCancel(request.cancelReason(), request.cancelCategory(), canceledBy);
-                log.info("[취소 요청] UNAVOIDABLE 관리자 검토 대기 reservationId={}, 취소주체={}",
-                        reservationId, canceledBy);
-                return toResponseDto(reservation);
-            }
-
-            // 그냥 취소하는거면? -> 위약금 차감 후 취소
+        // reservation 이 Pending 인 경우: 그냥.. 환불해주면 됨
+        if (reservation.isPending()){
             reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
-            log.info("[예약 취소] CONFIRMED 위약금 차감 취소 reservationId={}, 취소주체={}, 사유={}",
-                    reservationId, canceledBy, request.cancelReason());
+            log.info("[예약 취소] reservationId={}, 취소 주체={}, 사유={}", reservationId, canceledBy, request.cancelReason());
 
-            paymentRefundService.refundWithPenalty(reservationId, request.cancelReason(), canceledBy);
+            paymentRefundService.refundPaidPayments(reservationId, request.cancelReason());
             paymentRefundService.cancelNonPaidPayments(reservationId, request.cancelReason());
+
+            // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
             handleCancellation(reservation);
+
             return toResponseDto(reservation);
-        });
+        }
+
+        //  reservation 이 Confirmed 가 된 경우
+        //  : 어쩔 수 없는 일이 아니라면 무조건 위약금을 물게 됨
+
+        // 어쩔수 없는 일인지? -> 관리자 검토 후 위약금 안 물게 해줄 수도 있고 아닐 수도 있어요...
+        if (request.cancelCategory() == CancelCategory.UNAVOIDABLE) {
+            reservation.requestCancel(request.cancelReason(), request.cancelCategory(), canceledBy);
+            log.info("[취소 요청] UNAVOIDABLE 관리자 검토 대기 reservationId={}, 취소주체={}",
+                    reservationId, canceledBy);
+            return toResponseDto(reservation);
+        }
+
+        // 그냥 취소하는거면? -> 위약금 차감 후 취소
+        reservation.cancel(request.cancelReason(), request.cancelCategory(), canceledBy);
+        log.info("[예약 취소] CONFIRMED 위약금 차감 취소 reservationId={}, 취소주체={}, 사유={}",
+                reservationId, canceledBy, request.cancelReason());
+
+        paymentRefundService.refundWithPenalty(reservationId, request.cancelReason(), canceledBy);
+        paymentRefundService.cancelNonPaidPayments(reservationId, request.cancelReason());
+        handleCancellation(reservation);
+        return toResponseDto(reservation);
     }
 
     // 예약 만료 처리는 ReservationExpireScheduler + ReservationExpireService 로 이동

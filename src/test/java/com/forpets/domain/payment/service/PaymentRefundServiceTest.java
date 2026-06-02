@@ -12,6 +12,7 @@ import com.forpets.domain.payment.repository.PaymentRepository;
 import com.forpets.domain.reservation.entity.CanceledBy;
 import com.forpets.domain.reservation.entity.ReservationPayment;
 import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
+import com.forpets.domain.reservation.service.ReservationLockService;
 import com.forpets.domain.settlement.entity.SettlementType;
 import com.forpets.domain.settlement.service.SettlementService;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +54,7 @@ class PaymentRefundServiceTest {
     @Mock
     private CouponService couponService;
     @Mock
-    private PaymentLockService paymentLockService;
+    private ReservationLockService reservationLockService;
     @Mock
     private SettlementService settlementService;
 
@@ -121,13 +122,6 @@ class PaymentRefundServiceTest {
         ReflectionTestUtils.setField(reservationPayment, "id", 1L);
         reservationPayment.guardianConfirm();
         reservationPayment.sitterConfirm();
-
-        // PaymentLock 통과시키기
-        lenient().when(paymentLockService.executeWithReservationLock(any(), any()))
-                .thenAnswer(invocation -> {
-                    Supplier<?> task = invocation.getArgument(1);
-                    return task.get();
-                });
     }
 
     /**
@@ -353,8 +347,6 @@ class PaymentRefundServiceTest {
                     .cancelPayment(eq("merchant-sitter-001"), eq(20_000L), anyString());
             then(portOnePaymentClient).should(never())
                     .cancelPayment(eq("merchant-guardian-001"), any(), anyString());
-            then(paymentLockService).should(never())
-                    .executeWithReservationLock(any(), any());
         }
     }
 }
