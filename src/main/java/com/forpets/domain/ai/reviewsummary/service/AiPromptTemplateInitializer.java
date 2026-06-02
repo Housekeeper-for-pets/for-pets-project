@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AiPromptTemplateInitializer implements CommandLineRunner {
 
     private static final String FEATURE_REVIEW_SUMMARY = "SITTER_REVIEW_SUMMARY";
-    private static final String PROMPT_VERSION = "review-summary-v1";
+    private static final String PROMPT_VERSION = "review-summary-v2";
 
     private final AiPromptTemplateRepository promptTemplateRepository;
 
@@ -27,14 +27,16 @@ public class AiPromptTemplateInitializer implements CommandLineRunner {
     }
 
     private void seed(PromptCategory category, String template) {
-        boolean exists = promptTemplateRepository
+        boolean latestVersionExists = promptTemplateRepository
                 .findFirstByFeatureAndCategoryAndActiveTrueOrderByIdDesc(FEATURE_REVIEW_SUMMARY, category)
+                .filter(promptTemplate -> PROMPT_VERSION.equals(promptTemplate.getPromptVersion()))
                 .isPresent();
 
-        if (exists) {
+        if (latestVersionExists) {
             return;
         }
 
+        // 기존 v1 템플릿이 DB에 남아 있어도 최신 버전을 새로 저장해 재배포 없이 프롬프트를 갱신한다.
         promptTemplateRepository.save(AiPromptTemplate.builder()
                 .feature(FEATURE_REVIEW_SUMMARY)
                 .category(category)
@@ -55,9 +57,20 @@ public class AiPromptTemplateInitializer implements CommandLineRunner {
                 3. sentiment는 POSITIVE, NEUTRAL, NEGATIVE 중 하나만 사용하세요.
                 4. usedReviewIds에는 입력으로 제공된 reviewId만 포함하세요.
                 5. markdown 코드블록은 포함하지 마세요.
+                6. 아래 JSON 객체 구조와 camelCase 필드명을 그대로 사용하세요.
 
-                출력 필드:
-                summary, strengths, cautions, recommendedFor, keywords, sentiment, confidenceScore, reviewCount, usedReviewIds
+                출력 JSON:
+                {
+                  "summary": "string",
+                  "strengths": ["string"],
+                  "cautions": ["string"],
+                  "recommendedFor": ["string"],
+                  "keywords": ["string"],
+                  "sentiment": "POSITIVE | NEUTRAL | NEGATIVE",
+                  "confidenceScore": 0.0,
+                  "reviewCount": 0,
+                  "usedReviewIds": [1]
+                }
 
                 리뷰 목록:
                 {reviews}
@@ -76,9 +89,20 @@ public class AiPromptTemplateInitializer implements CommandLineRunner {
                 4. sentiment는 POSITIVE, NEUTRAL, NEGATIVE 중 하나만 사용하세요.
                 5. usedReviewIds에는 입력으로 제공된 reviewId만 포함하세요.
                 6. markdown 코드블록은 포함하지 마세요.
+                7. 아래 JSON 객체 구조와 camelCase 필드명을 그대로 사용하세요.
 
-                출력 필드:
-                summary, strengths, cautions, recommendedFor, keywords, sentiment, confidenceScore, reviewCount, usedReviewIds
+                출력 JSON:
+                {
+                  "summary": "string",
+                  "strengths": ["string"],
+                  "cautions": ["string"],
+                  "recommendedFor": ["string"],
+                  "keywords": ["string"],
+                  "sentiment": "POSITIVE | NEUTRAL | NEGATIVE",
+                  "confidenceScore": 0.0,
+                  "reviewCount": 0,
+                  "usedReviewIds": [1]
+                }
 
                 리뷰 목록:
                 {reviews}
