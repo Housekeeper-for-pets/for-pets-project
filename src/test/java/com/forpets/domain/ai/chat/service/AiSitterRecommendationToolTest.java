@@ -24,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -81,6 +82,8 @@ class AiSitterRecommendationToolTest {
                 PossiblePetType.DOG,
                 PossiblePetSize.SMALL,
                 15000,
+                new BigDecimal("4.5"),
+                10,
                 SitterProfileStatus.RESERVABLE,
                 SitterApprovalStatus.APPROVED,
                 null,
