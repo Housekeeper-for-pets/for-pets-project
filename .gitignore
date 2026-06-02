@@ -50,6 +50,9 @@ logs/
 *.log
 *.log.*
 
+### k6 test results ###
+k6/coupon/results/
+
 ### Compiled ###
 *.class
 *.war
