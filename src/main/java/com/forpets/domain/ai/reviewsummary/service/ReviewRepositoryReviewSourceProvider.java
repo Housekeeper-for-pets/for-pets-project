@@ -1,6 +1,7 @@
 package com.forpets.domain.ai.reviewsummary.service;
 
 import com.forpets.domain.ai.reviewsummary.dto.ReviewSource;
+import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.review.entity.Review;
 import com.forpets.domain.review.repository.ReviewRepository;
 import com.forpets.domain.sitter.entity.SitterProfile;
@@ -35,7 +36,11 @@ public class ReviewRepositoryReviewSourceProvider implements ReviewSourceProvide
                 Sort.by(Sort.Direction.DESC, "createdAt")
         );
 
-        return reviewRepository.findAllByRevieweeIdAndDeletedFalse(sitterProfile.getMemberId(), pageRequest)
+        return reviewRepository.findAllActiveByRevieweeIdAndReservationStatus(
+                        sitterProfile.getMemberId(),
+                        ReservationStatus.COMPLETED,
+                        pageRequest
+                )
                 .getContent()
                 .stream()
                 .map(this::toSource)

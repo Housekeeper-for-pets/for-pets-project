@@ -1,5 +1,6 @@
 package com.forpets.domain.review.service;
 
+import com.forpets.domain.ai.reviewsummary.service.AiReviewSummaryStaleService;
 import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationSource;
 import com.forpets.domain.reservation.entity.ReservationStatus;
@@ -71,6 +72,9 @@ class ReviewServiceTest {
     @Mock
     private SitterCacheService sitterCacheService;
 
+    @Mock
+    private AiReviewSummaryStaleService aiReviewSummaryStaleService;
+
     private final Long guardianId = 1L;
     private final Long sitterMemberId = 2L;
     private final Long otherMemberId = 3L;
@@ -119,6 +123,7 @@ class ReviewServiceTest {
             assertThat(response.reviewerId()).isEqualTo(guardianId);
             assertThat(response.revieweeId()).isEqualTo(sitterMemberId);
             assertThat(response.rating()).isEqualTo(5);
+            then(aiReviewSummaryStaleService).should().markStaleBySitterMemberId(sitterMemberId);
         }
 
         @Test
@@ -257,6 +262,7 @@ class ReviewServiceTest {
             // then
             assertThat(review.isDeleted()).isTrue();
             then(reviewRepository).should(never()).save(any());
+            then(aiReviewSummaryStaleService).should().markStaleBySitterMemberId(sitterMemberId);
         }
 
         @Test

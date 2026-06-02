@@ -1,5 +1,6 @@
 package com.forpets.domain.review.service;
 
+import com.forpets.domain.ai.reviewsummary.service.AiReviewSummaryStaleService;
 import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.reservation.repository.ReservationRepository;
@@ -47,6 +48,7 @@ public class ReviewService {
     private final ReservationRepository reservationRepository;
     private final SitterProfileRepository sitterProfileRepository;
     private final SitterCacheService sitterCacheService;
+    private final AiReviewSummaryStaleService aiReviewSummaryStaleService;
     private final BadWordFiltering badWordFiltering = new BadWordFiltering();
 
     @Transactional
@@ -70,6 +72,7 @@ public class ReviewService {
                 .build());
 
         updateSitterReviewStats(review.getRevieweeId());
+        aiReviewSummaryStaleService.markStaleBySitterMemberId(review.getRevieweeId());
 
         return ReviewResponse.from(review);
     }
@@ -85,6 +88,7 @@ public class ReviewService {
         review.delete();
 
         updateSitterReviewStats(review.getRevieweeId());
+        aiReviewSummaryStaleService.markStaleBySitterMemberId(review.getRevieweeId());
     }
 
     /**
