@@ -38,6 +38,8 @@ dependencies {
     implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
+    implementation 'org.springframework.ai:spring-ai-core:1.0.0-M6'
+
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
     implementation 'io.github.vaneproject:badwordfiltering:1.0.0'
 
