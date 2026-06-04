@@ -1,5 +1,6 @@
 package com.forpets.domain.proposal.service;
 
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
@@ -63,6 +64,9 @@ class ProposalServiceTest {
 
     @Mock
     private PostService postService;
+
+    @Mock
+    private NotificationMessageBroker notificationBroker;
 
     // ── 테스트 픽스처 ──
     private Post post;                   // member1의 OPEN 공고

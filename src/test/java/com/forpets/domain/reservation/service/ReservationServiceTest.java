@@ -1,6 +1,7 @@
 package com.forpets.domain.reservation.service;
 
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
 import com.forpets.domain.payment.entity.Payment;
 import com.forpets.domain.payment.entity.PaymentProvider;
 import com.forpets.domain.payment.entity.PaymentRole;
@@ -93,6 +94,9 @@ class ReservationServiceTest {
 
     @Mock
     private CareRequestRepository careRequestRepository;
+
+    @Mock
+    private NotificationMessageBroker notificationBroker;
 
     // ── 테스트 픽스처 ──
     private Reservation reservation;        // PENDING 상태 예약 (CareRequest 출처)

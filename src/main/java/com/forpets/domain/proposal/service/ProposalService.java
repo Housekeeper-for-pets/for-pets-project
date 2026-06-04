@@ -1,5 +1,7 @@
 package com.forpets.domain.proposal.service;
 
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
+import com.forpets.domain.notification.event.NotificationEvent;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
 import com.forpets.domain.post.entity.PostTimeSlot;
@@ -20,6 +22,7 @@ import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.service.SitterService;
+import com.forpets.global.sse.SseEventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,10 +36,13 @@ import java.util.List;
 @Slf4j
 public class ProposalService {
 
+    private static final String NAME = ProposalService.class.getSimpleName();
+
     private final ProposalRepository proposalRepository;
     private final SitterService sitterService;
     private final ReservationService reservationService;
     private final PostService postService;
+    private final NotificationMessageBroker notificationBroker;
 
 
     // ===== API =====
@@ -74,13 +80,17 @@ public class ProposalService {
                 .message(request.message())
                 .build());
 
-        /*
-         V2: 등록 후 Event send 하는 로직 추가
-         Kafka 로 Post 의 proposal 개수 저장 (모니터링)
-         sitter 에게 메시지 : 제안이 등록되었습니다.
-         공고 작성자에게 메시지 : 새로운 제안이 들어왔습니다.
-         ... 또 뭐가 있을까
-         */
+        // 보호자에게 "새 제안 도착" 알림
+        notificationBroker.publish(NotificationEvent.of(
+                post.getMemberId(),
+                memberId,
+                SseEventType.PROPOSAL_ARRIVED,
+                "새로운 제안이 도착했습니다.",
+                proposal.getId(),
+                "PROPOSAL"
+        ));
+        log.info("{} => 제안 등록 알림 발행: postId={}, guardianId={}",
+                NAME, postId, post.getMemberId());
 
         return ProposalResponseDto.from(proposal);
     }
@@ -161,7 +171,17 @@ public class ProposalService {
 
         reservationService.createFromProposal(proposal, post, sitterProfile.getMemberId(), postPets, postTimeSlots);
 
-        // 비동기 처리 (eventListener 또는 kafka) 는 알림이나 로그.. 같은거 작성 할 때 쓰자 ~
+        // 시터에게 "제안 수락, 예약 생성" 알림
+        notificationBroker.publish(NotificationEvent.of(
+                sitterProfile.getMemberId(),   // 시터 (받는 사람)
+                memberId,                      // 보호자 (수락한 사람)
+                SseEventType.MATCHING_CONFIRMED,
+                "보호자가 제안을 수락했습니다. 예약이 생성되었습니다.",
+                proposal.getId(),
+                "PROPOSAL"
+        ));
+        log.info("{} => 제안 수락 알림 발행: sitterMemberId={}, proposalId={}",
+                NAME, sitterProfile.getMemberId(), proposalId);
 
         return ProposalResponseDto.from(proposal);
     }

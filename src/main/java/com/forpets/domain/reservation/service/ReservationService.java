@@ -4,6 +4,8 @@ import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
+import com.forpets.domain.notification.event.NotificationEvent;
 import com.forpets.domain.payment.entity.Payment;
 import com.forpets.domain.payment.entity.PaymentRole;
 import com.forpets.domain.payment.entity.PaymentStatus;
@@ -34,6 +36,7 @@ import com.forpets.global.embed.HasTimeSlotInfo;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.monitoring.TrackExecutionTime;
+import com.forpets.global.sse.SseEventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -49,6 +52,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReservationService {
+    private static final String NAME = ReservationService.class.getSimpleName();
+
     private static final int DEPOSIT_RATIO = 20;
 
     private final ReservationRepository reservationRepository;
@@ -67,6 +72,8 @@ public class ReservationService {
 
     private final TimeSlotValidator timeSlotValidator;
     private final CareRequestRepository careRequestRepository;
+
+    private final NotificationMessageBroker notificationBroker;
 
     /*
     예약 생성 1: 순방향로직에서 Reservation 생성 (트리거: CareRequest 수락)
@@ -200,8 +207,63 @@ public class ReservationService {
                     reservation.confirm();
                     log.info("[예약 확정] reservationId={}, CONFIRMED", reservationId);
                     handlePostConfirmation(reservation);
+
+                    // CONFIRMED 후 알림 발행
+                    sendConfirmNotifications(reservation);
                     return toResponseDto(reservation);
                 });
+    }
+
+
+    private void sendConfirmNotifications(Reservation reservation) {
+        // 1. 보호자에게 결제 완료 알림
+        notificationBroker.publish(NotificationEvent.of(
+                reservation.getGuardianId(),
+                null,
+                SseEventType.PAYMENT_COMPLETED,
+                "결제가 완료되어 예약이 확정되었습니다.",
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        // 2. 시터에게 결제 완료 알림
+        notificationBroker.publish(NotificationEvent.of(
+                reservation.getSitterMemberId(),
+                null,
+                SseEventType.PAYMENT_COMPLETED,
+                "결제가 완료되어 예약이 확정되었습니다.",
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        // 3. Proposal 출처인 경우: 탈락한 시터들에게 WITHDRAWN 알림 (N명)
+        if (reservation.getSource() == ReservationSource.PROPOSAL) {
+            Proposal accepted = proposalRepository.findById(reservation.getSourceId())
+                    .orElse(null);
+
+            if (accepted != null) {
+                proposalRepository.findAllByPostId(accepted.getPostId())
+                        .stream()
+                        .filter(p -> p.getStatus() == ProposalStatus.REJECTED
+                                || p.getStatus() == ProposalStatus.WITHDRAWN)
+                        .filter(p -> !p.getSitterMemberId().equals(reservation.getSitterMemberId()))
+                        .forEach(p -> {
+                            notificationBroker.publish(NotificationEvent.of(
+                                    p.getSitterMemberId(),
+                                    null,
+                                    SseEventType.PROPOSAL_WITHDRAWN,
+                                    "다른 시터가 선택되어 제안이 자동 철회되었습니다.",
+                                    p.getId(),
+                                    "PROPOSAL"
+                            ));
+                            log.info("{} => 제안 철회 알림: sitterMemberId={}, proposalId={}",
+                                    NAME, p.getSitterMemberId(), p.getId());
+                        });
+            }
+        }
+
+        log.info("{} => 예약 확정 알림 발행: reservationId={}, guardianId={}, sitterMemberId={}",
+                NAME, reservation.getId(), reservation.getGuardianId(), reservation.getSitterMemberId());
     }
 
 

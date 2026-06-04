@@ -11,6 +11,7 @@ import com.forpets.domain.carerequest.exception.CareRequestException;
 import com.forpets.domain.carerequest.repository.CareRequestPetRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
 import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.entity.PetGender;
 import com.forpets.domain.pet.entity.PetSize;
@@ -74,6 +75,9 @@ class CareRequestServiceTest {
 
     @Mock
     private ReservationService reservationService;
+
+    @Mock
+    private NotificationMessageBroker notificationBroker;
 
     // ── 테스트 픽스처 ──
     private SitterProfile sitterProfile;     // member2의 시터 프로필
