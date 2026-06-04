@@ -48,7 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 
 // redis 가 필요하므로 CI 에서는 안 돌게 disabled 처리
-//@Disabled("로컬에서 Redis 띄운 후 실행 — Lock/Transaction race condition 증명")
+@Disabled("로컬에서 Redis 띄운 후 실행 — Lock/Transaction race condition 증명")
 @SpringBootTest
 @ActiveProfiles("test")
 class LockTransactionRaceConditionTest {
