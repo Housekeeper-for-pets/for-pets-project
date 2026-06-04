@@ -21,7 +21,7 @@ SET @load_test_password = (
 );
 
 SET @start_index = 1;
-SET @user_count = 1000;
+SET @user_count = 3000;
 
 DROP PROCEDURE IF EXISTS insert_coupon_load_test_members;
 
