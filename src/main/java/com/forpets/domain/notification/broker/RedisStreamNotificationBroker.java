@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "notification.broker", havingValue = "redis-stream")
+@ConditionalOnProperty(name = "spring.notifications.broker", havingValue = "redis-stream")
 @RequiredArgsConstructor
 public class RedisStreamNotificationBroker implements NotificationMessageBroker {
 
