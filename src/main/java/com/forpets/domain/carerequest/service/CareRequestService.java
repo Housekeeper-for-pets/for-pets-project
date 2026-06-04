@@ -11,6 +11,8 @@ import com.forpets.domain.carerequest.exception.CareRequestException;
 import com.forpets.domain.carerequest.repository.CareRequestPetRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
+import com.forpets.domain.notification.event.NotificationEvent;
 import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
@@ -21,6 +23,7 @@ import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.dto.TimeSlotRequest;
 import com.forpets.global.embed.entity.TimeSlotInfo;
+import com.forpets.global.sse.SseEventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +39,7 @@ import java.util.List;
 @Slf4j
 public class CareRequestService {
 
+    private static final String NAME = CareRequestService.class.getSimpleName();
     private final CareRequestRepository careRequestRepository;
     private final CareRequestPetRepository careRequestPetRepository;
     private final CareRequestTimeSlotRepository careRequestTimeSlotRepository;
@@ -43,6 +47,7 @@ public class CareRequestService {
     private final SitterService sitterService;
     private final TimeSlotValidator timeSlotValidator;
     private final ReservationService reservationService;
+    private final NotificationMessageBroker notificationBroker;
 
     /*
     케어 요청 등록
@@ -78,6 +83,19 @@ public class CareRequestService {
 
         List<CareRequestPet> careRequestPets = saveCareRequestPets(careRequest.getId(), pets);
         List<CareRequestTimeSlot> careRequestTimeSlots = saveCareRequestTimeSlots(careRequest.getId(), request.timeSlots());
+
+        // 시터에게 "새 케어 신청 도착" 알림
+        notificationBroker.publish(NotificationEvent.of(
+                sitter.getMemberId(),         // 시터 (받는 사람)
+                memberId,                     // 보호자 (신청한 사람)
+                SseEventType.REQUEST_RECEIVED,
+                "새로운 케어 신청이 도착했습니다.",
+                careRequest.getId(),
+                "CARE_REQUEST"
+        ));
+        log.info("{} => 케어 신청 알림 발행: sitterMemberId={}, guardianId={}",
+                NAME, sitter.getMemberId(), memberId);
+
 
         return CareRequestResponseDto.from(careRequest, careRequestPets, careRequestTimeSlots);
     }
