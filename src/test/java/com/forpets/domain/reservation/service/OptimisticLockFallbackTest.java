@@ -32,10 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
    이 때 Reservation.@Version 이 한 쪽을 OptimisticLockException 으로 막아줄 수 있는지
 
  흐름:
-   Thread A — tx 시작 → read (v=0) → [barrier] → confirm → commit (v=1)
-   Thread B — tx 시작 → read (v=0) → [barrier] → [A commit 대기] → confirm → commit
-              → DB 의 version 이 이미 1 이라 UPDATE ... WHERE version=0 가 0 rows
-              → StaleObjectStateException → Spring 이 ObjectOptimisticLockingFailureException 으로 래핑
+   Thread A - tx 시작 -> read (v=0) -> [barrier] -> confirm -> commit (v=1)
+   Thread B - tx 시작 -> read (v=0) -> [barrier] -> [A commit 대기] -> confirm → commit
+              -> DB 의 version 이 이미 1 이라 UPDATE ... WHERE version=0 가 0 rows
+              -> StaleObjectStateException -> Spring 이 ObjectOptimisticLockingFailureException 으로 래핑
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -137,7 +137,7 @@ class OptimisticLockFallbackTest {
             this.repo = repo;
         }
 
-        /** A: read → 둘 다 read 한 시점 동기화 → confirm → (메서드 종료 시 commit) */
+        /** A: read -> 둘 다 read 한 시점 동기화 -> confirm -> (메서드 종료 시 commit) */
         @Transactional
         public void readBarrierConfirm(Long id, CyclicBarrier bothRead) throws Exception {
             Reservation r = repo.findById(id).orElseThrow();
@@ -145,7 +145,7 @@ class OptimisticLockFallbackTest {
             r.confirm();
         }
 
-        /** B: read → 동기화 → A 의 commit 이 끝날 때까지 대기 → confirm → (메서드 종료 시 commit 실패) */
+        /** B: read -> 동기화 -> A 의 commit 이 끝날 때까지 대기 -> confirm -> (메서드 종료 시 commit 실패) */
         @Transactional
         public void readBarrierWaitConfirm(Long id, CyclicBarrier bothRead,
                                           CountDownLatch aCommitted) throws Exception {
