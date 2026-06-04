@@ -20,11 +20,13 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbacks;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -74,15 +76,26 @@ public class GeminiChatClient implements AiChatClient {
             @Value("${forpets.ai.gemini.model:gemini-2.5-flash-lite}") String model,
             @Value("${forpets.ai.chat.max-tokens:700}") Integer maxTokens,
             @Value("${forpets.ai.chat.temperature:0.3}") Double temperature,
+            @Value("${forpets.ai.gemini.connect-timeout-ms:2000}") Long connectTimeoutMs,
+            @Value("${forpets.ai.gemini.read-timeout-ms:5000}") Long readTimeoutMs,
             AiUsageLogService aiUsageLogService
     ) {
-        this.restClient = RestClient.create();
+        this.restClient = RestClient.builder()
+                .requestFactory(requestFactory(connectTimeoutMs, readTimeoutMs))
+                .build();
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.model = model;
         this.maxTokens = maxTokens;
         this.temperature = temperature;
         this.aiUsageLogService = aiUsageLogService;
+    }
+
+    private SimpleClientHttpRequestFactory requestFactory(Long connectTimeoutMs, Long readTimeoutMs) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofMillis(connectTimeoutMs));
+        requestFactory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
+        return requestFactory;
     }
 
     @Override
