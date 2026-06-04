@@ -2,24 +2,33 @@ package com.forpets.domain.ai.usage.service;
 
 import com.forpets.domain.ai.usage.entity.*;
 import com.forpets.domain.ai.usage.repository.AiUsageLogRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(MockitoExtension.class)
 class AiUsageLogServiceTest {
 
-    @InjectMocks
     private AiUsageLogService aiUsageLogService;
 
     @Mock
     private AiUsageLogRepository aiUsageLogRepository;
+
+    private SimpleMeterRegistry meterRegistry;
+
+    @BeforeEach
+    void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
+        aiUsageLogService = new AiUsageLogService(aiUsageLogRepository, meterRegistry);
+    }
 
     @Test
     @DisplayName("[성공] AI 사용량 로그를 저장한다")
@@ -40,6 +49,13 @@ class AiUsageLogServiceTest {
 
         // then
         then(aiUsageLogRepository).should().save(any(AiUsageLog.class));
+        assertThat(meterRegistry.counter(
+                "ai.requests.total",
+                "feature", "SITTER_REVIEW_SUMMARY",
+                "status", "SUCCESS",
+                "model", "gemini-test",
+                "errorType", "none"
+        ).count()).isEqualTo(1.0);
     }
 
     @Test
