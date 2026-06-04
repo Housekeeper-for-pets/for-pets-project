@@ -1,7 +1,7 @@
 package com.forpets.domain.coupon.controller;
 
 import com.forpets.domain.coupon.dto.IssueCouponResponse;
-import com.forpets.domain.coupon.service.CouponService;
+import com.forpets.domain.coupon.service.issue.CouponIssueDistributedLockService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class CouponController {
 
-    private final CouponService couponService;
+    private final CouponIssueDistributedLockService couponIssueDistributedLockService;
 
     // 로그인한 회원 쿠폰을 발급
     @PostMapping("/{couponId}/issue")
@@ -29,6 +29,8 @@ public class CouponController {
             @PathVariable Long couponId
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(couponService.issueCoupon(currentMember.id(), couponId)));
+                .body(ApiResponse.success(
+                        couponIssueDistributedLockService.issue(currentMember.id(), couponId)
+                ));
     }
 }
