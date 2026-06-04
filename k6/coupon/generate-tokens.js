@@ -6,7 +6,7 @@ import http from 'k6/http';
 const BASE_URL    = __ENV.BASE_URL     || 'http://localhost:8080';
 const PASSWORD    = __ENV.PASSWORD     || 'test1234!';
 const START_INDEX = Number(__ENV.START_INDEX || 1);
-const USER_COUNT  = Number(__ENV.USER_COUNT  || 600);
+const USER_COUNT  = Number(__ENV.USER_COUNT  || 3000);
 const EMAIL_PREFIX = __ENV.EMAIL_PREFIX || 'k6-user-';
 const EMAIL_DOMAIN = __ENV.EMAIL_DOMAIN || 'test.com';
 

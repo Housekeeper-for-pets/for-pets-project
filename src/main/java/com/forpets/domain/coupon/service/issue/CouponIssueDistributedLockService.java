@@ -7,13 +7,11 @@ import com.forpets.domain.coupon.service.CouponService;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
 
 @Service
-@Profile("!test")
 @RequiredArgsConstructor
 public class CouponIssueDistributedLockService {
 
