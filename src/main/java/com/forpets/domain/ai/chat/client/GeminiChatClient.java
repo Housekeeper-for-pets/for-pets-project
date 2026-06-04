@@ -8,6 +8,10 @@ import com.forpets.domain.ai.chat.dto.AiChatResponse;
 import com.forpets.domain.ai.chat.dto.AiSitterSearchCondition;
 import com.forpets.domain.ai.chat.dto.RecommendedSitterDto;
 import com.forpets.domain.ai.chat.service.AiSitterRecommendationTool;
+import com.forpets.domain.ai.usage.entity.AiErrorType;
+import com.forpets.domain.ai.usage.entity.AiFeature;
+import com.forpets.domain.ai.usage.service.AiUsageLogService;
+import com.forpets.domain.ai.usage.service.AiUsageRecord;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
@@ -62,13 +66,15 @@ public class GeminiChatClient implements AiChatClient {
     private final String model;
     private final Integer maxTokens;
     private final Double temperature;
+    private final AiUsageLogService aiUsageLogService;
 
     public GeminiChatClient(
             ObjectMapper objectMapper,
             @Value("${GEMINI_API_KEY:}") String apiKey,
             @Value("${forpets.ai.gemini.model:gemini-2.5-flash-lite}") String model,
             @Value("${forpets.ai.chat.max-tokens:700}") Integer maxTokens,
-            @Value("${forpets.ai.chat.temperature:0.3}") Double temperature
+            @Value("${forpets.ai.chat.temperature:0.3}") Double temperature,
+            AiUsageLogService aiUsageLogService
     ) {
         this.restClient = RestClient.create();
         this.objectMapper = objectMapper;
@@ -76,6 +82,7 @@ public class GeminiChatClient implements AiChatClient {
         this.model = model;
         this.maxTokens = maxTokens;
         this.temperature = temperature;
+        this.aiUsageLogService = aiUsageLogService;
     }
 
     @Override
@@ -116,6 +123,8 @@ public class GeminiChatClient implements AiChatClient {
             return AiChatClient.super.chatWithTools(message, sitterRecommendationTool);
         }
 
+        long startedAt = System.nanoTime();
+        UsageTokens totalUsage = UsageTokens.empty();
         try {
             ToolCallback[] callbacks = ToolCallbacks.from(sitterRecommendationTool);
             Map<String, ToolCallback> callbackByName = Arrays.stream(callbacks)
@@ -126,6 +135,7 @@ public class GeminiChatClient implements AiChatClient {
 
             for (int turn = 0; turn < MAX_TOOL_CALL_TURNS; turn++) {
                 JsonNode response = requestToolCallingContent(contents, callbacks);
+                totalUsage = totalUsage.plus(usageTokens(response));
                 List<JsonNode> functionCalls = findFunctionCalls(response);
 
                 if (functionCalls.isEmpty()) {
@@ -136,6 +146,7 @@ public class GeminiChatClient implements AiChatClient {
                     String fallbackAnswer = candidates.isEmpty()
                             ? "조건에 맞는 시터를 찾지 못했어요. 지역이나 반려동물 조건을 조금 넓혀서 다시 요청해보세요."
                             : buildLocalAnswer(candidates);
+                    recordToolCallingSuccess(totalUsage, elapsedMs(startedAt));
                     return new AiChatResponse(StringUtils.hasText(answer) ? answer : fallbackAnswer, candidates);
                 }
 
@@ -159,11 +170,57 @@ public class GeminiChatClient implements AiChatClient {
                 }
             }
 
+            recordToolCallingFallback(startedAt, AiErrorType.UNKNOWN, "MAX_TOOL_CALL_TURNS_EXCEEDED");
             return AiChatClient.super.chatWithTools(message, sitterRecommendationTool);
         } catch (Exception exception) {
             log.warn("Gemini 자동 Tool Calling 실패. 서버 오케스트레이션 fallback으로 대체합니다.", exception);
+            recordToolCallingFallback(startedAt, classify(exception), exception.getMessage());
             return AiChatClient.super.chatWithTools(message, sitterRecommendationTool);
         }
+    }
+
+    private void recordToolCallingSuccess(UsageTokens usageTokens, long latencyMs) {
+        aiUsageLogService.record(AiUsageRecord.success(
+                AiFeature.SITTER_RECOMMENDATION,
+                model,
+                usageTokens.promptTokens(),
+                usageTokens.completionTokens(),
+                usageTokens.totalTokens(),
+                latencyMs,
+                null
+        ));
+    }
+
+    private void recordToolCallingFallback(long startedAt, AiErrorType errorType, String failureReason) {
+        aiUsageLogService.record(AiUsageRecord.fallback(
+                AiFeature.SITTER_RECOMMENDATION,
+                model,
+                elapsedMs(startedAt),
+                errorType,
+                null,
+                failureReason
+        ));
+    }
+
+    private AiErrorType classify(Exception exception) {
+        String message = exception.getMessage();
+        if (message == null) {
+            return AiErrorType.UNKNOWN;
+        }
+        if (message.contains("429") || message.toLowerCase().contains("rate")) {
+            return AiErrorType.RATE_LIMIT;
+        }
+        if (message.contains("500") || message.contains("502") || message.contains("503")) {
+            return AiErrorType.SERVER_ERROR;
+        }
+        if (message.toLowerCase().contains("timed out") || message.toLowerCase().contains("timeout")) {
+            return AiErrorType.TIMEOUT;
+        }
+        return AiErrorType.UNKNOWN;
+    }
+
+    private long elapsedMs(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
     private String requestContent(String systemInstruction, String prompt, Double temperature, Integer maxTokens, boolean jsonResponse) throws Exception {
@@ -296,6 +353,20 @@ public class GeminiChatClient implements AiChatClient {
             }
         }
         return functionCalls;
+    }
+
+    private UsageTokens usageTokens(JsonNode response) {
+        JsonNode usage = response.path("usageMetadata");
+        return new UsageTokens(
+                token(usage, "promptTokenCount"),
+                token(usage, "candidatesTokenCount"),
+                token(usage, "totalTokenCount")
+        );
+    }
+
+    private Integer token(JsonNode usage, String fieldName) {
+        JsonNode tokenNode = usage.path(fieldName);
+        return tokenNode.isNumber() ? tokenNode.asInt() : null;
     }
 
     private String extractText(JsonNode response) {
@@ -446,6 +517,34 @@ public class GeminiChatClient implements AiChatClient {
     ) {
         private AiSitterSearchCondition toCondition() {
             return new AiSitterSearchCondition(region, possiblePetType, possiblePetSize, minPrice, maxPrice, concern);
+        }
+    }
+
+    private record UsageTokens(
+            Integer promptTokens,
+            Integer completionTokens,
+            Integer totalTokens
+    ) {
+        private static UsageTokens empty() {
+            return new UsageTokens(null, null, null);
+        }
+
+        private UsageTokens plus(UsageTokens other) {
+            return new UsageTokens(
+                    sum(promptTokens, other.promptTokens),
+                    sum(completionTokens, other.completionTokens),
+                    sum(totalTokens, other.totalTokens)
+            );
+        }
+
+        private Integer sum(Integer left, Integer right) {
+            if (left == null) {
+                return right;
+            }
+            if (right == null) {
+                return left;
+            }
+            return left + right;
         }
     }
 }

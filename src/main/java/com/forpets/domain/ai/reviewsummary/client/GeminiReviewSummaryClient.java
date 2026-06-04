@@ -1,5 +1,6 @@
 package com.forpets.domain.ai.reviewsummary.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.forpets.domain.ai.reviewsummary.dto.SitterReviewSummaryResponse;
 import com.forpets.domain.ai.reviewsummary.exception.AiReviewSummaryErrorCode;
@@ -64,14 +65,21 @@ public class GeminiReviewSummaryClient implements AiReviewSummaryClient {
                     .retrieve()
                     .body(String.class);
 
-            String content = extractText(rawResponse);
+            JsonNode responseNode = objectMapper.readTree(rawResponse);
+            String content = extractText(responseNode);
             if (!StringUtils.hasText(content)) {
                 throw new AiReviewSummaryException(AiReviewSummaryErrorCode.INVALID_AI_RESPONSE);
             }
 
             SitterReviewSummaryResponse response =
                     objectMapper.readValue(stripMarkdownFence(content), SitterReviewSummaryResponse.class);
-            return new AiReviewSummaryResult(response, model);
+            return new AiReviewSummaryResult(
+                    response,
+                    model,
+                    usageToken(responseNode, "promptTokenCount"),
+                    usageToken(responseNode, "candidatesTokenCount"),
+                    usageToken(responseNode, "totalTokenCount")
+            );
         } catch (AiReviewSummaryException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -137,15 +145,19 @@ public class GeminiReviewSummaryClient implements AiReviewSummaryClient {
         );
     }
 
-    private String extractText(String rawResponse) throws Exception {
-        return objectMapper.readTree(rawResponse)
-                .path("candidates")
+    private String extractText(JsonNode responseNode) {
+        return responseNode.path("candidates")
                 .path(0)
                 .path("content")
                 .path("parts")
                 .path(0)
                 .path("text")
                 .asText();
+    }
+
+    private Integer usageToken(JsonNode responseNode, String fieldName) {
+        JsonNode tokenNode = responseNode.path("usageMetadata").path(fieldName);
+        return tokenNode.isNumber() ? tokenNode.asInt() : null;
     }
 
     private String stripMarkdownFence(String content) {

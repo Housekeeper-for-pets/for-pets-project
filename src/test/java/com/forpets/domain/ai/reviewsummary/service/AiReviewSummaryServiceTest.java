@@ -11,6 +11,7 @@ import com.forpets.domain.ai.reviewsummary.exception.AiReviewSummaryException;
 import com.forpets.domain.ai.reviewsummary.repository.AiPromptTemplateRepository;
 import com.forpets.domain.ai.reviewsummary.repository.SitterReviewSummaryRepository;
 import com.forpets.domain.ai.reviewsummary.repository.SitterReviewSummaryReviewRepository;
+import com.forpets.domain.ai.usage.service.AiUsageLogService;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,9 @@ class AiReviewSummaryServiceTest {
 
     @Mock
     private AiReviewSummaryClient aiReviewSummaryClient;
+
+    @Mock
+    private AiUsageLogService aiUsageLogService;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
