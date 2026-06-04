@@ -49,16 +49,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
  케이스 B. @Transactional 진입 → DB 조회 1회 → tryLock 실패 → rollback
    → 커넥션 점유한 채로 락 시도, 실패해도 rollback 까지 점유. 의미 없는 낭비 발생.
-
- 결론:
-   - 락 실패 가능성이 있는 흐름이라면 트랜잭션 진입 전에 락을 잡아야 한다.
-     (ReservationLockService 로 분리 / @DistributedLock + @Order(HIGHEST_PRECEDENCE))
-   - 분리 전엔 케이스 B 패턴이 발생할 수 있었고, 분리 후엔 락 실패 시 아예 @Transactional
-     안으로 들어가지 않으므로 케이스 A 보다도 안전 (트랜잭션 동기화 셋업조차 안 일어남).
-   - 또한 운영 application.yml 에도 위 두 프로퍼티를 켜두면, 케이스 B 같은 패턴이 남아 있어도
-     커넥션 낭비를 줄일 수 있다 (단 DB 접근 이후엔 여전히 낭비).
-
- 본 테스트는 락 자체는 시뮬레이트 (예외 throw) 하므로 Redis 가 필요하지 않다.
  */
 @SpringBootTest
 @ActiveProfiles("test")

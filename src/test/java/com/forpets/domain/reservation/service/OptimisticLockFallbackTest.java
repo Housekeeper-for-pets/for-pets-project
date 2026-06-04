@@ -28,20 +28,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
  시나리오:
    분산 락이 어떤 이유로든 (TTL 만료, 락 키 누수, 신규 코드가 락 우회) 두 트랜잭션을 동시에 통과시켰다고 가정.
-   이 때 Reservation.@Version 이 한 쪽을 OptimisticLockException 으로 막아주는가?
+   (분산 락이 정상 동작하는 경로는 LockTransactionRaceConditionTest 의 [FIXED] 케이스)
+   이 때 Reservation.@Version 이 한 쪽을 OptimisticLockException 으로 막아줄 수 있는지
 
  흐름:
    Thread A — tx 시작 → read (v=0) → [barrier] → confirm → commit (v=1)
    Thread B — tx 시작 → read (v=0) → [barrier] → [A commit 대기] → confirm → commit
               → DB 의 version 이 이미 1 이라 UPDATE ... WHERE version=0 가 0 rows
               → StaleObjectStateException → Spring 이 ObjectOptimisticLockingFailureException 으로 래핑
-
- 결론:
-   - 분산락은 1차 방어선 (대부분의 경합을 여기서 직렬화)
-   - @Version 은 2차 방어선 (락이 뚫린 극단 케이스에서 정합성 보호)
-   - 본 테스트는 락을 의도적으로 끼우지 않음으로써 2차 방어선 단독 동작을 검증
-
- (분산 락이 정상 동작하는 경로는 LockTransactionRaceConditionTest 의 [FIXED] 케이스 참고)
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -117,7 +111,7 @@ class OptimisticLockFallbackTest {
         // (3) 최종 상태는 A 가 쓴 것 그대로, version 도 정확히 +1
         Reservation finalState = reservationRepository.findById(reservationId).orElseThrow();
         assertThat(finalState.getStatus()).isEqualTo(ReservationStatus.CONFIRMED);
-//        assertThat(finalState.getVersion()).isEqualTo(1L);
+        assertThat(finalState.getVersion()).isEqualTo(1L);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -159,9 +153,9 @@ class OptimisticLockFallbackTest {
             bothRead.await();
             aCommitted.await();
             r.confirm();
-            // 메서드 return 시점에 @Transactional advice 가 flush + commit 시도 →
-            // UPDATE ... WHERE version = 0 → 0 rows → StaleObjectStateException
-            // → Spring 이 ObjectOptimisticLockingFailureException 으로 래핑해서 던짐
+            // 메서드 return 시점에 @Transactional advice 가 flush + commit 시도 ->
+            // UPDATE ... WHERE version = 0 -> 0 rows -> StaleObjectStateException
+            // -> Spring 이 ObjectOptimisticLockingFailureException 으로 래핑해서 던짐
         }
     }
 }
