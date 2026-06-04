@@ -6,12 +6,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.stream.StreamMessageListenerContainer;
 
 import java.time.Duration;
@@ -67,12 +70,48 @@ public class RedisStreamConfig {
 
     private void createConsumerGroup() {
         try {
-            redisTemplate.opsForStream()
-                    .createGroup(STREAM_KEY, ReadOffset.from("0"), GROUP_NAME);
-            log.info("{} => Consumer Group 생성: {}", NAME, GROUP_NAME);
-        } catch (Exception e) {
-            // 이미 존재하면 무시 (정상)
-            log.info("{} => Consumer Group 이미 존재: {}", NAME, GROUP_NAME);
+            RedisSerializer<String> serializer = redisTemplate.getStringSerializer();
+            byte[] streamKey = serializer.serialize(STREAM_KEY);
+
+            if (streamKey == null) {
+                throw new IllegalStateException("Redis Stream key 직렬화 실패: " + STREAM_KEY);
+            }
+
+            String result = redisTemplate.execute((RedisCallback<String>) connection ->
+                    connection.streamCommands()
+                            .xGroupCreate(
+                                    streamKey,
+                                    GROUP_NAME,
+                                    ReadOffset.from("0-0"),
+                                    true
+                            )
+            );
+
+            log.info("{} => Consumer Group 생성: {}, result={}", NAME, GROUP_NAME, result);
+
+        } catch (RedisSystemException e) {
+            if (isBusyGroup(e)) {
+                log.info("{} => Consumer Group 이미 존재: {}", NAME, GROUP_NAME);
+                return;
+            }
+
+            log.error("{} => Consumer Group 생성 실패", NAME, e);
+            throw e;
         }
+    }
+
+    private boolean isBusyGroup(Throwable e) {
+        Throwable current = e;
+
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.contains("BUSYGROUP")) {
+                return true;
+            }
+
+            current = current.getCause();
+        }
+
+        return false;
     }
 }
