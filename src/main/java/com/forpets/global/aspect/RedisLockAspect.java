@@ -37,9 +37,13 @@ public class RedisLockAspect {
     private final StringRedisTemplate stringRedisTemplate;
     private final SpelExpressionParser parser = new SpelExpressionParser();
 
-    @Around("@annotation(distributedLock)")
-    public Object lock(ProceedingJoinPoint joinPoint,
-                       DistributedLock distributedLock) throws Throwable {
+    // aop binding error 해결을 위해 full directory 기재
+    @Around("@annotation(com.forpets.global.aspect.DistributedLock)")
+    public Object lock(ProceedingJoinPoint joinPoint) throws Throwable {
+
+        // reflection 을 통한 DistributedLock 추출
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        DistributedLock distributedLock = signature.getMethod().getAnnotation(DistributedLock.class);
 
         // distributed Lock annotation 을 사용할 때
         // @DistributedLock(key = "'reservation:' + #reservationId") 요런식으로 사용하게 되면

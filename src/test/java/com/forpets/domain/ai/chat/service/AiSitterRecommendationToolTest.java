@@ -73,6 +73,32 @@ class AiSitterRecommendationToolTest {
         assertThat(result.get(0).strengths()).contains("분리불안 반려견 대응");
     }
 
+    @Test
+    @DisplayName("[성공] 리뷰 요약이 없으면 Tool 실패 컨텍스트를 후보에 포함한다")
+    void search_sitters_with_missing_review_summary_context() {
+        // given
+        AiSitterSearchCondition condition = new AiSitterSearchCondition(
+                Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null, "분리불안"
+        );
+
+        given(sitterService.searchSitters(
+                eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null)),
+                eq(0),
+                eq(3),
+                eq("createdAt"),
+                eq("desc")
+        )).willReturn(SitterPageResponse.of(List.of(sitter()), 1, 1, 0, 3));
+        given(summaryRepository.findBySitterId(1L)).willReturn(Optional.empty());
+
+        // when
+        List<RecommendedSitterDto> result = recommendationTool.buildRecommendations(condition);
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).reviewSummary()).contains("아직 생성되지 않았습니다");
+        assertThat(result.get(0).cautions()).contains("AI 리뷰 요약 생성 후 더 정확한 추천이 가능합니다.");
+    }
+
     private SitterResponseDto sitter() {
         return new SitterResponseDto(
                 1L,

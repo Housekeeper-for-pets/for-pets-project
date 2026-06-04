@@ -57,9 +57,10 @@ public class AiReviewSummaryService {
 
         // AI 호출이 실패해도 상세/챗봇 화면이 비지 않도록, 검증 가능한 리뷰 원문 기반 fallback 요약을 저장한다.
         AiReviewSummaryClient.AiReviewSummaryResult result = generateWithFallback(sitterId, prompt, reviews);
-        SitterReviewSummaryResponse response = validateAndNormalizeAiResponse(result.response(), reviews);
+        ValidatedSummary validatedSummary = validateOrFallback(sitterId, result, reviews);
+        SitterReviewSummaryResponse response = validatedSummary.response();
 
-        SitterReviewSummary generated = toEntity(sitterId, response, result.model(), promptTemplate);
+        SitterReviewSummary generated = toEntity(sitterId, response, validatedSummary.model(), promptTemplate);
         SitterReviewSummary saved = saveOrReplace(sitterId, generated);
         replaceUsedReviews(saved.getId(), response.usedReviewIds());
 
@@ -80,6 +81,20 @@ public class AiReviewSummaryService {
                     buildFallbackResponse(reviews),
                     "fallback-review-summary"
             );
+        }
+    }
+
+    private ValidatedSummary validateOrFallback(
+            Long sitterId,
+            AiReviewSummaryClient.AiReviewSummaryResult result,
+            List<ReviewSource> reviews
+    ) {
+        try {
+            return new ValidatedSummary(validateAndNormalizeAiResponse(result.response(), reviews), result.model());
+        } catch (AiReviewSummaryException exception) {
+            log.warn("AI 리뷰 요약 응답 검증 실패. fallback 요약을 저장합니다. sitterId={}, code={}",
+                    sitterId, exception.getErrorCode().getCode());
+            return new ValidatedSummary(buildFallbackResponse(reviews), "fallback-review-summary");
         }
     }
 
@@ -131,6 +146,11 @@ public class AiReviewSummaryService {
                 || response.confidenceScore() == null
                 || response.confidenceScore() < 0
                 || response.confidenceScore() > 1
+                || response.reviewCount() == null
+                || response.strengths() == null
+                || response.cautions() == null
+                || response.recommendedFor() == null
+                || response.keywords() == null
                 || response.usedReviewIds() == null
                 || response.usedReviewIds().isEmpty()) {
             throw new AiReviewSummaryException(AiReviewSummaryErrorCode.INVALID_AI_RESPONSE);
@@ -146,7 +166,7 @@ public class AiReviewSummaryService {
                 .distinct()
                 .toList();
 
-        if (containsForbiddenExpression(response.summary())) {
+        if (containsForbiddenExpression(response)) {
             throw new AiReviewSummaryException(AiReviewSummaryErrorCode.INVALID_AI_RESPONSE, "근거 없는 의료/자격 표현이 포함되어 있습니다.");
         }
 
@@ -168,11 +188,24 @@ public class AiReviewSummaryService {
         );
     }
 
+    private boolean containsForbiddenExpression(SitterReviewSummaryResponse response) {
+        return containsForbiddenExpression(response.summary())
+                || containsForbiddenExpression(response.strengths())
+                || containsForbiddenExpression(response.cautions())
+                || containsForbiddenExpression(response.recommendedFor())
+                || containsForbiddenExpression(response.keywords());
+    }
+
+    private boolean containsForbiddenExpression(List<String> values) {
+        return values != null && values.stream().anyMatch(this::containsForbiddenExpression);
+    }
+
     private boolean containsForbiddenExpression(String value) {
-        return value.contains("진단")
+        return StringUtils.hasText(value)
+                && (value.contains("진단")
                 || value.contains("치료")
                 || value.contains("수의사")
-                || value.contains("자격증 보유");
+                || value.contains("자격증 보유"));
     }
 
     private SitterReviewSummaryResponse buildFallbackResponse(List<ReviewSource> reviews) {
@@ -274,5 +307,11 @@ public class AiReviewSummaryService {
         } catch (JsonProcessingException exception) {
             throw new AiReviewSummaryException(AiReviewSummaryErrorCode.AI_REVIEW_SUMMARY_FAILED);
         }
+    }
+
+    private record ValidatedSummary(
+            SitterReviewSummaryResponse response,
+            String model
+    ) {
     }
 }

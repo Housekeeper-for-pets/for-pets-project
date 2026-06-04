@@ -43,6 +43,7 @@ import com.forpets.global.embed.entity.TimeSlotInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +56,7 @@ import java.util.*;
 @Profile({"local", "docker", "prod"})
 @Component
 @RequiredArgsConstructor
+@Order(1)
 public class DataInit implements CommandLineRunner {
 
     private final MemberRepository memberRepository;
