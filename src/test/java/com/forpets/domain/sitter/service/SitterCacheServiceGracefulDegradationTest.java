@@ -47,7 +47,7 @@ class SitterCacheServiceGracefulDegradationTest {
         given(sitterProfileRepository.searchSitters(eq(condition), any(Pageable.class)))
                 .willReturn(expected);
 
-        SitterPageResponse result = sitterCacheService.searchSitters(condition, 0, 10, "createdAt");
+        SitterPageResponse result = sitterCacheService.searchSitters(condition, 0, 10, "createdAt", "desc");
 
         assertThat(result).isEqualTo(expected);
         then(sitterProfileRepository).should().searchSitters(eq(condition), any(Pageable.class));

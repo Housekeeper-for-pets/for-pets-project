@@ -17,10 +17,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CouponIssueOptimisticLockService {
 
     // 낙관적 락 충돌 발생 시 최대 재시도 횟수
-    private static final int MAX_RETRY_COUNT = 20;
+    private static final int MAX_RETRY_COUNT = 10;
 
     // 재시도 전 대기 시간(ms)
-    private static final long RETRY_BACKOFF_MILLIS = 6L;
+    private static final long RETRY_BACKOFF_MILLIS = 50L;
 
     // 테스트 결과 출력용 실제 재시도 횟수
     private final AtomicInteger actualRetryCount = new AtomicInteger();

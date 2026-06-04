@@ -1,5 +1,6 @@
 package com.forpets.domain.review.service;
 
+import com.forpets.domain.ai.reviewsummary.service.AiReviewSummaryStaleService;
 import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationSource;
 import com.forpets.domain.reservation.entity.ReservationStatus;
@@ -11,6 +12,7 @@ import com.forpets.domain.review.dto.MyWrittenReviewPageResponse;
 import com.forpets.domain.review.dto.MyWrittenReviewResponse;
 import com.forpets.domain.review.dto.ReviewPageResponse;
 import com.forpets.domain.review.dto.ReviewResponse;
+import com.forpets.domain.review.dto.SitterReviewStats;
 import com.forpets.domain.review.entity.Review;
 import com.forpets.domain.review.exception.ReviewErrorCode;
 import com.forpets.domain.review.exception.ReviewException;
@@ -22,6 +24,7 @@ import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
+import com.forpets.domain.sitter.service.SitterCacheService;
 import com.forpets.global.common.CareType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +40,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -64,6 +68,12 @@ class ReviewServiceTest {
 
     @Mock
     private SitterProfileRepository sitterProfileRepository;
+
+    @Mock
+    private SitterCacheService sitterCacheService;
+
+    @Mock
+    private AiReviewSummaryStaleService aiReviewSummaryStaleService;
 
     private final Long guardianId = 1L;
     private final Long sitterMemberId = 2L;
@@ -113,6 +123,7 @@ class ReviewServiceTest {
             assertThat(response.reviewerId()).isEqualTo(guardianId);
             assertThat(response.revieweeId()).isEqualTo(sitterMemberId);
             assertThat(response.rating()).isEqualTo(5);
+            then(aiReviewSummaryStaleService).should().markStaleBySitterMemberId(sitterMemberId);
         }
 
         @Test
@@ -251,6 +262,7 @@ class ReviewServiceTest {
             // then
             assertThat(review.isDeleted()).isTrue();
             then(reviewRepository).should(never()).save(any());
+            then(aiReviewSummaryStaleService).should().markStaleBySitterMemberId(sitterMemberId);
         }
 
         @Test
@@ -642,6 +654,98 @@ class ReviewServiceTest {
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
                             .isEqualTo(SitterErrorCode.INVALID_SORT_FIELD));
+        }
+    }
+
+    @Nested
+    @DisplayName("리뷰 작성/삭제 시 시터 평점 갱신")
+    class UpdateSitterReviewStatsTest {
+
+        @Test
+        @DisplayName("[성공] 리뷰 작성 시 SitterProfile 평점/리뷰 수가 갱신되고 상세 캐시가 무효화된다")
+        void update_stats_on_create() {
+            // given
+            CreateReviewRequest request = validRequest();
+            SitterProfile sitterProfile = createSitterProfile();
+
+            given(reservationRepository.findById(reservationId)).willReturn(Optional.of(completedReservation));
+            given(reviewRepository.existsByReservationId(reservationId)).willReturn(false);
+            given(reviewRepository.save(any(Review.class))).willAnswer(invocation -> invocation.getArgument(0));
+            given(sitterProfileRepository.findByMemberId(sitterMemberId)).willReturn(Optional.of(sitterProfile));
+            given(reviewQueryRepository.calculateSitterReviewStats(sitterMemberId))
+                    .willReturn(new SitterReviewStats(new BigDecimal("4.5"), 2));
+
+            // when
+            reviewService.create(guardianId, request);
+
+            // then
+            assertThat(sitterProfile.getAverageRating()).isEqualByComparingTo("4.5");
+            assertThat(sitterProfile.getReviewCount()).isEqualTo(2);
+            then(sitterCacheService).should().evictSitterDetail(sitterId);
+        }
+
+        @Test
+        @DisplayName("[성공] 리뷰 삭제 시 평점/리뷰 수가 재계산되어 갱신된다")
+        void update_stats_on_delete() {
+            // given
+            Long reviewId = 10L;
+            Review review = createReview(reviewId, guardianId);
+            SitterProfile sitterProfile = createSitterProfile();
+
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+            given(sitterProfileRepository.findByMemberId(sitterMemberId)).willReturn(Optional.of(sitterProfile));
+            given(reviewQueryRepository.calculateSitterReviewStats(sitterMemberId))
+                    .willReturn(new SitterReviewStats(new BigDecimal("3.0"), 1));
+
+            // when
+            reviewService.delete(guardianId, reviewId);
+
+            // then
+            assertThat(review.isDeleted()).isTrue();
+            assertThat(sitterProfile.getAverageRating()).isEqualByComparingTo("3.0");
+            assertThat(sitterProfile.getReviewCount()).isEqualTo(1);
+            then(sitterCacheService).should().evictSitterDetail(sitterId);
+        }
+
+        @Test
+        @DisplayName("[성공] 마지막 리뷰 삭제로 리뷰가 0개가 되면 평점 0.0, 리뷰 수 0으로 갱신된다")
+        void update_stats_to_zero_when_no_reviews() {
+            // given
+            Long reviewId = 10L;
+            Review review = createReview(reviewId, guardianId);
+            SitterProfile sitterProfile = createSitterProfile();
+
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+            given(sitterProfileRepository.findByMemberId(sitterMemberId)).willReturn(Optional.of(sitterProfile));
+            given(reviewQueryRepository.calculateSitterReviewStats(sitterMemberId))
+                    .willReturn(new SitterReviewStats(new BigDecimal("0.0"), 0));
+
+            // when
+            reviewService.delete(guardianId, reviewId);
+
+            // then
+            assertThat(sitterProfile.getAverageRating()).isEqualByComparingTo("0.0");
+            assertThat(sitterProfile.getReviewCount()).isZero();
+            then(sitterCacheService).should().evictSitterDetail(sitterId);
+        }
+
+        @Test
+        @DisplayName("[성공] 시터 프로필이 없으면(소프트 삭제) 평점 갱신을 건너뛴다")
+        void skip_stats_when_profile_absent() {
+            // given
+            Long reviewId = 10L;
+            Review review = createReview(reviewId, guardianId);
+
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+            given(sitterProfileRepository.findByMemberId(sitterMemberId)).willReturn(Optional.empty());
+
+            // when
+            reviewService.delete(guardianId, reviewId);
+
+            // then
+            assertThat(review.isDeleted()).isTrue();
+            then(reviewQueryRepository).should(never()).calculateSitterReviewStats(any());
+            then(sitterCacheService).should(never()).evictSitterDetail(any());
         }
     }
 

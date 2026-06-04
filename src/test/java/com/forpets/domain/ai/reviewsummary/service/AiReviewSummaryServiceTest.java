@@ -144,6 +144,81 @@ class AiReviewSummaryServiceTest {
         }));
     }
 
+    @Test
+    @DisplayName("[성공] AI 호출이 실패해도 리뷰 원문 기반 fallback 요약을 저장한다")
+    void generate_review_summary_fallback_when_ai_failed() {
+        // given
+        List<ReviewSource> reviews = reviews();
+        AiPromptTemplate promptTemplate = promptTemplate(PromptCategory.SMALL_DOG);
+
+        given(sitterProfileRepository.existsById(sitterId)).willReturn(true);
+        given(reviewSourceProvider.findRecentReviewsBySitterId(sitterId, 20)).willReturn(reviews);
+        given(promptTemplateRepository.findFirstByFeatureAndCategoryAndActiveTrueOrderByIdDesc(
+                "SITTER_REVIEW_SUMMARY", PromptCategory.SMALL_DOG))
+                .willReturn(Optional.of(promptTemplate));
+        given(aiReviewSummaryClient.generate(anyString()))
+                .willThrow(new AiReviewSummaryException(AiReviewSummaryErrorCode.AI_REVIEW_SUMMARY_FAILED));
+        given(summaryRepository.findBySitterId(sitterId)).willReturn(Optional.empty());
+        given(summaryRepository.save(any(SitterReviewSummary.class)))
+                .willAnswer(invocation -> {
+                    SitterReviewSummary saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", 10L);
+                    return saved;
+                });
+
+        // when
+        SitterReviewSummaryDto result = aiReviewSummaryService.generateReviewSummary(sitterId);
+
+        // then
+        assertThat(result.aiGenerated()).isFalse();
+        assertThat(result.model()).isEqualTo("fallback-review-summary");
+        assertThat(result.summary()).contains("리뷰");
+        then(summaryReviewRepository).should().saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("[성공] AI 응답에 금지 표현이 포함되면 저장하지 않고 fallback 요약을 저장한다")
+    void generate_review_summary_fallback_when_ai_response_has_forbidden_expression() {
+        // given
+        List<ReviewSource> reviews = reviews();
+        AiPromptTemplate promptTemplate = promptTemplate(PromptCategory.SMALL_DOG);
+        SitterReviewSummaryResponse unsafeResponse = new SitterReviewSummaryResponse(
+                "보호자 소통이 빠르다는 후기가 많습니다.",
+                List.of("수의사 수준의 치료 가능"),
+                List.of(),
+                List.of("말티즈"),
+                List.of("소형견"),
+                ReviewSentiment.POSITIVE,
+                0.87,
+                3,
+                List.of(1001L, 1002L, 1003L)
+        );
+
+        given(sitterProfileRepository.existsById(sitterId)).willReturn(true);
+        given(reviewSourceProvider.findRecentReviewsBySitterId(sitterId, 20)).willReturn(reviews);
+        given(promptTemplateRepository.findFirstByFeatureAndCategoryAndActiveTrueOrderByIdDesc(
+                "SITTER_REVIEW_SUMMARY", PromptCategory.SMALL_DOG))
+                .willReturn(Optional.of(promptTemplate));
+        given(aiReviewSummaryClient.generate(anyString()))
+                .willReturn(new AiReviewSummaryClient.AiReviewSummaryResult(unsafeResponse, "gemini-test"));
+        given(summaryRepository.findBySitterId(sitterId)).willReturn(Optional.empty());
+        given(summaryRepository.save(any(SitterReviewSummary.class)))
+                .willAnswer(invocation -> {
+                    SitterReviewSummary saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", 10L);
+                    return saved;
+                });
+
+        // when
+        SitterReviewSummaryDto result = aiReviewSummaryService.generateReviewSummary(sitterId);
+
+        // then
+        assertThat(result.aiGenerated()).isFalse();
+        assertThat(result.model()).isEqualTo("fallback-review-summary");
+        assertThat(result.strengths()).doesNotContain("수의사 수준의 치료 가능");
+        then(summaryReviewRepository).should().saveAll(anyList());
+    }
+
     private List<ReviewSource> reviews() {
         return List.of(
                 new ReviewSource(1001L, 5, "말티즈가 낯을 많이 가리는데 천천히 적응시켜주셨어요."),

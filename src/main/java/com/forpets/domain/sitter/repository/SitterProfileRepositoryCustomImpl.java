@@ -140,7 +140,7 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
 
     /**
      * Pageable 의 Sort 에서 첫 번째 정렬 조건을 꺼내 QueryDSL OrderSpecifier 로 변환합니다.
-     * 화이트리스트(createdAt, pricePerHour, experienceYears) 이외 필드는 호출 전에 이미 검증됩니다.
+     * 화이트리스트(createdAt, pricePerHour, experienceYears, averageRating) 이외 필드는 호출 전에 이미 검증됩니다.
      */
     private OrderSpecifier<?> buildOrderSpecifier(Pageable pageable) {
         if (pageable.getSort().isSorted()) {
@@ -151,6 +151,7 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
             return switch (order.getProperty()) {
                 case "pricePerHour" -> isAsc ? sitter.pricePerHour.asc() : sitter.pricePerHour.desc();
                 case "experienceYears" -> isAsc ? sitter.experienceYears.asc() : sitter.experienceYears.desc();
+                case "averageRating" -> isAsc ? sitter.averageRating.asc() : sitter.averageRating.desc();
                 default -> isAsc ? sitter.createdAt.asc() : sitter.createdAt.desc();
             };
         }

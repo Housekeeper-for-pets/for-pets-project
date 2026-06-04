@@ -1,6 +1,7 @@
 package com.forpets.domain.ai.reviewsummary.service;
 
 import com.forpets.domain.ai.reviewsummary.dto.ReviewSource;
+import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.review.entity.Review;
 import com.forpets.domain.review.repository.ReviewRepository;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
@@ -50,7 +51,10 @@ class ReviewRepositoryReviewSourceProviderTest {
         Review review = review(100L, sitterMemberId, 5, "정말 세심하게 돌봐주셔서 만족했습니다.");
 
         given(sitterProfileRepository.findById(sitterId)).willReturn(Optional.of(sitterProfile));
-        given(reviewRepository.findAllByRevieweeIdAndDeletedFalse(org.mockito.ArgumentMatchers.eq(sitterMemberId), org.mockito.ArgumentMatchers.any(Pageable.class)))
+        given(reviewRepository.findAllActiveByRevieweeIdAndReservationStatus(
+                org.mockito.ArgumentMatchers.eq(sitterMemberId),
+                org.mockito.ArgumentMatchers.eq(ReservationStatus.COMPLETED),
+                org.mockito.ArgumentMatchers.any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(review)));
 
         // when
@@ -64,7 +68,10 @@ class ReviewRepositoryReviewSourceProviderTest {
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         then(reviewRepository).should()
-                .findAllByRevieweeIdAndDeletedFalse(org.mockito.ArgumentMatchers.eq(sitterMemberId), pageableCaptor.capture());
+                .findAllActiveByRevieweeIdAndReservationStatus(
+                        org.mockito.ArgumentMatchers.eq(sitterMemberId),
+                        org.mockito.ArgumentMatchers.eq(ReservationStatus.COMPLETED),
+                        pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
         assertThat(pageableCaptor.getValue().getSort().getOrderFor("createdAt")).isNotNull();
     }

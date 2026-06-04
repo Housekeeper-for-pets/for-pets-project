@@ -1,5 +1,6 @@
 package com.forpets.domain.review.service;
 
+import com.forpets.domain.ai.reviewsummary.service.AiReviewSummaryStaleService;
 import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.reservation.repository.ReservationRepository;
@@ -10,6 +11,7 @@ import com.forpets.domain.review.dto.MyWrittenReviewPageResponse;
 import com.forpets.domain.review.dto.MyWrittenReviewResponse;
 import com.forpets.domain.review.dto.ReviewPageResponse;
 import com.forpets.domain.review.dto.ReviewResponse;
+import com.forpets.domain.review.dto.SitterReviewStats;
 import com.forpets.domain.review.entity.Review;
 import com.forpets.domain.review.exception.ReviewErrorCode;
 import com.forpets.domain.review.exception.ReviewException;
@@ -19,6 +21,7 @@ import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
+import com.forpets.domain.sitter.service.SitterCacheService;
 import com.vane.badwordfiltering.BadWordFiltering;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -44,6 +47,8 @@ public class ReviewService {
     private final ReviewQueryRepository reviewQueryRepository;
     private final ReservationRepository reservationRepository;
     private final SitterProfileRepository sitterProfileRepository;
+    private final SitterCacheService sitterCacheService;
+    private final AiReviewSummaryStaleService aiReviewSummaryStaleService;
     private final BadWordFiltering badWordFiltering = new BadWordFiltering();
 
     @Transactional
@@ -66,6 +71,9 @@ public class ReviewService {
                 .rating(request.rating())
                 .build());
 
+        updateSitterReviewStats(review.getRevieweeId());
+        aiReviewSummaryStaleService.markStaleBySitterMemberId(review.getRevieweeId());
+
         return ReviewResponse.from(review);
     }
 
@@ -78,6 +86,22 @@ public class ReviewService {
         validateNotDeleted(review);
 
         review.delete();
+
+        updateSitterReviewStats(review.getRevieweeId());
+        aiReviewSummaryStaleService.markStaleBySitterMemberId(review.getRevieweeId());
+    }
+
+    /**
+     * 시터의 평균 평점/리뷰 수를 전체 재계산하여 SitterProfile에 반영하고 상세 캐시를 무효화합니다.
+     * 동시성 이슈 방지를 위해 증분(count+1)이 아니라 매번 AVG/COUNT를 다시 계산합니다.
+     * 시터 프로필이 소프트 삭제된 경우(조회되지 않는 경우)에는 갱신을 건너뜁니다.
+     */
+    private void updateSitterReviewStats(Long sitterMemberId) {
+        sitterProfileRepository.findByMemberId(sitterMemberId).ifPresent(sitterProfile -> {
+            SitterReviewStats stats = reviewQueryRepository.calculateSitterReviewStats(sitterMemberId);
+            sitterProfile.updateReviewStats(stats.averageRating(), (int) stats.reviewCount());
+            sitterCacheService.evictSitterDetail(sitterProfile.getId());
+        });
     }
 
     public ReviewPageResponse getSitterReviews(Long sitterId, int page, int size, String sort, String direction) {
