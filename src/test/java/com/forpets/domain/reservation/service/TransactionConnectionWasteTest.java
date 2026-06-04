@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,17 +26,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /*
  [트랜잭션 자원 낭비 검증]
 
- 핵심 질문:
-   "@Transactional 진입 시점" 과 "DB 커넥션 획득 시점" 이 같은가?
+ 검증 대상 핵심 질문: @Transactional 진입 시점과 DB 커넥션 획득 시점이 동일한가?
 
- Spring + Hibernate 기본 설정 (hibernate.connection.handling_mode =
- DELAYED_ACQUISITION_AND_RELEASE_AFTER_TRANSACTION) 에서는
-   - 트랜잭션 진입 시점엔 커넥션을 안 잡고
-   - 첫 DB 문장이 나갈 때 커넥션을 점유하고
-   - commit / rollback 시점에 반환한다.
- 즉 lazy connection acquisition.
+ ※ 중요한 함정 (이 테스트의 @TestPropertySource 가 해결하는 것):
+   Spring Boot 기본 설정에서 Hikari 는 autocommit=true 로 커넥션을 발급한다.
+   Hibernate 는 JDBC 트랜잭션을 시작하려면 autocommit 을 false 로 토글해야 하고,
+   토글하려면 커넥션을 잡아야 한다.
+   → 결과적으로 hibernate.connection.handling_mode 가
+      DELAYED_ACQUISITION_AND_RELEASE_AFTER_TRANSACTION (Spring Boot 기본) 이어도
+      "@Transactional 진입 = autocommit 토글용 커넥션 획득" 이라 lazy 가 무력화됨.
 
- 그래서 락이 트랜잭션 안쪽에 있을 때 커넥션 낭비 정도는 "락 시도 시점에 DB 접근을 했느냐" 에 달려있음.
+   해결: 두 프로퍼티를 같이 켜야 진짜 lazy 가 된다.
+     spring.datasource.hikari.auto-commit=false
+     spring.jpa.properties.hibernate.connection.provider_disables_autocommit=true
+   → 풀이 이미 autocommit=false 로 발급 → Hibernate 가 토글할 필요 없음
+   → 첫 SQL 까지 커넥션 미점유
+
+ 그 위에서:
 
  케이스 A. @Transactional 진입 → (DB 접근 X) → tryLock 실패 → 즉시 rollback
    → 커넥션은 아예 안 잡혔으므로 낭비 0. 풀에 영향 없음.
@@ -48,11 +55,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
      (ReservationLockService 로 분리 / @DistributedLock + @Order(HIGHEST_PRECEDENCE))
    - 분리 전엔 케이스 B 패턴이 발생할 수 있었고, 분리 후엔 락 실패 시 아예 @Transactional
      안으로 들어가지 않으므로 케이스 A 보다도 안전 (트랜잭션 동기화 셋업조차 안 일어남).
+   - 또한 운영 application.yml 에도 위 두 프로퍼티를 켜두면, 케이스 B 같은 패턴이 남아 있어도
+     커넥션 낭비를 줄일 수 있다 (단 DB 접근 이후엔 여전히 낭비).
 
  본 테스트는 락 자체는 시뮬레이트 (예외 throw) 하므로 Redis 가 필요하지 않다.
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@TestPropertySource(properties = {
+        // lazy connection acquisition 을 진짜로 동작시키기 위한 필수 조합
+        "spring.datasource.hikari.auto-commit=false",
+        "spring.jpa.properties.hibernate.connection.provider_disables_autocommit=true"
+})
 class TransactionConnectionWasteTest {
 
     @Autowired private ConnectionWasteProbeService probe;
@@ -87,7 +101,7 @@ class TransactionConnectionWasteTest {
         int baseline = pool.getActiveConnections();
         AtomicInteger activeAtFailure = new AtomicInteger(-1);
 
-        // when — DB 접근 없이 락 실패 시뮬레이트
+        // when - DB 접근 없이 락 실패 시뮬레이트
         assertThatThrownBy(() -> probe.failLockWithoutDbAccess(activeAtFailure))
                 .isInstanceOf(SimulatedLockFailure.class);
 
@@ -108,12 +122,12 @@ class TransactionConnectionWasteTest {
         int baseline = pool.getActiveConnections();
         AtomicInteger activeAtFailure = new AtomicInteger(-1);
 
-        // when — findById 후 락 실패 시뮬레이트
+        // when - findById 후 락 실패 시뮬레이트
         assertThatThrownBy(() -> probe.failLockAfterDbAccess(activeAtFailure, reservationId))
                 .isInstanceOf(SimulatedLockFailure.class);
 
         // then
-        // (1) 락 실패 시점에 커넥션이 이미 점유 중 → rollback 비용까지 그대로 낭비됨
+        // (1) 락 실패 시점에 커넥션이 이미 점유 중 -> rollback 비용까지 그대로 낭비됨
         assertThat(activeAtFailure.get())
                 .as("DB 접근 후엔 커넥션 점유. 락 실패해도 rollback 까지 못 풀어줌")
                 .isEqualTo(baseline + 1);
@@ -145,27 +159,27 @@ class TransactionConnectionWasteTest {
      * 시점 측정 (activeRecorder) 은 락 시도 직전, 즉 throw 직전에 한다.
      */
     static class ConnectionWasteProbeService {
-        private final ReservationRepository repo;
-        private final HikariDataSource ds;
+        private final ReservationRepository repository;
+        private final HikariDataSource dataSource;
 
         ConnectionWasteProbeService(ReservationRepository repo, HikariDataSource ds) {
-            this.repo = repo;
-            this.ds = ds;
+            this.repository = repo;
+            this.dataSource = ds;
         }
 
-        /** Case A: 트랜잭션 진입 → DB 접근 X → 락 실패 */
+        /** Case A: 트랜잭션 진입 -> DB 접근 X -> 락 실패 */
         @Transactional
         public void failLockWithoutDbAccess(AtomicInteger activeRecorder) {
             // 락 시도 직전 활성 커넥션 측정 — 이 시점까지 DB 문장이 0건이므로 미점유여야 함
-            activeRecorder.set(ds.getHikariPoolMXBean().getActiveConnections());
+            activeRecorder.set(dataSource.getHikariPoolMXBean().getActiveConnections());
             throw new SimulatedLockFailure();
         }
 
-        /** Case B: 트랜잭션 진입 → findById → 락 실패 */
+        /** Case B: 트랜잭션 진입 -> findById -> 락 실패 */
         @Transactional
         public void failLockAfterDbAccess(AtomicInteger activeRecorder, Long id) {
-            repo.findById(id); // 첫 DB 문장 → Hibernate 가 커넥션 획득
-            activeRecorder.set(ds.getHikariPoolMXBean().getActiveConnections());
+            repository.findById(id); // 첫 DB 문장 -> Hibernate 가 커넥션 획득
+            activeRecorder.set(dataSource.getHikariPoolMXBean().getActiveConnections());
             throw new SimulatedLockFailure();
         }
     }
