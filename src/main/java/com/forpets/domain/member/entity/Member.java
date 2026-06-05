@@ -12,7 +12,9 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "member")
+@Table(name = "member", indexes = {
+        @Index(name = "idx_member_region", columnList = "region")
+})
 @SQLRestriction("deleted = false")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member extends BaseEntity {

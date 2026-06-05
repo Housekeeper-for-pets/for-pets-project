@@ -15,9 +15,13 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "sitter_profile", uniqueConstraints = {
-        @UniqueConstraint(columnNames = "member_id")
-})
+@Table(name = "sitter_profile",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = "member_id")
+        },
+        indexes = {
+                @Index(name = "idx_sitter_approval_created", columnList = "approval_status, created_at")
+        })
 @SQLRestriction("deleted = false")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SitterProfile extends BaseEntity {
