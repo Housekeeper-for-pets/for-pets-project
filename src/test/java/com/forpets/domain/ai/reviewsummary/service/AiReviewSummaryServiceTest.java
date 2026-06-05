@@ -11,10 +11,16 @@ import com.forpets.domain.ai.reviewsummary.exception.AiReviewSummaryException;
 import com.forpets.domain.ai.reviewsummary.repository.AiPromptTemplateRepository;
 import com.forpets.domain.ai.reviewsummary.repository.SitterReviewSummaryRepository;
 import com.forpets.domain.ai.reviewsummary.repository.SitterReviewSummaryReviewRepository;
+import com.forpets.domain.ai.usage.entity.AiErrorType;
+import com.forpets.domain.ai.usage.entity.AiFeature;
+import com.forpets.domain.ai.usage.entity.AiUsageStatus;
+import com.forpets.domain.ai.usage.service.AiUsageLogService;
+import com.forpets.domain.ai.usage.service.AiUsageRecord;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -51,6 +57,9 @@ class AiReviewSummaryServiceTest {
 
     @Mock
     private AiReviewSummaryClient aiReviewSummaryClient;
+
+    @Mock
+    private AiUsageLogService aiUsageLogService;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -174,6 +183,11 @@ class AiReviewSummaryServiceTest {
         assertThat(result.model()).isEqualTo("fallback-review-summary");
         assertThat(result.summary()).contains("리뷰");
         then(summaryReviewRepository).should().saveAll(anyList());
+        then(aiUsageLogService).should().record(argThat(record ->
+                record.feature() == AiFeature.SITTER_REVIEW_SUMMARY
+                        && record.status() == AiUsageStatus.FALLBACK
+                        && record.errorType() == AiErrorType.UNKNOWN
+        ));
     }
 
     @Test
@@ -217,6 +231,59 @@ class AiReviewSummaryServiceTest {
         assertThat(result.model()).isEqualTo("fallback-review-summary");
         assertThat(result.strengths()).doesNotContain("수의사 수준의 치료 가능");
         then(summaryReviewRepository).should().saveAll(anyList());
+        then(aiUsageLogService).should().record(argThat(record ->
+                record.feature() == AiFeature.SITTER_REVIEW_SUMMARY
+                        && record.status() == AiUsageStatus.FALLBACK
+                        && record.errorType() == AiErrorType.INVALID_RESPONSE
+        ));
+    }
+
+    @Test
+    @DisplayName("[성공] AI 응답이 DTO 스키마를 만족하지 않으면 fallback 요약을 저장한다")
+    void generate_review_summary_fallback_when_ai_response_is_invalid_schema() {
+        // given
+        List<ReviewSource> reviews = reviews();
+        AiPromptTemplate promptTemplate = promptTemplate(PromptCategory.SMALL_DOG);
+        SitterReviewSummaryResponse invalidResponse = new SitterReviewSummaryResponse(
+                "",
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                null,
+                1.2,
+                3,
+                List.of()
+        );
+
+        given(sitterProfileRepository.existsById(sitterId)).willReturn(true);
+        given(reviewSourceProvider.findRecentReviewsBySitterId(sitterId, 20)).willReturn(reviews);
+        given(promptTemplateRepository.findFirstByFeatureAndCategoryAndActiveTrueOrderByIdDesc(
+                "SITTER_REVIEW_SUMMARY", PromptCategory.SMALL_DOG))
+                .willReturn(Optional.of(promptTemplate));
+        given(aiReviewSummaryClient.generate(anyString()))
+                .willReturn(new AiReviewSummaryClient.AiReviewSummaryResult(invalidResponse, "gemini-test"));
+        given(summaryRepository.findBySitterId(sitterId)).willReturn(Optional.empty());
+        given(summaryRepository.save(any(SitterReviewSummary.class)))
+                .willAnswer(invocation -> {
+                    SitterReviewSummary saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", 10L);
+                    return saved;
+                });
+
+        // when
+        SitterReviewSummaryDto result = aiReviewSummaryService.generateReviewSummary(sitterId);
+
+        // then
+        assertThat(result.aiGenerated()).isFalse();
+        assertThat(result.model()).isEqualTo("fallback-review-summary");
+        then(summaryReviewRepository).should().saveAll(anyList());
+
+        ArgumentCaptor<AiUsageRecord> usageRecordCaptor = ArgumentCaptor.forClass(AiUsageRecord.class);
+        then(aiUsageLogService).should().record(usageRecordCaptor.capture());
+        AiUsageRecord usageRecord = usageRecordCaptor.getValue();
+        assertThat(usageRecord.status()).isEqualTo(AiUsageStatus.FALLBACK);
+        assertThat(usageRecord.errorType()).isEqualTo(AiErrorType.INVALID_RESPONSE);
     }
 
     private List<ReviewSource> reviews() {

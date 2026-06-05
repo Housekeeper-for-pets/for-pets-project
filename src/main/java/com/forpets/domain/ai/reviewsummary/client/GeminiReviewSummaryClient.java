@@ -1,5 +1,6 @@
 package com.forpets.domain.ai.reviewsummary.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.forpets.domain.ai.reviewsummary.dto.SitterReviewSummaryResponse;
 import com.forpets.domain.ai.reviewsummary.exception.AiReviewSummaryErrorCode;
@@ -7,11 +8,13 @@ import com.forpets.domain.ai.reviewsummary.exception.AiReviewSummaryException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -40,14 +43,25 @@ public class GeminiReviewSummaryClient implements AiReviewSummaryClient {
             @Value("${GEMINI_API_KEY:}") String apiKey,
             @Value("${forpets.ai.gemini.model:gemini-2.5-flash-lite}") String model,
             @Value("${forpets.ai.gemini.max-tokens:900}") Integer maxTokens,
-            @Value("${forpets.ai.gemini.temperature:0.2}") Double temperature
+            @Value("${forpets.ai.gemini.temperature:0.2}") Double temperature,
+            @Value("${forpets.ai.gemini.connect-timeout-ms:2000}") Long connectTimeoutMs,
+            @Value("${forpets.ai.gemini.read-timeout-ms:5000}") Long readTimeoutMs
     ) {
-        this.restClient = RestClient.create();
+        this.restClient = RestClient.builder()
+                .requestFactory(requestFactory(connectTimeoutMs, readTimeoutMs))
+                .build();
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.model = model;
         this.maxTokens = maxTokens;
         this.temperature = temperature;
+    }
+
+    private SimpleClientHttpRequestFactory requestFactory(Long connectTimeoutMs, Long readTimeoutMs) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofMillis(connectTimeoutMs));
+        requestFactory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
+        return requestFactory;
     }
 
     @Override
@@ -64,14 +78,21 @@ public class GeminiReviewSummaryClient implements AiReviewSummaryClient {
                     .retrieve()
                     .body(String.class);
 
-            String content = extractText(rawResponse);
+            JsonNode responseNode = objectMapper.readTree(rawResponse);
+            String content = extractText(responseNode);
             if (!StringUtils.hasText(content)) {
                 throw new AiReviewSummaryException(AiReviewSummaryErrorCode.INVALID_AI_RESPONSE);
             }
 
             SitterReviewSummaryResponse response =
                     objectMapper.readValue(stripMarkdownFence(content), SitterReviewSummaryResponse.class);
-            return new AiReviewSummaryResult(response, model);
+            return new AiReviewSummaryResult(
+                    response,
+                    model,
+                    usageToken(responseNode, "promptTokenCount"),
+                    usageToken(responseNode, "candidatesTokenCount"),
+                    usageToken(responseNode, "totalTokenCount")
+            );
         } catch (AiReviewSummaryException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -137,15 +158,19 @@ public class GeminiReviewSummaryClient implements AiReviewSummaryClient {
         );
     }
 
-    private String extractText(String rawResponse) throws Exception {
-        return objectMapper.readTree(rawResponse)
-                .path("candidates")
+    private String extractText(JsonNode responseNode) {
+        return responseNode.path("candidates")
                 .path(0)
                 .path("content")
                 .path("parts")
                 .path(0)
                 .path("text")
                 .asText();
+    }
+
+    private Integer usageToken(JsonNode responseNode, String fieldName) {
+        JsonNode tokenNode = responseNode.path("usageMetadata").path(fieldName);
+        return tokenNode.isNumber() ? tokenNode.asInt() : null;
     }
 
     private String stripMarkdownFence(String content) {

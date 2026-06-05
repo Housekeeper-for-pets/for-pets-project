@@ -8,7 +8,13 @@ public interface AiReviewSummaryClient {
 
     record AiReviewSummaryResult(
             SitterReviewSummaryResponse response,
-            String model
+            String model,
+            Integer promptTokens,
+            Integer completionTokens,
+            Integer totalTokens
     ) {
+        public AiReviewSummaryResult(SitterReviewSummaryResponse response, String model) {
+            this(response, model, null, null, null);
+        }
     }
 }
