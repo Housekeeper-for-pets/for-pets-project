@@ -41,7 +41,7 @@ public class ChatMessageWebSocketService {
             Long senderId,
             ChatMessageRequest request
     ) {
-        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+        chatRoomRepository.findById(chatRoomId)
                 .orElseThrow(() -> new ChatException(ChatErrorCode.CHAT_ROOM_NOT_FOUND));
 
         ChatRoomParticipant senderParticipant = chatRoomParticipantRepository
@@ -72,22 +72,18 @@ public class ChatMessageWebSocketService {
                 .content(content)
                 .build());
 
-        LocalDateTime createdAt = message.getCreatedAt();
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
+        LocalDateTime createdAt = message.getCreatedAt() != null
+                ? message.getCreatedAt()
+                : LocalDateTime.now();
 
-        chatRoom.updateLastMessage(message.getId(), createdAt);
+        chatRoomRepository.updateLastMessageIfNewer(chatRoomId, message.getId(), createdAt);
 
         if (opponentParticipant.isLeft()) {
             opponentParticipant.rejoin();
         }
 
         log.info("[WebSocket TEXT] chatRoomId={}, senderId={}, messageId={}",
-                chatRoomId,
-                senderId,
-                message.getId()
-        );
+                chatRoomId, senderId, message.getId());
 
         return ChatMessageBroadcast.builder()
                 .chatRoomId(chatRoomId)
