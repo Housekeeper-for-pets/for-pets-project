@@ -95,8 +95,8 @@ public class PostDummyDataInserter implements CommandLineRunner {
                 long n = alreadyInserted + i + 1;
                 Long memberId = memberIds.get(random.nextInt(memberCount));
                 LocalDateTime createdAt = randomDateTime(random, oneYearAgo, now);
-                // status: OPEN 70% / CLOSED 30%
-                String status = random.nextDouble() < 0.70 ? "OPEN" : "CLOSED";
+                // 변경 후 (OPEN 10% / CLOSED 90% — 실서비스 현실 분포)
+                String status = random.nextDouble() < 0.10 ? "OPEN" : "CLOSED";
                 // care_type: VISIT / BOARDING 랜덤
                 String careType = CARE_TYPES[random.nextInt(2)];
                 batch.add(new Object[]{
