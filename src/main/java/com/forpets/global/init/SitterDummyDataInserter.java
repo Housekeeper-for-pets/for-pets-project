@@ -167,7 +167,7 @@ public class SitterDummyDataInserter implements CommandLineRunner {
                 "(member_id, introduction, experience_years, possible_pet_type, possible_pet_size, " +
                 "price_per_hour, average_rating, review_count, status, approval_status, " +
                 "deleted, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED', false, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?, ?)";
 
         for (int offset = 0; offset < count; offset += BATCH_SIZE) {
             int end = Math.min(offset + BATCH_SIZE, count);
@@ -177,6 +177,11 @@ public class SitterDummyDataInserter implements CommandLineRunner {
                 LocalDateTime createdAt = randomDateTime(random, oneYearAgo, now);
                 // status: RESERVABLE 85% / NON_RESERVABLE 15%
                 String status = random.nextDouble() < 0.85 ? "RESERVABLE" : "NON_RESERVABLE";
+                // 실제값과 유사하게 변경 approval_status: APPROVED 75% / PENDING 15% / REJECTED 10%
+                double r = random.nextDouble();//
+                String approvalStatus = r < 0.75 ? "APPROVED"
+                        : r < 0.90 ? "PENDING"
+                        : "REJECTED";
                 // average_rating: 0.0 ~ 5.0 (소수 첫째 자리)
                 BigDecimal avgRating = BigDecimal.valueOf(Math.round(random.nextDouble() * 50) / 10.0);
                 batch.add(new Object[]{
@@ -189,6 +194,7 @@ public class SitterDummyDataInserter implements CommandLineRunner {
                         avgRating,                        // average_rating: 0.0~5.0
                         random.nextInt(301),              // review_count: 0~300
                         status,
+                        approvalStatus,
                         createdAt,
                         randomDateTime(random, createdAt, now)
                 });
