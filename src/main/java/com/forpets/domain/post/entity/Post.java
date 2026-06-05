@@ -17,7 +17,10 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "post")
+@Table(name = "post", indexes = {
+        @Index(name = "idx_post_deleted_created", columnList = "deleted, created_at"),
+        @Index(name = "idx_post_deleted_status_created", columnList = "deleted, status, created_at")
+})
 @SQLRestriction("deleted = false")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Post extends BaseEntity {
