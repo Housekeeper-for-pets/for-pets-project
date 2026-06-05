@@ -12,6 +12,10 @@ import com.forpets.domain.ai.reviewsummary.exception.AiReviewSummaryException;
 import com.forpets.domain.ai.reviewsummary.repository.AiPromptTemplateRepository;
 import com.forpets.domain.ai.reviewsummary.repository.SitterReviewSummaryRepository;
 import com.forpets.domain.ai.reviewsummary.repository.SitterReviewSummaryReviewRepository;
+import com.forpets.domain.ai.usage.entity.AiErrorType;
+import com.forpets.domain.ai.usage.entity.AiFeature;
+import com.forpets.domain.ai.usage.service.AiUsageLogService;
+import com.forpets.domain.ai.usage.service.AiUsageRecord;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
@@ -32,6 +36,7 @@ import java.util.stream.Collectors;
 public class AiReviewSummaryService {
 
     private static final String FEATURE_REVIEW_SUMMARY = "SITTER_REVIEW_SUMMARY";
+    private static final String FALLBACK_MODEL = "fallback-review-summary";
     private static final int REVIEW_LIMIT = 20;
 
     private final SitterProfileRepository sitterProfileRepository;
@@ -40,10 +45,12 @@ public class AiReviewSummaryService {
     private final AiPromptTemplateRepository promptTemplateRepository;
     private final ReviewSourceProvider reviewSourceProvider;
     private final AiReviewSummaryClient aiReviewSummaryClient;
+    private final AiUsageLogService aiUsageLogService;
     private final ObjectMapper objectMapper;
 
     @Transactional
     public SitterReviewSummaryDto generateReviewSummary(Long sitterId) {
+        long startedAt = System.nanoTime();
         validateSitterExists(sitterId);
 
         List<ReviewSource> reviews = reviewSourceProvider.findRecentReviewsBySitterId(sitterId, REVIEW_LIMIT);
@@ -58,6 +65,7 @@ public class AiReviewSummaryService {
         // AI 호출이 실패해도 상세/챗봇 화면이 비지 않도록, 검증 가능한 리뷰 원문 기반 fallback 요약을 저장한다.
         AiReviewSummaryClient.AiReviewSummaryResult result = generateWithFallback(sitterId, prompt, reviews);
         ValidatedSummary validatedSummary = validateOrFallback(sitterId, result, reviews);
+        recordUsage(result, validatedSummary, promptTemplate, elapsedMs(startedAt));
         SitterReviewSummaryResponse response = validatedSummary.response();
 
         SitterReviewSummary generated = toEntity(sitterId, response, validatedSummary.model(), promptTemplate);
@@ -79,7 +87,7 @@ public class AiReviewSummaryService {
                     sitterId, exception.getErrorCode().getCode());
             return new AiReviewSummaryClient.AiReviewSummaryResult(
                     buildFallbackResponse(reviews),
-                    "fallback-review-summary"
+                    FALLBACK_MODEL
             );
         }
     }
@@ -94,8 +102,53 @@ public class AiReviewSummaryService {
         } catch (AiReviewSummaryException exception) {
             log.warn("AI 리뷰 요약 응답 검증 실패. fallback 요약을 저장합니다. sitterId={}, code={}",
                     sitterId, exception.getErrorCode().getCode());
-            return new ValidatedSummary(buildFallbackResponse(reviews), "fallback-review-summary");
+            return new ValidatedSummary(
+                    buildFallbackResponse(reviews),
+                    FALLBACK_MODEL,
+                    AiErrorType.INVALID_RESPONSE,
+                    exception.getErrorCode().getCode()
+            );
         }
+    }
+
+    private void recordUsage(
+            AiReviewSummaryClient.AiReviewSummaryResult result,
+            ValidatedSummary validatedSummary,
+            AiPromptTemplate promptTemplate,
+            long latencyMs
+    ) {
+        if (!FALLBACK_MODEL.equals(validatedSummary.model())) {
+            aiUsageLogService.record(AiUsageRecord.success(
+                    AiFeature.SITTER_REVIEW_SUMMARY,
+                    result.model(),
+                    result.promptTokens(),
+                    result.completionTokens(),
+                    result.totalTokens(),
+                    latencyMs,
+                    promptTemplate.getPromptVersion()
+            ));
+            return;
+        }
+
+        AiErrorType errorType = validatedSummary.errorType() == null
+                ? AiErrorType.UNKNOWN
+                : validatedSummary.errorType();
+        String failureReason = validatedSummary.failureReason() == null
+                ? "AI_REVIEW_SUMMARY_FALLBACK"
+                : validatedSummary.failureReason();
+
+        aiUsageLogService.record(AiUsageRecord.fallback(
+                AiFeature.SITTER_REVIEW_SUMMARY,
+                result.model(),
+                latencyMs,
+                errorType,
+                promptTemplate.getPromptVersion(),
+                failureReason
+        ));
+    }
+
+    private long elapsedMs(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
     public SitterReviewSummaryDto getReviewSummary(Long sitterId) {
@@ -271,7 +324,7 @@ public class AiReviewSummaryService {
                 .sentiment(response.sentiment())
                 .confidenceScore(response.confidenceScore())
                 .reviewCount(response.reviewCount())
-                .aiGenerated(!"fallback-review-summary".equals(model))
+                .aiGenerated(!FALLBACK_MODEL.equals(model))
                 .model(model)
                 .promptVersion(promptTemplate.getPromptVersion())
                 .summaryStatus(SummaryStatus.FRESH)
@@ -311,7 +364,12 @@ public class AiReviewSummaryService {
 
     private record ValidatedSummary(
             SitterReviewSummaryResponse response,
-            String model
+            String model,
+            AiErrorType errorType,
+            String failureReason
     ) {
+        private ValidatedSummary(SitterReviewSummaryResponse response, String model) {
+            this(response, model, null, null);
+        }
     }
 }

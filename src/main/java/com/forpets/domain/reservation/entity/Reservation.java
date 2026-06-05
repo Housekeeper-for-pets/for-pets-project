@@ -104,6 +104,7 @@ public class Reservation extends BaseEntity {
     }
 
     public void cancel(String cancelReason, CancelCategory cancelCategory, CanceledBy canceledBy) {
+        if (!isCancelable()) throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
         this.status = ReservationStatus.CANCELED;
         this.cancelReason = cancelReason;
         this.cancelCategory = cancelCategory;
