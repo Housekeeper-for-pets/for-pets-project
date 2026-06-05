@@ -1,9 +1,6 @@
 package com.forpets.domain.chat.service;
 
-import com.forpets.domain.chat.dto.ChatRoomCreateResponse;
-import com.forpets.domain.chat.dto.ChatRoomLeaveResponse;
-import com.forpets.domain.chat.dto.ChatRoomListItem;
-import com.forpets.domain.chat.dto.ChatRoomListResponse;
+import com.forpets.domain.chat.dto.*;
 import com.forpets.domain.chat.entity.ChatMessage;
 import com.forpets.domain.chat.entity.ChatRoom;
 import com.forpets.domain.chat.entity.ChatRoomParticipant;
@@ -17,6 +14,7 @@ import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -142,177 +140,85 @@ public class ChatRoomService {
     ) {
         int effectiveSize = Math.min(Math.max(size, 1), 50);
 
-        // 나가지 않은 채팅방 조회
-        List<ChatRoomParticipant> myParticipants =
-                chatRoomParticipantRepository.findAllActiveRoomsByMemberId(memberId);
+        // DB에서 정렬·페이징·unreadCount 집계를 한 번에 처리
+        // size + 1개를 가져와서 다음 페이지 존재 여부를 판단
+        List<ChatRoomSummary> summaries = chatRoomParticipantRepository.findChatRoomSummaries(
+                memberId,
+                cursorLastMessageAt,
+                cursorChatRoomId,
+                PageRequest.of(0, effectiveSize + 1)
+        );
 
-        // 빈 채팅방 응답
-        if (myParticipants.isEmpty()) {
+        if (summaries.isEmpty()) {
             return ChatRoomListResponse.empty();
         }
 
-        // 내 채팅방 참여 목록을 chatRoomId로 찾기
-        Map<Long, ChatRoomParticipant> participantMap = myParticipants.stream()
-                .collect(Collectors.toMap(ChatRoomParticipant::getChatRoomId, Function.identity()));
+        boolean hasNext = summaries.size() > effectiveSize;
+        List<ChatRoomSummary> pagedSummaries = summaries.subList(0, Math.min(effectiveSize, summaries.size()));
 
-
-        List<Long> chatRoomIds = myParticipants.stream()
-                .map(ChatRoomParticipant::getChatRoomId)
-                .toList();
-
-        List<ChatRoom> chatRooms = chatRoomRepository.findAllById(chatRoomIds);
-
-        // 마지막 메시지가 있는 채팅방만 목록에 보여준다.
-        // 채팅방 생성만 하고 메시지가 없으면 목록에는 표시하지 않는다.
-        List<ChatRoom> filteredRooms = chatRooms.stream()
-                .filter(chatRoom -> isDisplayableRoom(chatRoom, participantMap.get(chatRoom.getId())))
-                .filter(chatRoom -> isBeforeCursor(chatRoom, cursorLastMessageAt, cursorChatRoomId))
-                .sorted(Comparator
-                        .comparing(ChatRoom::getLastMessageAt, Comparator.reverseOrder())
-                        .thenComparing(ChatRoom::getId, Comparator.reverseOrder()))
-                .toList();
-
-        boolean hasNext = filteredRooms.size() > effectiveSize;
-
-        List<ChatRoom> pagedRooms = filteredRooms.stream()
-                .limit(effectiveSize)
-                .toList();
-
-        if (pagedRooms.isEmpty()) {
-            return ChatRoomListResponse.empty();
-        }
-
-        Map<Long, Member> opponentMap = getOpponentMap(memberId, pagedRooms);
-        Map<Long, ChatMessage> lastMessageMap = getLastMessageMap(pagedRooms);
-
-        // ChatRoom 목록, 응답 DTO로 변환
-        List<ChatRoomListItem> items = pagedRooms.stream()
-                .map(chatRoom -> toChatRoomListItem(
-                        memberId,
-                        chatRoom,
-                        participantMap.get(chatRoom.getId()),
-                        opponentMap,
-                        lastMessageMap
-                ))
-                .toList();
-
-        ChatRoom lastRoom = pagedRooms.get(pagedRooms.size() - 1);
-
-        return ChatRoomListResponse.builder()
-                .items(items)
-                .hasNext(hasNext)
-                .nextCursorLastMessageAt(hasNext ? lastRoom.getLastMessageAt() : null)
-                .nextCursorChatRoomId(hasNext ? lastRoom.getId() : null)
-                .build();
-    }
-
-    // 목록에 보여줄 수 있는 채팅방인지 판단
-    private boolean isDisplayableRoom(ChatRoom chatRoom, ChatRoomParticipant participant) {
-        if (chatRoom.getLastMessageAt() == null) {
-            return false;
-        }
-
-        if (participant == null || participant.isLeft()) {
-            return false;
-        }
-
-        if (participant.getVisibleFromAt() == null) {
-            return true;
-        }
-
-        return chatRoom.getLastMessageAt().isAfter(participant.getVisibleFromAt());
-    }
-
-    // 커서가 없으면 전체 대상이고, 커서가 있으면 커서보다 이전 채팅방만 조회 대상
-    private boolean isBeforeCursor(
-            ChatRoom chatRoom,
-            LocalDateTime cursorLastMessageAt,
-            Long cursorChatRoomId
-    ) {
-        if (cursorLastMessageAt == null || cursorChatRoomId == null) {
-            return true;
-        }
-
-        if (chatRoom.getLastMessageAt().isBefore(cursorLastMessageAt)) {
-            return true;
-        }
-
-        return chatRoom.getLastMessageAt().isEqual(cursorLastMessageAt)
-                && chatRoom.getId() < cursorChatRoomId;
-    }
-
-    // 채팅방 목록에 표시할 상대 회원 정보를 조회한다.
-    private Map<Long, Member> getOpponentMap(Long memberId, List<ChatRoom> chatRooms) {
-        List<Long> opponentIds = chatRooms.stream()
-                .map(chatRoom -> resolveOpponentId(memberId, chatRoom))
+        // 상대방 회원 정보를 한 번에 조회
+        List<Long> opponentIds = pagedSummaries.stream()
+                .map(s -> resolveOpponentIdFromSummary(memberId, s))
                 .distinct()
                 .toList();
 
-        if (opponentIds.isEmpty()) {
-            return Map.of();
-        }
-
-        return memberRepository.findAllByIdIncludingDeleted(opponentIds)
+        Map<Long, Member> opponentMap = memberRepository.findAllByIdIncludingDeleted(opponentIds)
                 .stream()
                 .collect(Collectors.toMap(Member::getId, Function.identity()));
-    }
 
-    // 채팅방 목록에 표시할 마지막 메시지 정보를 조회한다.
-    private Map<Long, ChatMessage> getLastMessageMap(List<ChatRoom> chatRooms) {
-        List<Long> lastMessageIds = chatRooms.stream()
-                .map(ChatRoom::getLastMessageId)
+        // 마지막 메시지 내용을 한 번에 조회
+        List<Long> lastMessageIds = pagedSummaries.stream()
+                .map(ChatRoomSummary::lastMessageId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
 
-        if (lastMessageIds.isEmpty()) {
-            return Map.of();
-        }
-
-        return chatMessageRepository.findAllById(lastMessageIds)
+        Map<Long, ChatMessage> lastMessageMap = chatMessageRepository.findAllById(lastMessageIds)
                 .stream()
                 .collect(Collectors.toMap(ChatMessage::getId, Function.identity()));
+
+        List<ChatRoomListItem> items = pagedSummaries.stream()
+                .map(s -> toChatRoomListItem(memberId, s, opponentMap, lastMessageMap))
+                .toList();
+
+        ChatRoomSummary lastSummary = pagedSummaries.get(pagedSummaries.size() - 1);
+
+        return ChatRoomListResponse.builder()
+                .items(items)
+                .hasNext(hasNext)
+                .nextCursorLastMessageAt(hasNext ? lastSummary.lastMessageAt() : null)
+                .nextCursorChatRoomId(hasNext ? lastSummary.chatRoomId() : null)
+                .build();
     }
 
-    // 채팅방 Entity를 목록 응답 DTO로 변환한다.
+    // ChatRoomSummary 기준으로 상대방 ID를 계산
+    private Long resolveOpponentIdFromSummary(Long memberId, ChatRoomSummary summary) {
+        return summary.memberAId().equals(memberId)
+                ? summary.memberBId()
+                : summary.memberAId();
+    }
+
+    // ChatRoomSummary를 목록 응답 DTO로 변환
     private ChatRoomListItem toChatRoomListItem(
             Long memberId,
-            ChatRoom chatRoom,
-            ChatRoomParticipant myParticipant,
+            ChatRoomSummary summary,
             Map<Long, Member> opponentMap,
             Map<Long, ChatMessage> lastMessageMap
     ) {
-        Long opponentId = resolveOpponentId(memberId, chatRoom);
+        Long opponentId = resolveOpponentIdFromSummary(memberId, summary);
         Member opponent = opponentMap.get(opponentId);
-        ChatMessage lastMessage = lastMessageMap.get(chatRoom.getLastMessageId());
-
-        long unreadCount = chatMessageRepository.countUnread(
-                chatRoom.getId(),
-                memberId,
-                myParticipant.getLastReadMessageId(),
-                myParticipant.getVisibleFromAt()
-        );
+        ChatMessage lastMessage = lastMessageMap.get(summary.lastMessageId());
 
         return ChatRoomListItem.builder()
-                .chatRoomId(chatRoom.getId())
+                .chatRoomId(summary.chatRoomId())
                 .opponentId(opponentId)
                 .opponentNickname(resolveOpponentNickname(opponent))
                 .lastMessage(resolveLastMessageContent(lastMessage))
                 .lastMessageType(lastMessage == null ? null : lastMessage.getMessageType())
-                .lastMessageAt(chatRoom.getLastMessageAt())
-                .unreadCount((int) unreadCount)
+                .lastMessageAt(summary.lastMessageAt())
+                .unreadCount((int) summary.unreadCount())
                 .build();
     }
-
-    // 현재 회원 기준으로 채팅 상대 회원 ID를 계산한다.
-    private Long resolveOpponentId(Long memberId, ChatRoom chatRoom) {
-        if (chatRoom.getMemberAId().equals(memberId)) {
-            return chatRoom.getMemberBId();
-        }
-
-        return chatRoom.getMemberAId();
-    }
-
 
     // 이미지 업로드 없는 버전이므로 마지막 메시지는 TEXT content 그대로 보여준다.
     private String resolveLastMessageContent(ChatMessage lastMessage) {
