@@ -57,14 +57,14 @@ public class StompChannelInterceptor implements ChannelInterceptor {
         String authorizationHeader = accessor.getFirstNativeHeader("Authorization");
 
         if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-            throwUnauthorized(message);
+            throw throwUnauthorized(message);
         }
 
         String token = authorizationHeader.substring(7);
 
         try {
             if (tokenRedisService.isBlacklisted(token)) {
-                throwUnauthorized(message);
+                throw throwUnauthorized(message);
             }
 
             jwtTokenProvider.validateToken(token);
@@ -89,7 +89,7 @@ public class StompChannelInterceptor implements ChannelInterceptor {
         } catch (MessageDeliveryException e) {
             throw e;
         } catch (Exception e) {
-            throwUnauthorized(message);
+            throw throwUnauthorized(message);
         }
     }
 
@@ -127,17 +127,17 @@ public class StompChannelInterceptor implements ChannelInterceptor {
         Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
 
         if (sessionAttributes == null) {
-            throwUnauthorized(message);
+            throw throwUnauthorized(message);
         }
 
         Long tokenExpiresAt = (Long) sessionAttributes.get("tokenExpiresAt");
         if (tokenExpiresAt == null || System.currentTimeMillis() > tokenExpiresAt) {
-            throwUnauthorized(message);
+            throw throwUnauthorized(message);
         }
 
         String token = (String) sessionAttributes.get("token");
         if (token == null || tokenRedisService.isBlacklisted(token)) {
-            throwUnauthorized(message);
+            throw throwUnauthorized(message);
         }
     }
 
@@ -145,7 +145,7 @@ public class StompChannelInterceptor implements ChannelInterceptor {
         Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
 
         if (sessionAttributes == null || sessionAttributes.get("memberId") == null) {
-            throwUnauthorized(message);
+            throw throwUnauthorized(message);
         }
 
         return (Long) sessionAttributes.get("memberId");
@@ -160,10 +160,9 @@ public class StompChannelInterceptor implements ChannelInterceptor {
         }
     }
 
-    private void throwUnauthorized(Message<?> message) {
+    private RuntimeException throwUnauthorized(Message<?> message) {
         throw new MessageDeliveryException(
-                message,
-                ChatErrorCode.CHAT_WEBSOCKET_UNAUTHORIZED.getMessage()
+                message, ChatErrorCode.CHAT_WEBSOCKET_UNAUTHORIZED.getMessage()
         );
     }
 }
