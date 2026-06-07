@@ -11,6 +11,7 @@ import com.forpets.domain.sitter.dto.profile.UpdateSitterRequest;
 import com.forpets.domain.sitter.dto.profile.UpdateSitterStatusRequest;
 import com.forpets.domain.sitter.entity.SitterApprovalStatus;
 import com.forpets.domain.sitter.entity.SitterProfile;
+import com.forpets.domain.sitter.entity.SitterProfileStatus;
 import com.forpets.domain.sitter.entity.SitterSchedule;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
@@ -205,7 +206,12 @@ public class SitterService {
     // -------------Transaction 아닌 method 들------------------
 
     private void validateApproved(SitterProfile sitter) {
-        if (!sitter.isApproved()) throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);
+        switch (sitter.getApprovalStatus()) {
+            case SitterApprovalStatus.APPROVED -> { return; }
+            case SitterApprovalStatus.PENDING -> throw new SitterException(SitterErrorCode.SITTER_PROFILE_PENDING);
+            case SitterApprovalStatus.REJECTED -> throw new SitterException(SitterErrorCode.SITTER_PROFILE_REJECTED);
+            // 필요 시 다른 상태도
+        }
     }
 
     // rejected 되면 삭제 후 재등록이 가능하도록 함
@@ -253,24 +259,49 @@ public class SitterService {
         }
     }
 
+    /*
+    [본인 컨텍스트] 로그인한 사용자의 시터 프로필 + 승인 검증
+    - 프로필 없음 → SITTER_PROFILE_REQUIRED ("시터 프로필 등록 후 이용 가능합니다")
+    - PENDING    → SITTER_PROFILE_PENDING  ("시터 프로필 승인 대기 중입니다")
+    - REJECTED   → SITTER_PROFILE_REJECTED ("시터 프로필이 반려되었습니다")
+    시터 전용 기능(제안, 요청 수락 등)에서 사용
+     */
     public SitterProfile findApprovedByMemberId(Long memberId){
         SitterProfile sitter = findByMemberId(memberId);
         validateApproved(sitter);
         return sitter;
     }
 
+    /*
+    [타인 컨텍스트] sitterId 로 시터 프로필 조회 + 승인 검증
+    - 못 찾거나 미승인 → 모두 SITTER_NOT_FOUND 로 통일 ("존재하지 않는 시터입니다")
+    - 외부 사용자에게 타인의 PENDING/REJECTED 상태를 노출하지 않기 위함
+    돌봄 요청 전송, 제안 수락 등 타인 시터 참조 시 사용
+     */
     public SitterProfile findApprovedById(Long sitterId){
         SitterProfile sitter = findById(sitterId);
-        validateApproved(sitter);
+        if (sitter.getApprovalStatus() != SitterApprovalStatus.APPROVED) {
+            throw new SitterException(SitterErrorCode.SITTER_NOT_FOUND);
+        }
         return sitter;
     }
 
+    /*
+    [본인 컨텍스트] 로그인한 사용자의 시터 프로필 조회
+    - 프로필 없음 → SITTER_PROFILE_REQUIRED ("시터 프로필 등록 후 이용 가능합니다")
+    시터 본인이 자신의 프로필을 다루는 경우 사용 (조회, 수정, 삭제, 스케줄 등)
+     */
     public SitterProfile findByMemberId(Long memberId){
         return sitterProfileRepository.findByMemberId(memberId).orElseThrow(
-                ()->new SitterException(SitterErrorCode.SITTER_NOT_FOUND)
+                ()->new SitterException(SitterErrorCode.SITTER_PROFILE_REQUIRED)
         );
     }
 
+    /*
+    [타인 컨텍스트] sitterId 로 시터 프로필 조회
+    - 못 찾음 → SITTER_NOT_FOUND ("존재하지 않는 시터입니다")
+    관리자, 타인의 시터 프로필을 ID 로 참조할 때 사용
+     */
     public SitterProfile findById(Long sitterId){
         return sitterProfileRepository.findById(sitterId).orElseThrow(
                 ()->new SitterException(SitterErrorCode.SITTER_NOT_FOUND)

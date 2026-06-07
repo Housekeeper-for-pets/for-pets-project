@@ -38,7 +38,7 @@ public class ProposalController {
     /*
     1. 공고에 제안 등록 (역방향)
      */
-    @PreAuthorize("hasRole('SITTER')")
+//    @PreAuthorize("hasRole('SITTER')")
     @PostMapping("/api/posts/{postId}/proposals")
     public ResponseEntity<ApiResponse<ProposalResponseDto>> create(
             @LoginUser CurrentMember currentMember,
