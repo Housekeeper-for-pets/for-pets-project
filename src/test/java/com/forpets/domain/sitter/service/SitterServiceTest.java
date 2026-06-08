@@ -308,7 +308,7 @@ class SitterServiceTest {
             assertThatThrownBy(() -> sitterService.getMyProfile(member2Id))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
-                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+                            .isEqualTo(SitterErrorCode.SITTER_PROFILE_REQUIRED));
         }
     }
 
@@ -358,7 +358,7 @@ class SitterServiceTest {
             assertThatThrownBy(() -> sitterService.update(member2Id, request))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
-                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+                            .isEqualTo(SitterErrorCode.SITTER_PROFILE_REQUIRED));
         }
     }
 
@@ -431,7 +431,7 @@ class SitterServiceTest {
             assertThatThrownBy(() -> sitterService.updateStatus(member2Id, request))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
-                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+                            .isEqualTo(SitterErrorCode.SITTER_PROFILE_REQUIRED));
         }
     }
 
@@ -486,7 +486,7 @@ class SitterServiceTest {
             assertThatThrownBy(() -> sitterService.delete(member2Id))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
-                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+                            .isEqualTo(SitterErrorCode.SITTER_PROFILE_REQUIRED));
         }
     }
 

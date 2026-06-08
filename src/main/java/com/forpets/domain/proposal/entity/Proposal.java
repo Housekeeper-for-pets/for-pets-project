@@ -9,9 +9,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "proposal", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"post_id", "sitter_profile_id"})
-})
+@Table(name = "proposal")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Proposal extends BaseEntity {
 
