@@ -264,6 +264,40 @@ class SitterControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("[성공] TC-19 gender 필터 - 지정한 성별만 조회된다")
+    void get_sitters_tc_19() throws Exception {
+        saveSitter("gender-male@test.com", "gender-male", Region.GANGNAM,
+                PossiblePetType.DOG, PossiblePetSize.SMALL, 3, 20000, MemberGender.MALE);
+        saveSitter("gender-female@test.com", "gender-female", Region.GANGNAM,
+                PossiblePetType.DOG, PossiblePetSize.SMALL, 3, 20000, MemberGender.FEMALE);
+        entityManager.flush();
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/sitters").param("gender", "MALE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isArray())
+                .andExpect(jsonPath("$.data.content.length()", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.data.content[*].gender", everyItem(is("MALE"))));
+    }
+
+    @Test
+    @DisplayName("[성공] TC-20 목록 응답에 nickname, gender가 포함된다")
+    void get_sitters_tc_20() throws Exception {
+        mockMvc.perform(get("/api/sitters"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0]", hasKey("nickname")))
+                .andExpect(jsonPath("$.data.content[0]", hasKey("gender")));
+    }
+
+    @Test
+    @DisplayName("[실패] TC-21 잘못된 Enum 값 - gender")
+    void get_sitters_tc_21() throws Exception {
+        mockMvc.perform(get("/api/sitters").param("gender", "INVALID_GENDER"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_SEARCH_CONDITION"));
+    }
+
+    @Test
     @DisplayName("[성공] 상세 TC-01 로그인 상태에서 존재하는 sitterId로 조회")
     void get_sitter_detail_tc_01() throws Exception {
         mockMvc.perform(get("/api/sitters/{sitterId}", detailSitterWithScheduleId)
@@ -413,6 +447,16 @@ class SitterControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.memberId", any(Number.class)));
     }
 
+    @Test
+    @DisplayName("[성공] 상세 TC-16 응답에 nickname, gender가 포함된다")
+    void get_sitter_detail_tc_16() throws Exception {
+        mockMvc.perform(get("/api/sitters/{sitterId}", detailSitterWithScheduleId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasKey("nickname")))
+                .andExpect(jsonPath("$.data", hasKey("gender")));
+    }
+
     private SitterProfile saveSitter(
             String email,
             String nickname,
@@ -422,12 +466,26 @@ class SitterControllerIntegrationTest {
             int experienceYears,
             int pricePerHour
     ) {
+        return saveSitter(email, nickname, region, possiblePetType, possiblePetSize,
+                experienceYears, pricePerHour, MemberGender.UNKNOWN);
+    }
+
+    private SitterProfile saveSitter(
+            String email,
+            String nickname,
+            Region region,
+            PossiblePetType possiblePetType,
+            PossiblePetSize possiblePetSize,
+            int experienceYears,
+            int pricePerHour,
+            MemberGender gender
+    ) {
         Member member = Member.builder()
                 .email(email)
                 .password("password123")
                 .nickname(nickname)
                 .phone("010-0000-0000")
-                .gender(MemberGender.UNKNOWN)
+                .gender(gender)
                 .region(region)
                 .build();
         member.changeRoleToSitter();

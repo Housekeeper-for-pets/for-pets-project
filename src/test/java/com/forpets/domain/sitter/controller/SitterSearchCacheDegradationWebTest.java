@@ -63,7 +63,7 @@ class SitterSearchCacheDegradationWebTest {
     @DisplayName("GET /api/sitters — 캐시 장애 시 200 응답 및 DB 폴백")
     void search_returns_200_when_cache_fails() throws Exception {
         SitterPageResponse response = SitterPageResponse.of(List.of(), 0, 0, 0, 10);
-        given(sitterProfileRepository.searchSitters(eq(new SitterSearchCondition(null, null, null, null, null)), any(Pageable.class)))
+        given(sitterProfileRepository.searchSitters(eq(new SitterSearchCondition(null, null, null, null, null, null)), any(Pageable.class)))
                 .willReturn(response);
 
         mockMvc.perform(get("/api/sitters"))

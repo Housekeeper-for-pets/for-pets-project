@@ -1,5 +1,6 @@
 package com.forpets.domain.sitter.repository;
 
+import com.forpets.domain.member.entity.MemberGender;
 import com.forpets.domain.member.entity.QMember;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
@@ -40,7 +41,7 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
 
         // ── 데이터 쿼리 (Tuple로 sitter와 member.region을 한 번에 JOIN 조회하여 N+1 방지) ────────────────
         List<com.querydsl.core.Tuple> results = queryFactory
-                .select(sitter, member.region)
+                .select(sitter, member.region, member.nickname, member.gender)
                 .from(sitter)
                 .join(member).on(member.id.eq(sitter.memberId))
                 .where(
@@ -49,7 +50,8 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
                         possiblePetTypeEq(condition),
                         possiblePetSizeEq(condition),
                         minPriceGoe(condition),
-                        maxPriceLoe(condition)
+                        maxPriceLoe(condition),
+                        genderEq(condition)
                 )
                 .orderBy(buildOrderSpecifier(pageable))
                 .offset(pageable.getOffset())
@@ -67,7 +69,8 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
                         possiblePetTypeEq(condition),
                         possiblePetSizeEq(condition),
                         minPriceGoe(condition),
-                        maxPriceLoe(condition)
+                        maxPriceLoe(condition),
+                        genderEq(condition)
                 )
                 .fetchOne();
 
@@ -98,10 +101,14 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
                 .map(tuple -> {
                     SitterProfile s = tuple.get(sitter);
                     Region region = tuple.get(member.region);
+                    String nickname = tuple.get(member.nickname);
+                    MemberGender gender = tuple.get(member.gender);
                     List<SitterSchedule> schedules = schedulesMap.getOrDefault(s.getId(), List.of());
                     return SitterResponseDto.from(
                             s,
                             region != null ? region : Region.UNKNOWN,
+                            nickname,
+                            gender,
                             schedules
                     );
                 })
@@ -134,6 +141,10 @@ public class SitterProfileRepositoryCustomImpl implements SitterProfileRepositor
 
     private BooleanExpression maxPriceLoe(SitterSearchCondition condition) {
         return condition.maxPrice() != null ? sitter.pricePerHour.loe(condition.maxPrice()) : null;
+    }
+
+    private BooleanExpression genderEq(SitterSearchCondition condition) {
+        return condition.gender() != null ? member.gender.eq(condition.gender()) : null;
     }
 
     // ── 정렬 빌더 ─────────────────────────────────────────────────────────

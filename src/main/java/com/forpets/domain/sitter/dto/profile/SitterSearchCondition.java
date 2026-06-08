@@ -1,5 +1,6 @@
 package com.forpets.domain.sitter.dto.profile;
 
+import com.forpets.domain.member.entity.MemberGender;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
@@ -13,6 +14,7 @@ public record SitterSearchCondition(
         PossiblePetType possiblePetType,
         PossiblePetSize possiblePetSize,
         Integer minPrice,
-        Integer maxPrice
+        Integer maxPrice,
+        MemberGender gender
 ) {
 }

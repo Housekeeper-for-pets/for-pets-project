@@ -41,7 +41,7 @@ class SitterCacheServiceGracefulDegradationTest {
     @Test
     @DisplayName("캐시 GET 실패 시 Repository 조회 결과를 반환한다 (DB 폴백)")
     void searchSitters_falls_back_to_repository_when_cache_fails() {
-        SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+        SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null, null);
         SitterPageResponse expected = SitterPageResponse.of(List.of(), 0, 0, 0, 10);
 
         given(sitterProfileRepository.searchSitters(eq(condition), any(Pageable.class)))
