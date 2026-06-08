@@ -47,7 +47,8 @@ public class AiSitterRecommendationTool {
                 condition.possiblePetType(),
                 condition.possiblePetSize(),
                 condition.minPrice(),
-                condition.maxPrice()
+                condition.maxPrice(),
+                null//gender 필터 미적용
         );
 
         SitterPageResponse response = sitterService.searchSitters(searchCondition, 0, RECOMMENDATION_LIMIT, "createdAt", "desc");

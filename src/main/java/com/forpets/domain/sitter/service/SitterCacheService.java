@@ -51,7 +51,7 @@ public class SitterCacheService {
                 .orElseThrow(() -> new SitterException(SitterErrorCode.SITTER_NOT_FOUND));
         Member member = memberService.findById(sitter.getMemberId());
         List<SitterSchedule> schedules = sitterScheduleRepository.findAllBySitterProfileId(sitter.getId());
-        return SitterResponseDto.from(sitter, member.getRegion(), schedules);
+        return SitterResponseDto.from(sitter, member.getRegion(), member.getNickname(), member.getGender(), schedules);
     }
 
     /**

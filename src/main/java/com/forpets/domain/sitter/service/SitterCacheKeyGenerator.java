@@ -30,6 +30,7 @@ public class SitterCacheKeyGenerator implements KeyGenerator {
                 valueOf(condition.possiblePetSize()),
                 valueOf(condition.minPrice()),
                 valueOf(condition.maxPrice()),
+                valueOf(condition.gender()),
                 String.valueOf(page),
                 String.valueOf(size),
                 valueOf(sort),
