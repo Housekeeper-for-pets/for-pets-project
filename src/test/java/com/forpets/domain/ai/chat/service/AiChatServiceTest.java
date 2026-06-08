@@ -4,6 +4,9 @@ import com.forpets.domain.ai.chat.client.AiChatClient;
 import com.forpets.domain.ai.chat.dto.AiChatRequest;
 import com.forpets.domain.ai.chat.dto.AiChatResponse;
 import com.forpets.domain.ai.chat.dto.RecommendedSitterDto;
+import com.forpets.domain.ai.rag.dto.RagSearchResultDto;
+import com.forpets.domain.ai.rag.dto.RagSourceType;
+import com.forpets.domain.ai.rag.service.AiRagService;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
@@ -33,6 +36,9 @@ class AiChatServiceTest {
     @Mock
     private AiSitterRecommendationTool sitterRecommendationTool;
 
+    @Mock
+    private AiRagService aiRagService;
+
     @Test
     @DisplayName("[성공] 사용자 메시지를 자동 Tool Calling 클라이언트에 위임한다")
     void chat_success() {
@@ -41,6 +47,7 @@ class AiChatServiceTest {
         List<RecommendedSitterDto> candidates = List.of(candidate());
         given(aiChatClient.chatWithTools(message, sitterRecommendationTool))
                 .willReturn(new AiChatResponse("마포구에서 소형견 케어가 가능한 시터를 찾았어요.", candidates));
+        given(aiRagService.searchSources(message)).willReturn(List.of(source()));
 
         // when
         AiChatResponse response = aiChatService.chat(1L, new AiChatRequest(message));
@@ -48,7 +55,19 @@ class AiChatServiceTest {
         // then
         assertThat(response.answer()).contains("마포구");
         assertThat(response.recommendedSitters()).hasSize(1);
+        assertThat(response.sources()).hasSize(1);
         then(aiChatClient).should().chatWithTools(message, sitterRecommendationTool);
+    }
+
+    private RagSearchResultDto source() {
+        return new RagSearchResultDto(
+                RagSourceType.REVIEW,
+                10L,
+                1L,
+                5,
+                "분리불안 반려견을 차분하게 케어해주셨어요.",
+                0.88
+        );
     }
 
     private RecommendedSitterDto candidate() {

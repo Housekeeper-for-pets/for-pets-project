@@ -3,6 +3,9 @@ package com.forpets.domain.ai.chat.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.forpets.domain.ai.chat.dto.AiSitterSearchCondition;
 import com.forpets.domain.ai.chat.dto.RecommendedSitterDto;
+import com.forpets.domain.ai.rag.dto.RagSearchResultDto;
+import com.forpets.domain.ai.rag.dto.RagSourceType;
+import com.forpets.domain.ai.rag.service.AiRagService;
 import com.forpets.domain.ai.reviewsummary.entity.ReviewSentiment;
 import com.forpets.domain.ai.reviewsummary.entity.SitterReviewSummary;
 import com.forpets.domain.ai.reviewsummary.entity.SummaryStatus;
@@ -44,6 +47,9 @@ class AiSitterRecommendationToolTest {
     @Mock
     private SitterReviewSummaryRepository summaryRepository;
 
+    @Mock
+    private AiRagService aiRagService;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -56,7 +62,7 @@ class AiSitterRecommendationToolTest {
         );
 
         given(sitterService.searchSitters(
-                eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null)),
+                eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null, null)),
                 eq(0),
                 eq(3),
                 eq("createdAt"),
@@ -82,7 +88,7 @@ class AiSitterRecommendationToolTest {
         );
 
         given(sitterService.searchSitters(
-                eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null)),
+                eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null, null)),
                 eq(0),
                 eq(3),
                 eq("createdAt"),
@@ -99,11 +105,40 @@ class AiSitterRecommendationToolTest {
         assertThat(result.get(0).cautions()).contains("AI 리뷰 요약 생성 후 더 정확한 추천이 가능합니다.");
     }
 
+    @Test
+    @DisplayName("[성공] 사용자 질문과 가까운 리뷰 근거를 RAG Tool로 조회한다")
+    void search_relevant_review_sources() {
+        // given
+        String query = "분리불안 있는 말티즈를 잘 보는 시터";
+        given(aiRagService.searchSources(query)).willReturn(List.of(source()));
+
+        // when
+        List<RagSearchResultDto> result = recommendationTool.searchRelevantReviewSources(query);
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).reviewId()).isEqualTo(10L);
+        assertThat(result.get(0).snippet()).contains("분리불안");
+    }
+
+    private RagSearchResultDto source() {
+        return new RagSearchResultDto(
+                RagSourceType.REVIEW,
+                10L,
+                1L,
+                5,
+                "분리불안 반려견을 차분하게 케어해주셨어요.",
+                0.88
+        );
+    }
+
     private SitterResponseDto sitter() {
         return new SitterResponseDto(
                 1L,
                 3L,
                 Region.MAPO,
+                null,
+                null,
                 "소형견 케어 경험이 많습니다.",
                 3,
                 PossiblePetType.DOG,

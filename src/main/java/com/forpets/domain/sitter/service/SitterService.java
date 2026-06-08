@@ -63,7 +63,7 @@ public class SitterService {
                         request.pricePerHour()
                 );
 
-                return SitterResponseDto.from(sitter, member.getRegion());
+                return SitterResponseDto.from(sitter, member.getRegion(), member.getNickname(), member.getGender());
             }
 
             // deleted 가 풀렸고, 이미 승인 대기 중
@@ -89,7 +89,7 @@ public class SitterService {
         // 승인이 되어야 역할이 변경됨
 //        member.changeRoleToSitter();
 
-        return SitterResponseDto.from(sitter, member.getRegion());
+        return SitterResponseDto.from(sitter, member.getRegion(), member.getNickname(), member.getGender());
     }
 
     /**
@@ -141,7 +141,7 @@ public class SitterService {
         // 경안님도 아래 로직 똑같이 사용하면 getOne'sProfile API 구현할 때 편할 것 같아요
         List<SitterSchedule> schedules = sitterScheduleRepository.findAllBySitterProfileId(sitter.getId());
 
-        return SitterResponseDto.from(sitter, member.getRegion(), schedules);
+        return SitterResponseDto.from(sitter, member.getRegion(), member.getNickname(), member.getGender(), schedules);
     }
 
     /*
@@ -162,7 +162,7 @@ public class SitterService {
         );
 
         sitterCacheService.evictSitterDetail(sitter.getId());
-        return SitterResponseDto.from(sitter, member.getRegion());
+        return SitterResponseDto.from(sitter, member.getRegion(), member.getNickname(), member.getGender());
     }
 
     /*
@@ -178,7 +178,7 @@ public class SitterService {
         sitter.changeStatus(request.status());
 
         sitterCacheService.evictSitterDetail(sitter.getId());
-        return SitterResponseDto.from(sitter, member.getRegion());
+        return SitterResponseDto.from(sitter, member.getRegion(), member.getNickname(), member.getGender());
     }
 
     /*

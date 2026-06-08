@@ -13,8 +13,13 @@ spring:
 
   notifications:
     # broker: direct         # v0
-    broker: redis-stream   # v1 전환 시
-    # broker: kafka          # v2 전환 시
+    # broker: redis-stream   # v1 전환 시
+    broker: kafka          # v2 전환 시
+    kafka:
+      topic: notification-events
+      consumer-group: notification-service
+      partitions: 3
+      replicas: 1
 
   servlet:
     multipart:
@@ -47,3 +52,17 @@ management:
 portone:
   store-id: ${PORTONE_STORE_ID:}
   api-secret: ${PORTONE_API_SECRET:}
+
+forpets:
+  ai:
+    rag:
+      collection-name: forpets_reviews
+      vector-size: 768
+      search-limit: 5
+      score-threshold: 0.7
+    qdrant:
+      base-url: ${QDRANT_BASE_URL:http://localhost:6333}
+    gemini:
+      embedding-model: text-embedding-004
+  cache:
+    enabled: true # true(캐시활성화)/false(비활성화)

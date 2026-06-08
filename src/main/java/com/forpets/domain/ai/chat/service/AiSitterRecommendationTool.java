@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.forpets.domain.ai.chat.dto.AiSitterSearchCondition;
 import com.forpets.domain.ai.chat.dto.RecommendedSitterDto;
+import com.forpets.domain.ai.rag.dto.RagSearchResultDto;
+import com.forpets.domain.ai.rag.service.AiRagService;
 import com.forpets.domain.ai.reviewsummary.entity.SitterReviewSummary;
 import com.forpets.domain.ai.reviewsummary.entity.SummaryStatus;
 import com.forpets.domain.ai.reviewsummary.repository.SitterReviewSummaryRepository;
@@ -29,6 +31,7 @@ public class AiSitterRecommendationTool {
 
     private final SitterService sitterService;
     private final SitterReviewSummaryRepository summaryRepository;
+    private final AiRagService aiRagService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -44,7 +47,8 @@ public class AiSitterRecommendationTool {
                 condition.possiblePetType(),
                 condition.possiblePetSize(),
                 condition.minPrice(),
-                condition.maxPrice()
+                condition.maxPrice(),
+                null//gender 필터 미적용
         );
 
         SitterPageResponse response = sitterService.searchSitters(searchCondition, 0, RECOMMENDATION_LIMIT, "createdAt", "desc");
@@ -78,6 +82,17 @@ public class AiSitterRecommendationTool {
             @ToolParam(description = "시터 검색 API가 반환한 후보 시터 정보") SitterResponseDto sitter
     ) {
         return sitter.schedules();
+    }
+
+    /**
+     * Tool 4. 사용자 질문과 의미가 가까운 리뷰 근거 검색.
+     * RAG 검색 결과에는 reviewId/sitterId가 포함되어 LLM 답변의 출처로 사용할 수 있다.
+     */
+    @Tool(name = "searchRelevantReviewSources", description = "사용자 질문과 의미적으로 가까운 실제 보호자 리뷰 근거를 검색합니다.")
+    public List<RagSearchResultDto> searchRelevantReviewSources(
+            @ToolParam(description = "보호자가 입력한 자연어 추천 요청") String query
+    ) {
+        return aiRagService.searchSources(query);
     }
 
     public List<RecommendedSitterDto> buildRecommendations(AiSitterSearchCondition condition) {

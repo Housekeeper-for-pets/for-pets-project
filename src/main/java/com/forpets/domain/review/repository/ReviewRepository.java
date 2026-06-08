@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     boolean existsByReservationId(Long reservationId);
@@ -27,4 +29,13 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             @Param("status") ReservationStatus status,
             Pageable pageable
     );
+
+    @Query("""
+            select r
+            from Review r
+            join Reservation reservation on r.reservationId = reservation.id
+            where r.deleted = false
+              and reservation.status = :status
+            """)
+    List<Review> findAllActiveByReservationStatus(@Param("status") ReservationStatus status);
 }
