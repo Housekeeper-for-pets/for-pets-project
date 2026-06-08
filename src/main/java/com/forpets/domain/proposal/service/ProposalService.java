@@ -59,12 +59,12 @@ public class ProposalService {
     public ProposalResponseDto create(Long memberId, Long postId, CreateProposalRequest request) {
         Post post = postService.findById(postId);
         validatePostOpen(post);
+        validateNotOwnPost(memberId, post);
 
         SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         validateNoDuplicate(postId, sitter.getId());
         // 정책 수정으로 CONFIRMED 예약이 있어도 Proposal 은 언제든 받을 수 있음
 
-        validateNotOwnPost(memberId, post);
 
         List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(postId);
         if (reservationService.hasConfirmedConflict(sitter.getId(), postTimeSlots)) {
