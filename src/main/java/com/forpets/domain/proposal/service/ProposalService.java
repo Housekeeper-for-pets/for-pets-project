@@ -59,11 +59,12 @@ public class ProposalService {
     public ProposalResponseDto create(Long memberId, Long postId, CreateProposalRequest request) {
         Post post = postService.findById(postId);
         validatePostOpen(post);
+        // 본인 공고 검증을 먼저 수행: 시터 프로필 조회/중복 검증 비용 절감 +
+        // 시터 프로필 없는 작성자가 본인 공고에 제안 시도 시 명확한 메시지("본인 공고에 제안할 수 없습니다") 노출
         validateNotOwnPost(memberId, post);
 
         SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         validateNoDuplicate(postId, sitter.getId());
-        validateApproved(sitter);
         // 정책 수정으로 CONFIRMED 예약이 있어도 Proposal 은 언제든 받을 수 있음
 
         List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(postId);
@@ -293,9 +294,5 @@ public class ProposalService {
         proposalRepository.findAllByPostIdAndStatus(postId, ProposalStatus.PENDING).stream()
                 .filter(p -> !p.getId().equals(acceptedProposalId))
                 .forEach(Proposal::reject);
-    }
-
-    private void validateApproved(SitterProfile sitter) {
-        if (!sitter.isApproved()) throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);
     }
 }

@@ -18,6 +18,8 @@ public enum ReservationErrorCode implements ErrorCode {
     ALREADY_PAID(HttpStatus.CONFLICT, "ALREADY_PAID", "중복 결제입니다."),
     RESERVATION_CONFIRM_LOCK_FAILED(HttpStatus.TOO_MANY_REQUESTS, "RESERVATION_CONFIRM_LOCK_FAILED", "예약 확정 처리 중입니다. 잠시 후 다시 시도해주세요."),
     RESERVATION_LOCK_FAILED(HttpStatus.TOO_MANY_REQUESTS, "RESERVATION_LOCK_FAILED", "예약 처리 중입니다. 잠시 후 다시 시도해주세요."),
+    INVALID_PAGE_REQUEST(HttpStatus.BAD_REQUEST, "INVALID_PAGE_REQUEST", "페이지 번호 또는 크기 값이 올바르지 않습니다."),
+    CARE_LOG_EXISTS_CANNOT_CANCEL(HttpStatus.CONFLICT, "CARE_LOG_EXISTS_CANNOT_CANCEL", "케어 일지가 등록된 예약은 취소할 수 없습니다."),
     ;
 
     private final HttpStatus status;
