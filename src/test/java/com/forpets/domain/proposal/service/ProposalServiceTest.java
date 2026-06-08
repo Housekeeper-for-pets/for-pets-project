@@ -200,11 +200,12 @@ class ProposalServiceTest {
         @Test
         @DisplayName("[실패] 본인 공고에 제안 시도")
         void proposal_test_03() {
-            // given
+            // given — 본인 공고이므로 validateNotOwnPost 에서 즉시 차단됨
+            // (sitter 조회 / 중복 검증 단계 진입 전이라 stub 불필요)
             CreateProposalRequest request = new CreateProposalRequest(25000, "제안");
             given(postService.findById(postId)).willReturn(post);
 
-            // when & then
+            // when & then — member1 이 본인 공고에 제안 시도
             assertThatThrownBy(() -> proposalService.create(member1Id, postId, request))
                     .isInstanceOf(ProposalException.class)
                     .satisfies(ex -> assertThat(((ProposalException) ex).getErrorCode())
