@@ -64,3 +64,5 @@ forpets:
       base-url: ${QDRANT_BASE_URL:http://localhost:6333}
     gemini:
       embedding-model: text-embedding-004
+  cache:
+    enabled: true # true(캐시활성화)/false(비활성화)
