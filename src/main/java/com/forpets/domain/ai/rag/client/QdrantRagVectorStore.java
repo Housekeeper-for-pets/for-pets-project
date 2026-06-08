@@ -84,7 +84,7 @@ public class QdrantRagVectorStore implements RagVectorStore {
             for (int index = 0; index < documents.size(); index++) {
                 RagDocument document = documents.get(index);
                 points.add(Map.of(
-                        "id", document.reviewId(),
+                        "id", document.pointId(),
                         "vector", vectors.get(index),
                         "payload", payload(document)
                 ));
@@ -136,7 +136,10 @@ public class QdrantRagVectorStore implements RagVectorStore {
     private Map<String, Object> payload(RagDocument document) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("sourceType", document.sourceType().name());
-        payload.put("reviewId", document.reviewId());
+        payload.put("sourceId", document.sourceId());
+        if (document.sourceType() == RagSourceType.REVIEW) {
+            payload.put("reviewId", document.sourceId());
+        }
         payload.put("sitterId", document.sitterId());
         payload.put("rating", document.rating());
         payload.put("content", document.content());
@@ -145,13 +148,19 @@ public class QdrantRagVectorStore implements RagVectorStore {
 
     private RagSearchResultDto toSearchResult(JsonNode result) {
         JsonNode payload = result.path("payload");
+        RagSourceType sourceType = RagSourceType.valueOf(payload.path("sourceType").asText(RagSourceType.REVIEW.name()));
         return new RagSearchResultDto(
-                RagSourceType.valueOf(payload.path("sourceType").asText(RagSourceType.REVIEW.name())),
-                payload.path("reviewId").asLong(),
+                sourceType,
+                nullableLong(payload.path("sourceId")),
+                sourceType == RagSourceType.REVIEW ? nullableLong(payload.path("reviewId")) : null,
                 payload.path("sitterId").asLong(),
-                payload.path("rating").asInt(),
+                payload.path("rating").isNumber() ? payload.path("rating").asInt() : null,
                 payload.path("content").asText(),
                 result.path("score").asDouble()
         );
+    }
+
+    private Long nullableLong(JsonNode node) {
+        return node.isNumber() ? node.asLong() : null;
     }
 }

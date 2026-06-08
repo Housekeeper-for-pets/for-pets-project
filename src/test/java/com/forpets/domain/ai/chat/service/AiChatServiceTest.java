@@ -54,6 +54,7 @@ class AiChatServiceTest {
 
         // then
         assertThat(response.answer()).contains("마포구");
+        assertThat(response.answer()).contains("리뷰 근거");
         assertThat(response.recommendedSitters()).hasSize(1);
         assertThat(response.sources()).hasSize(1);
         then(aiChatClient).should().chatWithTools(message, sitterRecommendationTool);
@@ -62,6 +63,7 @@ class AiChatServiceTest {
     private RagSearchResultDto source() {
         return new RagSearchResultDto(
                 RagSourceType.REVIEW,
+                10L,
                 10L,
                 1L,
                 5,

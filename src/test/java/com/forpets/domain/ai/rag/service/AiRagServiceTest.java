@@ -5,6 +5,10 @@ import com.forpets.domain.ai.rag.client.RagVectorStore;
 import com.forpets.domain.ai.rag.dto.RagIndexResponse;
 import com.forpets.domain.ai.rag.dto.RagSearchResultDto;
 import com.forpets.domain.ai.rag.dto.RagSourceType;
+import com.forpets.domain.ai.reviewsummary.entity.ReviewSentiment;
+import com.forpets.domain.ai.reviewsummary.entity.SitterReviewSummary;
+import com.forpets.domain.ai.reviewsummary.entity.SummaryStatus;
+import com.forpets.domain.ai.reviewsummary.repository.SitterReviewSummaryRepository;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.review.entity.Review;
 import com.forpets.domain.review.repository.ReviewRepository;
@@ -26,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.BDDMockito.then;
@@ -41,6 +46,9 @@ class AiRagServiceTest {
 
     @Mock
     private SitterProfileRepository sitterProfileRepository;
+
+    @Mock
+    private SitterReviewSummaryRepository summaryRepository;
 
     @Mock
     private RagEmbeddingClient embeddingClient;
@@ -70,6 +78,50 @@ class AiRagServiceTest {
         then(vectorStore).should().upsertReviews(documentCaptor.capture(), vectorCaptor.capture());
         assertThat(documentCaptor.getValue()).hasSize(1);
         assertThat(vectorCaptor.getValue()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("[성공] 저장된 AI 리뷰 요약도 RAG 인덱싱 대상에 포함한다")
+    void index_review_summaries() {
+        // given
+        SitterReviewSummary summary = summary(20L, 1L);
+        given(reviewRepository.findAllActiveByReservationStatus(ReservationStatus.COMPLETED)).willReturn(List.of());
+        given(summaryRepository.findAll()).willReturn(List.of(summary));
+        given(embeddingClient.embed(org.mockito.ArgumentMatchers.contains("분리불안"))).willReturn(List.of(0.1, 0.2, 0.3));
+
+        // when
+        RagIndexResponse response = aiRagService.indexCompletedReviews();
+
+        // then
+        assertThat(response.indexedCount()).isEqualTo(1);
+        assertThat(response.failedCount()).isZero();
+        ArgumentCaptor<List> documentCaptor = ArgumentCaptor.forClass(List.class);
+        then(vectorStore).should().upsertReviews(documentCaptor.capture(), org.mockito.ArgumentMatchers.anyList());
+        assertThat(documentCaptor.getValue()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("[성공] 일부 문서 임베딩 실패 시 성공 문서는 저장하고 실패 건수를 반환한다")
+    void index_partial_failure() {
+        // given
+        Review successReview = review(10L, 3L, "분리불안 반려견을 차분하게 케어해주셨어요.");
+        Review failedReview = review(11L, 3L, "낯가림 있는 아이 케어 후기입니다.");
+        SitterProfile sitterProfile = mock(SitterProfile.class);
+        given(sitterProfile.getId()).willReturn(1L);
+        given(reviewRepository.findAllActiveByReservationStatus(ReservationStatus.COMPLETED)).willReturn(List.of(successReview, failedReview));
+        given(sitterProfileRepository.findByMemberId(3L)).willReturn(Optional.of(sitterProfile));
+        given(embeddingClient.embed(successReview.getReviewComment())).willReturn(List.of(0.1, 0.2, 0.3));
+        willThrow(new RuntimeException("embedding failed")).given(embeddingClient).embed(failedReview.getReviewComment());
+
+        // when
+        RagIndexResponse response = aiRagService.indexCompletedReviews();
+
+        // then
+        assertThat(response.indexedCount()).isEqualTo(1);
+        assertThat(response.failedCount()).isEqualTo(1);
+        ArgumentCaptor<List> documentCaptor = ArgumentCaptor.forClass(List.class);
+        then(vectorStore).should().upsertReviews(documentCaptor.capture(), org.mockito.ArgumentMatchers.anyList());
+        assertThat(documentCaptor.getValue()).hasSize(1);
     }
 
     @Test
@@ -121,11 +173,32 @@ class AiRagServiceTest {
         return new RagSearchResultDto(
                 RagSourceType.REVIEW,
                 10L,
+                10L,
                 1L,
                 5,
                 "분리불안 반려견을 차분하게 케어해주셨어요.",
                 0.88
         );
+    }
+
+    private SitterReviewSummary summary(Long summaryId, Long sitterId) {
+        SitterReviewSummary summary = SitterReviewSummary.builder()
+                .sitterId(sitterId)
+                .summary("분리불안 반려견을 차분하게 돌봤다는 후기가 많습니다.")
+                .strengths("[\"분리불안 케어\"]")
+                .cautions("[]")
+                .recommendedFor("[\"소형견\"]")
+                .keywords("[\"분리불안\", \"소형견\"]")
+                .sentiment(ReviewSentiment.POSITIVE)
+                .confidenceScore(0.9)
+                .reviewCount(3)
+                .aiGenerated(true)
+                .model("gemini")
+                .promptVersion("review-summary-v1")
+                .summaryStatus(SummaryStatus.FRESH)
+                .build();
+        ReflectionTestUtils.setField(summary, "id", summaryId);
+        return summary;
     }
 
     private List<Double> anyListOfDouble() {
