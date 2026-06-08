@@ -1048,7 +1048,7 @@ public class DataInit implements CommandLineRunner {
         );
     }
 
-    // 프론트에서 모든 시터 상세 화면의 리뷰 목록과 AI 요약 갱신을 확인할 수 있는 local seed 데이터.
+    // 프론트/RAG 시연에서 리뷰 요약과 의미 기반 검색 품질을 확인할 수 있는 local seed 데이터.
     private void saveAiReviewDemoData(List<SitterProfile> sitters, List<DemoReviewGuardian> guardians) {
         String[] comments = {
                 "말티즈가 낯을 많이 가리는데 천천히 적응시켜주시고 사진도 자주 보내주셔서 안심됐습니다.",
@@ -1059,13 +1059,38 @@ public class DataInit implements CommandLineRunner {
                 "시간 약속은 잘 지켰지만 케어 일지가 조금 짧아서 아이 상태를 더 자세히 알고 싶었습니다.",
                 "응답은 빨랐지만 산책 후 사진 공유가 한 장뿐이라 다음에는 조금 더 자주 공유되면 좋겠습니다.",
                 "아이를 다정하게 봐주셨지만 활발한 대형견 산책에는 아직 조심스러워 보였습니다.",
-                "예약 진행은 매끄러웠지만 약속 시간보다 10분 늦게 도착해서 조금 아쉬웠습니다."
+                "예약 진행은 매끄러웠지만 약속 시간보다 10분 늦게 도착해서 조금 아쉬웠습니다.",
+                "노령견이라 걱정했는데 이동 속도에 맞춰 천천히 산책해주시고 물 먹는 양도 확인해주셨습니다.",
+                "투약 보조가 필요한 아이였는데 보호자가 남긴 안내를 꼼꼼히 확인하고 시간 맞춰 챙겨주셨습니다.",
+                "고양이가 낯선 사람을 경계하는 편인데 거리를 유지하면서 화장실과 급식 상태를 잘 확인해주셨습니다.",
+                "대형견 산책 경험이 많아 보였고 리드줄 관리가 안정적이라 보호자 입장에서 믿음이 갔습니다.",
+                "케어 중간중간 짧은 영상까지 보내주셔서 아이가 편안한지 바로 확인할 수 있었습니다.",
+                "예약 전 상담은 친절했지만 실제 케어 후 피드백이 늦게 와서 기다리는 시간이 조금 불안했습니다.",
+                "아이 밥그릇 정리는 잘 되어 있었지만 장난감 정리가 덜 되어 있어 세심함은 조금 아쉬웠습니다.",
+                "산책 코스를 미리 공유해주고 더운 시간대를 피해 움직여주셔서 만족했습니다.",
+                "예민한 아이를 무리하게 안으려 하지 않고 보호자 요청대로 천천히 접근해주셨습니다.",
+                "응급 상황은 아니었지만 아이가 기침을 하자 바로 연락을 주셔서 대응이 좋았습니다.",
+                "처음 이용이라 걱정했는데 체크리스트처럼 급식, 배변, 산책 내용을 정리해주셔서 좋았습니다.",
+                "리뷰가 좋아 기대했는데 사진 수가 적고 케어 메모가 짧아 기대보다는 아쉬웠습니다.",
+                "방문 시간이 조금 들쭉날쭉해서 정해진 루틴이 중요한 아이에게는 맞지 않을 수도 있겠다고 느꼈습니다.",
+                "활발한 강아지와 오래 놀아주셨고 귀가 후에도 아이가 안정적으로 쉬고 있었습니다.",
+                "소형견 두 마리를 함께 맡겼는데 각각 성격에 맞춰 다르게 케어해주신 점이 좋았습니다.",
+                "배변 실수가 있었는데 상황과 정리 내용을 솔직하게 공유해주셔서 신뢰가 갔습니다.",
+                "가격 대비 케어는 무난했지만 특별히 자세한 관찰 기록은 부족했습니다.",
+                "예약 확정 후 질문에 대한 답변이 느려서 급하게 확인해야 하는 보호자에게는 아쉬울 수 있습니다.",
+                "아이 피부가 예민한 편이라 산책 후 발 닦는 방법을 요청드렸는데 그대로 지켜주셨습니다.",
+                "분리불안이 심한 아이였는데 보호자 냄새가 있는 담요를 활용해 안정시켜주셨습니다.",
+                "고양이 모래 상태와 물그릇 교체 여부를 사진으로 남겨주셔서 집을 비운 동안 안심됐습니다."
         };
 
         int reviewIndex = 0;
         for (SitterProfile sitter : sitters) {
             int savedCount = 0;
-            for (DemoReviewGuardian guardian : guardians) {
+            int guardianIndex = 0;
+            while (savedCount < 10 && guardianIndex < guardians.size() * 4) {
+                DemoReviewGuardian guardian = guardians.get(guardianIndex % guardians.size());
+                guardianIndex++;
+
                 if (guardian.member().getId().equals(sitter.getMemberId())) {
                     continue;
                 }
@@ -1086,17 +1111,15 @@ public class DataInit implements CommandLineRunner {
 
                 reviewIndex++;
                 savedCount++;
-                if (savedCount >= 3) {
-                    break;
-                }
             }
         }
     }
 
     private int resolveDemoReviewRating(int reviewIndex) {
-        return switch (reviewIndex % 9) {
-            case 5, 6, 7 -> 4;
-            case 8 -> 3;
+        return switch (reviewIndex % 12) {
+            case 5, 6, 7, 10 -> 4;
+            case 8, 11 -> 3;
+            case 9 -> 2;
             default -> 5;
         };
     }
