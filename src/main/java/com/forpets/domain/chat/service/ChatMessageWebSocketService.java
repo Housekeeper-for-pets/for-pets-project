@@ -49,7 +49,7 @@ public class ChatMessageWebSocketService {
                 .orElseThrow(() -> new ChatException(ChatErrorCode.CHAT_ROOM_ACCESS_DENIED));
 
         if (senderParticipant.isLeft()) {
-            throw new ChatException(ChatErrorCode.CHAT_ROOM_LEFT);
+            senderParticipant.rejoin();
         }
 
         Member sender = memberRepository.findByIdIncludingDeleted(senderId)
@@ -80,6 +80,7 @@ public class ChatMessageWebSocketService {
 
         if (opponentParticipant.isLeft()) {
             opponentParticipant.rejoin();
+            chatRoomParticipantRepository.save(opponentParticipant); // 이 줄 추가
         }
 
         log.info("[WebSocket TEXT] chatRoomId={}, senderId={}, messageId={}",
