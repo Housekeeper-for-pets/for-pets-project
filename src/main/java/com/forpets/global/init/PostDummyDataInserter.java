@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * PET-214: 인덱스 효과 검증용 더미 데이터 삽입 — post 1만 건
+ * PET-214: 인덱스 효과 검증용 더미 데이터 삽입 — post (건수: DummyDataConstants.TARGET_COUNT)
  *
  * 실행 조건: spring.profiles.active=local
  * SitterDummyDataInserter(@Order(2)) 이후에 실행됩니다.
@@ -41,7 +41,7 @@ public class PostDummyDataInserter implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
-    private static final int TARGET_COUNT = 10_000;
+    private static final int TARGET_COUNT = DummyDataConstants.TARGET_COUNT;
     private static final int BATCH_SIZE = 1_000;
     private static final String[] CARE_TYPES = {"VISIT", "BOARDING"};
 

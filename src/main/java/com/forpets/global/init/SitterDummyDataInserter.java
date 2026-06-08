@@ -18,7 +18,7 @@ import java.util.Random;
 import java.util.Set;
 
 /**
- * PET-214: 인덱스 효과 검증용 더미 데이터 삽입 — sitter_profile 1만 건
+ * PET-214: 인덱스 효과 검증용 더미 데이터 삽입 — sitter_profile (건수: DummyDataConstants.TARGET_COUNT)
  *
  * 실행 조건: spring.profiles.active=local
  *
@@ -49,7 +49,7 @@ public class SitterDummyDataInserter implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
-    private static final int TARGET_COUNT = 10_000;
+    private static final int TARGET_COUNT = DummyDataConstants.TARGET_COUNT;
     private static final int BATCH_SIZE = 1_000;
     private static final String DUMMY_EMAIL_PATTERN = "dummy-sitter-%d@dummy.local";
     private static final String DUMMY_INTRO = "더미 소개";
