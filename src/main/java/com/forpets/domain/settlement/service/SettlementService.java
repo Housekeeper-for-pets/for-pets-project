@@ -41,7 +41,7 @@ public class SettlementService {
                                                                Long sourcePaymentId,
                                                                Long originalAmount) {
         validatePositiveAmount(originalAmount);
-        validateNotExists(reservationId);
+        validateNotExists(reservationId, SettlementType.CARE_COMPLETION);
 
         return SettlementResponseDto.from(saveSettlement(
                 reservationId,
@@ -63,7 +63,7 @@ public class SettlementService {
                                                         String reason) {
         validatePenaltyType(settlementType);
         validatePositiveAmount(penaltyAmount);
-        validateNotExists(reservationId);
+        validateNotExists(reservationId, settlementType);
 
         return SettlementResponseDto.from(saveSettlement(
                 reservationId,
@@ -72,6 +72,28 @@ public class SettlementService {
                 settlementType,
                 penaltyAmount,
                 PENALTY_PLATFORM_FEE_RATE,
+                reason
+        ));
+    }
+
+    @Transactional
+    public SettlementResponseDto createGuardianRefundSettlement(
+            Long reservationId,
+            Long guardianMemberId,
+            Long sourcePaymentId,
+            Long refundAmount,
+            String reason) {
+
+        validateNotExists(reservationId, SettlementType.GUARDIAN_PARTIAL_REFUND);
+        validatePositiveAmount(refundAmount);
+
+        return SettlementResponseDto.from(saveSettlement(
+                reservationId,
+                guardianMemberId,
+                sourcePaymentId,
+                SettlementType.GUARDIAN_PARTIAL_REFUND,
+                refundAmount,
+                0,  // 환불분은 수수료 없음
                 reason
         ));
     }
@@ -121,8 +143,8 @@ public class SettlementService {
         throw new SettlementException(SettlementErrorCode.NOT_SETTLEMENT_RECEIVER);
     }
 
-    private void validateNotExists(Long reservationId) {
-        if (settlementRepository.existsByReservationId(reservationId)) {
+    private void validateNotExists(Long reservationId, SettlementType settlementType) {
+        if (settlementRepository.existsByReservationIdAndSettlementType(reservationId, settlementType)) {
             throw new SettlementException(SettlementErrorCode.SETTLEMENT_ALREADY_EXISTS);
         }
     }

@@ -13,9 +13,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "settlements", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_settlement_reservation", columnNames = "reservation_id")
-})
+@Table(name = "settlements")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Settlement extends BaseEntity {
 
