@@ -216,6 +216,7 @@ jobs:
               -e SPRING_DATA_REDIS_HOST="$REDIS_HOST" \
               -e SPRING_DATA_REDIS_PORT="$REDIS_PORT" \
               -e SPRING_DATA_REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
+              -e SPRING_DATA_REDIS_SSL_ENABLED="${{ secrets.REDIS_SSL_ENABLED || 'false' }}" \
               -e SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/ \
               "$IMAGE_URI"
 
