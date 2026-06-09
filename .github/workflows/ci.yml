@@ -105,12 +105,19 @@ jobs:
           script: |
             set -e
 
+            IMAGE_URI="${{ secrets.ECR_REGISTRY }}/forpets-backend:latest"
+
+            if [ -z "${{ secrets.ECR_REGISTRY }}" ]; then
+              echo "❌ ECR_REGISTRY secret이 비어있습니다."
+              exit 1
+            fi
+
             # ECR 로그인
             aws ecr get-login-password --region ap-northeast-2 \
               | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
 
             # 새 이미지 가져오기
-            docker pull ${{ secrets.ECR_REGISTRY }}/forpets-backend:latest
+            docker pull "$IMAGE_URI"
 
             # Nginx와 Spring 컨테이너가 서로 이름으로 통신할 Docker network 준비
             docker network create forpets-network || true
@@ -170,10 +177,10 @@ jobs:
               -e DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
               -e JWT_SECRET_KEY="${{ secrets.JWT_SECRET_KEY }}" \
               -e JWT_ACCESS_TOKEN_VALIDITY_TIME="${{ secrets.JWT_ACCESS_TOKEN_VALIDITY_TIME }}" \
-              -e JWT_REFRESH_TOKEN_VALIDITY_TIME="${{ secrets.JWT_REFRESH_TOKEN_VALIDITY_TIME }}" \            
+              -e JWT_REFRESH_TOKEN_VALIDITY_TIME="${{ secrets.JWT_REFRESH_TOKEN_VALIDITY_TIME }}" \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/ \
-              ${{ secrets.ECR_REGISTRY }}/forpets-backend:latest        
+              "$IMAGE_URI"
 
             # Spring 컨테이너가 바로 죽으면 Nginx만 떠서 502가 되므로 여기서 배포를 실패 처리
             sleep 15
@@ -190,7 +197,7 @@ jobs:
               -p 80:80 \
               -v /home/ec2-user/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro \
               nginx:1.27-alpine
- 
+
             # 헬스체크: 이제 외부 진입점은 Nginx 80번 포트
             sleep 10
-            curl -f http://localhost/health || echo "⚠️ 헬스체크 실패"
+            curl -f http://localhost/health
