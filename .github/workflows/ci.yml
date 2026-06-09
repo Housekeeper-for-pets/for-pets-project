@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ========== Job 1: 빌드 + 테스트 (항상 실행) ==========
+  # ========= Job 1: 빌드 + 테스트 (항상 실행) ==========
   test:
     name: Build & Test
     runs-on: ubuntu-latest
@@ -103,15 +103,57 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
+
+            IMAGE_URI="${{ secrets.ECR_REGISTRY }}/forpets-backend:latest"
+
+            if [ -z "${{ secrets.ECR_REGISTRY }}" ]; then
+              echo "❌ ECR_REGISTRY secret이 비어있습니다."
+              exit 1
+            fi
+
+            if [ -z "${{ secrets.REDIS_HOST }}" ]; then
+              echo "❌ REDIS_HOST secret이 비어있습니다. ElastiCache Redis 엔드포인트를 GitHub Secrets에 등록해야 합니다."
+              exit 1
+            fi
+
+            RAW_REDIS_HOST="${{ secrets.REDIS_HOST }}"
+            REDIS_PORT="${{ secrets.REDIS_PORT || '6379' }}"
+
+            # GitHub Secret에 redis://, 포트, 슬래시가 섞여 들어와도 호스트명만 사용한다.
+            REDIS_HOST="$RAW_REDIS_HOST"
+            REDIS_HOST="$(printf '%s' "$REDIS_HOST" | tr -d '[:space:]' | tr -d '\"' | tr -d "'")"
+            REDIS_HOST="${REDIS_HOST#redis://}"
+            REDIS_HOST="${REDIS_HOST#rediss://}"
+            REDIS_HOST="${REDIS_HOST%%/*}"
+            REDIS_HOST="${REDIS_HOST%%:*}"
+            REDIS_PORT="$(printf '%s' "$REDIS_PORT" | tr -d '[:space:]')"
+
+            if [ -z "$REDIS_HOST" ]; then
+              echo "❌ REDIS_HOST 정규화 실패. ElastiCache 엔드포인트 값을 확인해야 합니다."
+              exit 1
+            fi
+
+            # Redis endpoint 사전 점검: DNS가 안 풀리면 Secret 값이 잘못된 것이고, TCP가 막히면 보안그룹/VPC 문제다.
+            if ! getent hosts "$REDIS_HOST" >/dev/null; then
+              echo "❌ REDIS_HOST DNS 해석 실패. ElastiCache의 Primary endpoint 또는 Configuration endpoint 호스트명을 확인해야 합니다."
+              exit 1
+            fi
+
+            if ! timeout 5 bash -c "cat < /dev/null > /dev/tcp/$REDIS_HOST/$REDIS_PORT"; then
+              echo "❌ Redis TCP 연결 실패. ElastiCache 보안그룹 인바운드 6379가 EC2 보안그룹을 허용하는지 확인해야 합니다."
+              exit 1
+            fi
+
             # ECR 로그인
             aws ecr get-login-password --region ap-northeast-2 \
               | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
 
             # 새 이미지 가져오기
-            docker pull ${{ secrets.ECR_REGISTRY }}/forpets-backend:latest
+            docker pull "$IMAGE_URI"
 
             # Nginx와 Spring 컨테이너가 서로 이름으로 통신할 Docker network 준비
-            docker network create forpets-network || true
+            docker network inspect forpets-network >/dev/null 2>&1 || docker network create forpets-network
 
             # Nginx reverse proxy 설정 준비
             mkdir -p /home/ec2-user/nginx
@@ -170,8 +212,40 @@ jobs:
               -e JWT_ACCESS_TOKEN_VALIDITY_TIME="${{ secrets.JWT_ACCESS_TOKEN_VALIDITY_TIME }}" \
               -e JWT_REFRESH_TOKEN_VALIDITY_TIME="${{ secrets.JWT_REFRESH_TOKEN_VALIDITY_TIME }}" \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e SPRING_NOTIFICATIONS_BROKER=direct \
+              -e SPRING_DATA_REDIS_HOST="$REDIS_HOST" \
+              -e SPRING_DATA_REDIS_PORT="$REDIS_PORT" \
+              -e SPRING_DATA_REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
+              -e SPRING_DATA_REDIS_SSL_ENABLED="${{ secrets.REDIS_SSL_ENABLED || 'false' }}" \
               -e SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/ \
-              ${{ secrets.ECR_REGISTRY }}/forpets-backend:latest
+              "$IMAGE_URI"
+
+            # Spring 컨테이너가 바로 죽으면 여기서 배포를 실패 처리
+            if [ "$(docker inspect -f '{{.State.Running}}' forpets 2>/dev/null)" != "true" ]; then
+              echo "❌ Spring 컨테이너 실행 실패"
+              docker logs forpets --tail 200 || true
+              exit 1
+            fi
+
+            # 컨테이너가 Running이어도 Spring이 아직 HTTP 요청을 받을 준비가 안 됐을 수 있음
+            APP_READY=false
+            for i in $(seq 1 30); do
+              if docker run --rm --network forpets-network nginx:1.27-alpine \
+                sh -c "wget -q -O - http://forpets:8080/health >/dev/null"; then
+                APP_READY=true
+                break
+              fi
+
+              echo "⏳ Spring health 대기 중... ($i/30)"
+              sleep 3
+            done
+
+            if [ "$APP_READY" != "true" ]; then
+              echo "❌ Spring health check 실패"
+              docker ps -a
+              docker logs forpets --tail 200 || true
+              exit 1
+            fi
 
             # Nginx reverse proxy 실행: 외부 80 -> 내부 Spring 8080
             docker run -d --name forpets-nginx \
@@ -180,7 +254,18 @@ jobs:
               -p 80:80 \
               -v /home/ec2-user/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro \
               nginx:1.27-alpine
- 
+
             # 헬스체크: 이제 외부 진입점은 Nginx 80번 포트
-            sleep 10
-            curl -f http://localhost/health || echo "⚠️ 헬스체크 실패"
+            for i in $(seq 1 10); do
+              if curl -f http://localhost/health; then
+                exit 0
+              fi
+
+              echo "⏳ Nginx health 대기 중... ($i/10)"
+              sleep 3
+            done
+
+            echo "❌ Nginx health check 실패"
+            docker logs forpets-nginx --tail 100 || true
+            docker logs forpets --tail 200 || true
+            exit 1

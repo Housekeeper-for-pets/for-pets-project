@@ -2,6 +2,8 @@ package com.forpets.domain.admin.service;
 
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.service.MemberService;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
+import com.forpets.domain.notification.event.NotificationEvent;
 import com.forpets.domain.sitter.dto.admin.AdminSitterDetailResponseDto;
 import com.forpets.domain.sitter.dto.admin.AdminSitterPageResponse;
 import com.forpets.domain.sitter.dto.admin.AdminSitterResponseDto;
@@ -11,6 +13,7 @@ import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.service.SitterCacheService;
+import com.forpets.global.sse.SseEventType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
@@ -28,6 +31,7 @@ public class SitterAdminService {
     private final SitterProfileRepository sitterProfileRepository;
     private final MemberService memberService;
     private final SitterCacheService sitterCacheService;
+    private final NotificationMessageBroker notificationBroker;
 
     /*
     승인 대기 시터 프로필 목록 (페이징)
@@ -84,6 +88,15 @@ public class SitterAdminService {
 
         // 시터 상세 캐시 무효화
         sitterCacheService.evictSitterDetail(sitterId);
+
+        notificationBroker.publish(NotificationEvent.of(
+                sitter.getMemberId(),
+                adminId,
+                SseEventType.SITTER_PROFILE_APPROVED,
+                "시터 프로필이 승인되었습니다.",
+                sitter.getId(),
+                "SITTER_PROFILE"
+        ));
 
         return AdminSitterResponseDto.from(sitter, member.getRegion());
     }

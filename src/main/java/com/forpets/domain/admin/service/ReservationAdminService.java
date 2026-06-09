@@ -1,6 +1,8 @@
 package com.forpets.domain.admin.service;
 
 import com.forpets.domain.payment.service.PaymentRefundService;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
+import com.forpets.domain.notification.event.NotificationEvent;
 import com.forpets.domain.reservation.dto.ReservationPageResponse;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
 import com.forpets.domain.reservation.entity.*;
@@ -10,6 +12,7 @@ import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
+import com.forpets.global.sse.SseEventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -31,6 +34,7 @@ public class ReservationAdminService {
     private final ReservationPetRepository reservationPetRepository;
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
     private final PaymentRefundService paymentRefundService;
+    private final NotificationMessageBroker notificationBroker;
 
     /*
     CANCEL_REQUESTED 상태이고 UNAVOIDABLE 사유인 취소 요청 목록 (페이징)
@@ -75,6 +79,7 @@ public class ReservationAdminService {
 
         paymentRefundService.refundPaidPayments(reservationId, reservation.getCancelReason());
         paymentRefundService.expireNonPaidPayments(reservationId);
+        sendReservationCanceledNotifications(reservation);
 
         return toResponseDto(reservation);
     }
@@ -108,6 +113,29 @@ public class ReservationAdminService {
         if (page < 0 || size < 1 || size > 50) {
             throw new ReservationException(ReservationErrorCode.INVALID_PAGE_REQUEST);
         }
+    }
+
+    private void sendReservationCanceledNotifications(Reservation reservation) {
+        notificationBroker.publish(NotificationEvent.of(
+                reservation.getGuardianId(),
+                null,
+                SseEventType.RESERVATION_CANCELED,
+                "예약이 취소되었습니다.",
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        notificationBroker.publish(NotificationEvent.of(
+                reservation.getSitterMemberId(),
+                null,
+                SseEventType.RESERVATION_CANCELED,
+                "예약이 취소되었습니다.",
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        log.info("[ReservationAdminService] 예약 취소 승인 알림 발행 reservationId={}, guardianId={}, sitterMemberId={}",
+                reservation.getId(), reservation.getGuardianId(), reservation.getSitterMemberId());
     }
 
     private ReservationResponseDto toResponseDto(Reservation reservation) {

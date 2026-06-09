@@ -331,6 +331,7 @@ public class ReservationService {
 
             // Proposal 출처인 경우: ACCEPTED → PENDING 복원, 공고 OPEN 유지
             handleCancellation(reservation);
+            sendReservationCanceledNotifications(reservation);
 
             return toResponseDto(reservation);
         }
@@ -354,12 +355,36 @@ public class ReservationService {
         paymentRefundService.refundWithPenalty(reservationId, request.cancelReason(), canceledBy);
         paymentRefundService.cancelNonPaidPayments(reservationId, request.cancelReason());
         handleCancellation(reservation);
+        sendReservationCanceledNotifications(reservation);
         return toResponseDto(reservation);
     }
 
     // 예약 만료 처리는 ReservationExpireScheduler + ReservationExpireService 로 이동
 
     // transaction 아닌 애들 ==========
+
+    private void sendReservationCanceledNotifications(Reservation reservation) {
+        notificationBroker.publish(NotificationEvent.of(
+                reservation.getGuardianId(),
+                null,
+                SseEventType.RESERVATION_CANCELED,
+                "예약이 취소되었습니다.",
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        notificationBroker.publish(NotificationEvent.of(
+                reservation.getSitterMemberId(),
+                null,
+                SseEventType.RESERVATION_CANCELED,
+                "예약이 취소되었습니다.",
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        log.info("{} => 예약 취소 알림 발행: reservationId={}, guardianId={}, sitterMemberId={}",
+                NAME, reservation.getId(), reservation.getGuardianId(), reservation.getSitterMemberId());
+    }
 
     private void validateParty(Long memberId, Reservation reservation) {
         if (!reservation.isParty(memberId)) {

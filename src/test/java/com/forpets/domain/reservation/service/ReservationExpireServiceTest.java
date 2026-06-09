@@ -1,6 +1,7 @@
 package com.forpets.domain.reservation.service;
 
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
 import com.forpets.domain.payment.service.PaymentRefundService;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.entity.ProposalStatus;
@@ -43,6 +44,9 @@ class ReservationExpireServiceTest {
 
     @Mock
     private CareRequestRepository careRequestRepository;
+
+    @Mock
+    private NotificationMessageBroker notificationBroker;
 
     // ── 픽스처 ──
     private Reservation reservation;          // CareRequest 출처 PENDING
@@ -106,6 +110,8 @@ class ReservationExpireServiceTest {
                 .refundPaidPayments(reservationId, "예약 결제 제한 시간 초과");
         then(paymentRefundService).should()
                 .expireNonPaidPayments(reservationId);
+        then(notificationBroker).should(org.mockito.Mockito.times(2))
+                .publish(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
