@@ -103,6 +103,8 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
+
             # ECR 로그인
             aws ecr get-login-password --region ap-northeast-2 \
               | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
@@ -172,6 +174,14 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/ \
               ${{ secrets.ECR_REGISTRY }}/forpets-backend:latest
+
+            # Spring 컨테이너가 바로 죽으면 Nginx만 떠서 502가 되므로 여기서 배포를 실패 처리
+            sleep 15
+            if [ "$(docker inspect -f '{{.State.Running}}' forpets 2>/dev/null)" != "true" ]; then
+              echo "❌ Spring 컨테이너 실행 실패"
+              docker logs forpets --tail 200 || true
+              exit 1
+            fi
 
             # Nginx reverse proxy 실행: 외부 80 -> 내부 Spring 8080
             docker run -d --name forpets-nginx \
