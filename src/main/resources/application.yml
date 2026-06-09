@@ -58,4 +58,4 @@ forpets:
     qdrant:
       base-url: ${QDRANT_BASE_URL:http://localhost:6333}
     gemini:
-      embedding-model: text-embedding-004
+      embedding-model: gemini-embedding-001
