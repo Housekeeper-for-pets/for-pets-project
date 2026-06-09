@@ -13,8 +13,13 @@ spring:
 
   notifications:
     # broker: direct         # v0
-    broker: redis-stream   # v1 전환 시
-    # broker: kafka          # v2 전환 시
+    # broker: redis-stream   # v1 전환 시
+    broker: kafka          # v2 전환 시
+    kafka:
+      topic: notification-events
+      consumer-group: notification-service
+      partitions: 3
+      replicas: 1
 
   servlet:
     multipart:
@@ -59,3 +64,7 @@ forpets:
       base-url: ${QDRANT_BASE_URL:http://localhost:6333}
     gemini:
       embedding-model: gemini-embedding-001
+  cache:
+    enabled: true # true(캐시활성화)/false(비활성화)
+  dummy-data:
+    enabled: false # true일 때만 더미데이터(시터·공고) 삽입 — 성능측정 시에만 사용. 평소·운영 false
