@@ -94,7 +94,10 @@ public class GeminiRagEmbeddingClient implements RagEmbeddingClient {
                 "content", Map.of(
                         "parts", List.of(Map.of("text", text))
                 ),
-                "outputDimensionality", outputDimensionality
+                "embedContentConfig", Map.of(
+                        "outputDimensionality", outputDimensionality,
+                        "autoTruncate", true
+                )
         );
     }
 }
