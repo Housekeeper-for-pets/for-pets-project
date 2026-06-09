@@ -9,6 +9,9 @@ import com.forpets.domain.ai.rag.dto.RagSearchResultDto;
 import com.forpets.domain.ai.rag.dto.RagSourceType;
 import com.forpets.domain.ai.rag.exception.AiRagErrorCode;
 import com.forpets.domain.ai.rag.exception.AiRagException;
+import com.forpets.domain.ai.reviewsummary.entity.SitterReviewSummary;
+import com.forpets.domain.ai.reviewsummary.entity.SummaryStatus;
+import com.forpets.domain.ai.reviewsummary.repository.SitterReviewSummaryRepository;
 import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.review.entity.Review;
 import com.forpets.domain.review.repository.ReviewRepository;
@@ -24,6 +27,8 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +38,7 @@ public class AiRagService {
 
     private final ReviewRepository reviewRepository;
     private final SitterProfileRepository sitterProfileRepository;
+    private final SitterReviewSummaryRepository summaryRepository;
     private final RagEmbeddingClient embeddingClient;
     private final RagVectorStore vectorStore;
 
@@ -44,23 +50,41 @@ public class AiRagService {
 
     public RagIndexResponse indexCompletedReviews() {
         List<Review> reviews = reviewRepository.findAllActiveByReservationStatus(ReservationStatus.COMPLETED);
-        List<RagDocument> documents = reviews.stream()
+        List<RagDocument> reviewDocuments = reviews.stream()
                 .map(this::toDocument)
                 .flatMap(Optional::stream)
                 .toList();
+        List<RagDocument> summaryDocuments = summaryRepository.findAll()
+                .stream()
+                .filter(summary -> summary.getSummaryStatus() != SummaryStatus.FAILED)
+                .map(this::toSummaryDocument)
+                .toList();
+        List<RagDocument> documents = new ArrayList<>();
+        documents.addAll(reviewDocuments);
+        documents.addAll(summaryDocuments);
 
         if (documents.isEmpty()) {
-            return new RagIndexResponse(0);
+            return new RagIndexResponse(0, 0);
         }
 
         try {
             vectorStore.initializeCollection();
+            List<RagDocument> indexedDocuments = new ArrayList<>();
             List<List<Double>> vectors = new ArrayList<>();
             for (RagDocument document : documents) {
-                vectors.add(embeddingClient.embed(document.content()));
+                try {
+                    vectors.add(embeddingClient.embed(document.content()));
+                    indexedDocuments.add(document);
+                } catch (Exception exception) {
+                    log.warn("RAG 문서 임베딩 실패. sourceType={}, sourceId={}, message={}",
+                            document.sourceType(), document.sourceId(), exception.getMessage(), exception);
+                }
             }
-            vectorStore.upsertReviews(documents, vectors);
-            return new RagIndexResponse(documents.size());
+
+            if (!indexedDocuments.isEmpty()) {
+                vectorStore.upsertReviews(indexedDocuments, vectors);
+            }
+            return new RagIndexResponse(indexedDocuments.size(), documents.size() - indexedDocuments.size());
         } catch (AiRagException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -92,11 +116,44 @@ public class AiRagService {
         return sitterProfileRepository.findByMemberId(review.getRevieweeId())
                 .map(SitterProfile::getId)
                 .map(sitterId -> new RagDocument(
+                        pointId(RagSourceType.REVIEW, review.getId()),
                         review.getId(),
                         sitterId,
                         review.getRating(),
                         review.getReviewComment(),
                         RagSourceType.REVIEW
                 ));
+    }
+
+    private RagDocument toSummaryDocument(SitterReviewSummary summary) {
+        return new RagDocument(
+                pointId(RagSourceType.REVIEW_SUMMARY, summary.getId()),
+                summary.getId(),
+                summary.getSitterId(),
+                null,
+                summaryContent(summary),
+                RagSourceType.REVIEW_SUMMARY
+        );
+    }
+
+    private String summaryContent(SitterReviewSummary summary) {
+        return """
+                요약: %s
+                강점: %s
+                주의점: %s
+                추천 대상: %s
+                키워드: %s
+                """.formatted(
+                summary.getSummary(),
+                summary.getStrengths(),
+                summary.getCautions(),
+                summary.getRecommendedFor(),
+                summary.getKeywords()
+        );
+    }
+
+    private String pointId(RagSourceType sourceType, Long sourceId) {
+        String rawId = sourceType.name() + ":" + sourceId;
+        return UUID.nameUUIDFromBytes(rawId.getBytes(StandardCharsets.UTF_8)).toString();
     }
 }
