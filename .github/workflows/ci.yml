@@ -117,6 +117,19 @@ jobs:
               exit 1
             fi
 
+            REDIS_PORT="${{ secrets.REDIS_PORT || '6379' }}"
+
+            # Redis endpoint 사전 점검: DNS가 안 풀리면 Secret 값이 잘못된 것이고, TCP가 막히면 보안그룹/VPC 문제다.
+            if ! getent hosts "${{ secrets.REDIS_HOST }}" >/dev/null; then
+              echo "❌ REDIS_HOST DNS 해석 실패. GitHub Secret에는 redis://, 포트, 경로를 빼고 ElastiCache 엔드포인트 호스트명만 넣어야 합니다."
+              exit 1
+            fi
+
+            if ! timeout 5 bash -c "cat < /dev/null > /dev/tcp/${{ secrets.REDIS_HOST }}/$REDIS_PORT"; then
+              echo "❌ Redis TCP 연결 실패. ElastiCache 보안그룹 인바운드 6379가 EC2 보안그룹을 허용하는지 확인해야 합니다."
+              exit 1
+            fi
+
             # ECR 로그인
             aws ecr get-login-password --region ap-northeast-2 \
               | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
@@ -186,7 +199,7 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_NOTIFICATIONS_BROKER=direct \
               -e SPRING_DATA_REDIS_HOST="${{ secrets.REDIS_HOST }}" \
-              -e SPRING_DATA_REDIS_PORT="${{ secrets.REDIS_PORT || '6379' }}" \
+              -e SPRING_DATA_REDIS_PORT="$REDIS_PORT" \
               -e SPRING_DATA_REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
               -e SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/ \
               "$IMAGE_URI"
