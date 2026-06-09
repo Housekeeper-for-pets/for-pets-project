@@ -3,6 +3,8 @@ package com.forpets.domain.reservation.repository;
 import com.forpets.domain.reservation.entity.CancelCategory;
 import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -44,4 +46,6 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
 
     List<Reservation> findAllByStatusAndCancelCategory(ReservationStatus reservationStatus, CancelCategory cancelCategory);
+
+    Page<Reservation> findAllByStatusAndCancelCategory(ReservationStatus reservationStatus, CancelCategory cancelCategory, Pageable pageable);
 }

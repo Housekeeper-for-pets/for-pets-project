@@ -15,15 +15,23 @@ public record ReservationResponseDto(
         Long sitterProfileId,
         CareType careType,
         ReservationStatus status,
+        // 결제 버튼 노출/활성화 판단을 위한 단일 진실 — 프론트는 status 분기 대신 이 필드만 보면 됨
+        boolean payable,
         ReservationSource source,
         Long sourceId,
+        // ===== 가격 정보 =====
+        int guardianPrice,
+        int sitterPrice,
         boolean guardianPaid,
         boolean sitterPaid,
+        // ===== 취소 정보 =====
         String cancelReason,
         CancelCategory cancelCategory,
         CanceledBy canceledBy,
+        // ===== 연관 데이터 =====
         List<PetSnapshotResponseDto> pets,
         List<TimeSlotResponseDto> timeSlots,
+        // ===== 상태 변경 타임스탬프 =====
         LocalDateTime confirmedAt,
         LocalDateTime completedAt,
         LocalDateTime canceledAt,
@@ -42,8 +50,11 @@ public record ReservationResponseDto(
                 reservation.getSitterProfileId(),
                 reservation.getCareType(),
                 reservation.getStatus(),
+                reservation.isPayable(),
                 reservation.getSource(),
                 reservation.getSourceId(),
+                payment.getGuardianPrice(),
+                payment.getSitterPrice(),
                 payment.isGuardianPaid(),
                 payment.isSitterPaid(),
                 reservation.getCancelReason(),

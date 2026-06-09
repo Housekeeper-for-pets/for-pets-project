@@ -71,20 +71,45 @@ public class PaymentRefundService {
 
     /*
     반복문 돌려서 이미 지불된 상태인 Payment List 찾고 refund method 일괄 적용
+
+    [정합성 안전장치]
+    PAID 상태인 Payment row 가 없는데 ReservationPayment 의 guardianPaid/sitterPaid 플래그가 true 인
+    "stale paid 플래그" 상태가 과거에 관측된 적이 있다. (reservation EXPIRED 처리됐지만 payment 는 PAID 로 stuck)
+    이 경우 단순 early return 하면 ReservationPayment 가 영원히 paid=true 로 남아 만료/환불 표시가 안 됨.
+    → PAID 결제건이 없어도 ReservationPayment 의 paid 플래그가 켜져 있으면 정합성 깨진 상태로 간주하고
+      WARN 로그 + 강제로 false 동기화한다.
      */
     @Transactional
     public void refundPaidPayments(Long reservationId, String reason) {
         List<Payment> paidPayments = paymentRepository.findAllByReservationIdAndStatusIn(
                 reservationId, List.of(PaymentStatus.PAID));
 
-        if (paidPayments.isEmpty()) {
-            return;
-        }
-
         ReservationPayment reservationPayment = reservationPaymentRepository.findByReservationId(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
+        if (paidPayments.isEmpty()) {
+            forceSyncReservationPaymentIfDirty(reservationId, reservationPayment);
+            return;
+        }
+
         paidPayments.forEach(payment -> refund(payment, reservationPayment, reason));
+    }
+
+    /*
+    Payment 테이블엔 PAID row 가 없는데 ReservationPayment 에는 paid=true 로 남아있는 stale 상태 감지 + 정정.
+    운영에서 이 WARN 로그가 찍히면 데이터 정합성 깨진 케이스가 있는지 추적해야 함.
+     */
+    private void forceSyncReservationPaymentIfDirty(Long reservationId, ReservationPayment reservationPayment) {
+        if (reservationPayment.isGuardianPaid()) {
+            log.warn("[PaymentRefundService][정합성 정정] PAID Payment 없는데 guardianPaid=true → 강제 false 동기화 reservationId={}",
+                    reservationId);
+            reservationPayment.guardianRefund();
+        }
+        if (reservationPayment.isSitterPaid()) {
+            log.warn("[PaymentRefundService][정합성 정정] PAID Payment 없는데 sitterPaid=true → 강제 false 동기화 reservationId={}",
+                    reservationId);
+            reservationPayment.sitterRefund();
+        }
     }
 
     /*

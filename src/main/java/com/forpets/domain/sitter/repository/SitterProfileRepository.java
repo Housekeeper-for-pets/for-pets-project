@@ -2,6 +2,8 @@ package com.forpets.domain.sitter.repository;
 
 import com.forpets.domain.sitter.entity.SitterApprovalStatus;
 import com.forpets.domain.sitter.entity.SitterProfile;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,4 +28,6 @@ public interface SitterProfileRepository extends JpaRepository<SitterProfile, Lo
     Optional<SitterProfile> findByMemberId(Long memberId);
 
     List<SitterProfile> findAllByApprovalStatus(SitterApprovalStatus sitterApprovalStatus);
+
+    Page<SitterProfile> findAllByApprovalStatus(SitterApprovalStatus sitterApprovalStatus, Pageable pageable);
 }

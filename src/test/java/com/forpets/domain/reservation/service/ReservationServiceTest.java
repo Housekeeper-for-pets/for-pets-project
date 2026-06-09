@@ -1,5 +1,6 @@
 package com.forpets.domain.reservation.service;
 
+import com.forpets.domain.carelog.repository.CareLogRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.notification.broker.NotificationMessageBroker;
 import com.forpets.domain.payment.entity.Payment;
@@ -94,6 +95,10 @@ class ReservationServiceTest {
 
     @Mock
     private CareRequestRepository careRequestRepository;
+
+    // ReservationService.cancel() 에서 케어일지 존재 여부 검증을 위해 의존성 추가됨
+    @Mock
+    private CareLogRepository careLogRepository;
 
     @Mock
     private NotificationMessageBroker notificationBroker;

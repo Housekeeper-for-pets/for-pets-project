@@ -6,6 +6,7 @@ import com.forpets.domain.payment.config.PortOneProperties;
 import com.forpets.domain.payment.exception.PaymentErrorCode;
 import com.forpets.domain.payment.exception.PaymentException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -14,6 +15,7 @@ import org.springframework.web.client.RestClientException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class PortOnePaymentClient {
@@ -36,21 +38,31 @@ public class PortOnePaymentClient {
                     .body(String.class);
 
             JsonNode root = objectMapper.readTree(rawResponse);
-            return new PortOnePaymentResult(
+            PortOnePaymentResult result = new PortOnePaymentResult(
                     readText(root, "id", "paymentId"),
                     readText(root, "status"),
                     readAmount(root),
                     rawResponse
             );
+            log.info("[PortOnePaymentClient] getPayment 성공 merchantUid={}, status={}, amount={}",
+                    paymentId, result.status(), result.totalAmount());
+            return result;
         } catch (RestClientException | IllegalArgumentException exception) {
+            // 운영에서 환불 stuck 원인 추적 가능하도록 상세 로그를 반드시 남긴다
+            log.error("[PortOnePaymentClient] getPayment 실패 (Rest/Parse) merchantUid={}, error={}",
+                    paymentId, exception.toString(), exception);
             throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_VERIFY_FAILED);
         } catch (Exception exception) {
+            log.error("[PortOnePaymentClient] getPayment 실패 (Unknown) merchantUid={}, error={}",
+                    paymentId, exception.toString(), exception);
             throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_VERIFY_FAILED);
         }
     }
 
     public PortOneCancelResult cancelPayment(String paymentId, Long amount, String reason) {
         validateApiSecret();
+        log.info("[PortOnePaymentClient] cancelPayment 시작 merchantUid={}, amount={}, reason={}",
+                paymentId, amount, reason);
 
         try {
             Map<String, Object> requestBody = new LinkedHashMap<>();
@@ -70,10 +82,17 @@ public class PortOnePaymentClient {
                     .retrieve()
                     .body(String.class);
 
+            log.info("[PortOnePaymentClient] cancelPayment 성공 merchantUid={}, amount={}, response={}",
+                    paymentId, amount, rawResponse);
             return new PortOneCancelResult(rawResponse);
         } catch (RestClientException | IllegalArgumentException exception) {
+            // 환불이 안 됐다는 사용자 리포트의 핵심 추적 지점. 절대 swallow 하지 않는다.
+            log.error("[PortOnePaymentClient][CRITICAL] cancelPayment 실패 (Rest/Parse) merchantUid={}, amount={}, reason={}, error={}",
+                    paymentId, amount, reason, exception.toString(), exception);
             throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_CANCEL_FAILED);
         } catch (Exception exception) {
+            log.error("[PortOnePaymentClient][CRITICAL] cancelPayment 실패 (Unknown) merchantUid={}, amount={}, reason={}, error={}",
+                    paymentId, amount, reason, exception.toString(), exception);
             throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_CANCEL_FAILED);
         }
     }

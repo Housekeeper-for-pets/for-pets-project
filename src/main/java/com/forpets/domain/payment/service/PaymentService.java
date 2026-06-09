@@ -178,9 +178,20 @@ public class PaymentService {
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
     }
 
+    /*
+    결제 생성 가능한 상태는 PENDING 뿐. 그 외 상태별로 명확히 분기해서
+    프론트가 사용자에게 정확한 메시지("결제 시간이 만료되었습니다" 등) 노출 가능하게 한다.
+     */
     private void validateReservationPending(Reservation reservation) {
-        if (!reservation.isPending()) {
-            throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+        if (reservation.isPayable()) {
+            return;
+        }
+        switch (reservation.getStatus()) {
+            case EXPIRED -> throw new ReservationException(ReservationErrorCode.RESERVATION_EXPIRED);
+            case CANCELED, CANCEL_REQUESTED -> throw new ReservationException(ReservationErrorCode.RESERVATION_CANCELED);
+            case CONFIRMED -> throw new ReservationException(ReservationErrorCode.RESERVATION_ALREADY_CONFIRMED);
+            case COMPLETED -> throw new ReservationException(ReservationErrorCode.RESERVATION_ALREADY_COMPLETED);
+            default -> throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
         }
     }
 
@@ -218,6 +229,18 @@ public class PaymentService {
             return ConfirmPaymentResponse.of(payment, reservation.getStatus());
         }
 
+        /*
+        만료 이후 도착한 PG 결제 보호 장치
+        Scheduler 가 payment 를 EXPIRED 로 닫은 직후, PG 측에서는 결제가 성공한 케이스.
+        이대로 두면 PG 측엔 결제됐는데 우리 시스템엔 없는 stuck 상태가 됨.
+        → PortOne 에 결제가 실제 PAID 인지 확인 후, 맞으면 즉시 자동 환불 시도하고
+          어떤 경우든 PAYMENT_EXPIRED 로 차단해서 reservation 상태와의 정합성을 보장한다.
+         */
+        if (payment.getStatus() == PaymentStatus.EXPIRED || payment.getStatus() == PaymentStatus.CANCELED) {
+            handleLateArrivedPayment(payment);
+            throw new PaymentException(PaymentErrorCode.PAYMENT_EXPIRED);
+        }
+
         // PaymentStatus == READY || PENDING 일 때만 Confirm
         validateConfirmable(payment);
 
@@ -246,6 +269,42 @@ public class PaymentService {
                 payment.getId(), payment.getReservationId(), payment.getPaymentRole());
 
         return ConfirmPaymentResponse.of(payment, reservation.status());
+    }
+
+    /*
+    만료 / 취소된 payment 에 PG 결제가 뒤늦게 도착한 케이스 처리.
+    - PortOne 에서 실제로 PAID 인지 확인
+    - PAID 라면 즉시 자동 환불 시도
+    - PortOne 호출 실패는 알림/로그만 남기고 swallow — 호출자는 어차피 PAYMENT_EXPIRED 던질 거라
+      여기서 예외 던지면 사용자에겐 모호한 메시지만 가고, 자동 환불 실패는 운영에서 추적 가능해야 한다.
+     */
+    private void handleLateArrivedPayment(Payment payment) {
+        try {
+            PortOnePaymentResult portOnePayment = portOnePaymentClient.getPayment(payment.getMerchantUid());
+            if (!portOnePayment.isPaid()) {
+                log.info("[PaymentService] 만료된 payment 에 PG 결제 미완료 도착 → 처리 종료 paymentId={}, merchantUid={}",
+                        payment.getId(), payment.getMerchantUid());
+                return;
+            }
+
+            // 금액 검증 후 자동 환불
+            if (!payment.getFinalAmount().equals(portOnePayment.totalAmount())) {
+                log.error("[PaymentService][CRITICAL] 만료 payment 자동 환불 시 금액 불일치 paymentId={}, expected={}, portOne={}",
+                        payment.getId(), payment.getFinalAmount(), portOnePayment.totalAmount());
+            }
+            portOnePaymentClient.cancelPayment(
+                    payment.getMerchantUid(),
+                    portOnePayment.totalAmount(),
+                    "만료 이후 도착한 PG 결제 자동 환불"
+            );
+            log.warn("[PaymentService] 만료 payment 자동 환불 완료 paymentId={}, merchantUid={}, amount={}",
+                    payment.getId(), payment.getMerchantUid(), portOnePayment.totalAmount());
+        } catch (Exception e) {
+            // 자동 환불 실패는 catch — 사용자 응답은 PAYMENT_EXPIRED 로 통일.
+            // 운영에서 이 ERROR 로그를 보고 PG 대시보드에서 수동 환불 진행해야 함.
+            log.error("[PaymentService][CRITICAL] 만료 payment 자동 환불 실패 paymentId={}, merchantUid={} — 수동 환불 필요",
+                    payment.getId(), payment.getMerchantUid(), e);
+        }
     }
 
     /*

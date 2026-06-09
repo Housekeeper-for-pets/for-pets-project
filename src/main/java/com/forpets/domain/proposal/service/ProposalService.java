@@ -59,6 +59,8 @@ public class ProposalService {
     public ProposalResponseDto create(Long memberId, Long postId, CreateProposalRequest request) {
         Post post = postService.findById(postId);
         validatePostOpen(post);
+        // 본인 공고 검증을 먼저 수행: 시터 프로필 조회/중복 검증 비용 절감 +
+        // 시터 프로필 없는 작성자가 본인 공고에 제안 시도 시 명확한 메시지("본인 공고에 제안할 수 없습니다") 노출
         validateNotOwnPost(memberId, post);
 
         SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
