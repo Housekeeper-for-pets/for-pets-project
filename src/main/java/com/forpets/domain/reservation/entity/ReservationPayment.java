@@ -29,6 +29,14 @@ public class ReservationPayment {
     @Column(nullable = false)
     private int sitterPrice;
 
+    /*
+    ReservationPayment 는 confirm/refund/expire 흐름에서 양쪽 결제 플래그가 동시 변경될 수 있어
+    Lock 으로 1차 직렬화 + @Version 으로 stale write 마지막 방어선.
+     */
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     public static ReservationPayment create(Long reservationId, int guardianPrice, int sitterPrice) {
         ReservationPayment payment = new ReservationPayment();
         payment.reservationId = reservationId;
@@ -45,6 +53,14 @@ public class ReservationPayment {
 
     public void sitterConfirm() {
         this.sitterPaid = true;
+    }
+
+    public void guardianRefund() {
+        this.guardianPaid = false;
+    }
+
+    public void sitterRefund() {
+        this.sitterPaid = false;
     }
 
     public boolean isBothPaid() {

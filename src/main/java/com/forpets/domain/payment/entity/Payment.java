@@ -1,5 +1,7 @@
 package com.forpets.domain.payment.entity;
 
+import com.forpets.domain.payment.exception.PaymentErrorCode;
+import com.forpets.domain.payment.exception.PaymentException;
 import com.forpets.global.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -86,6 +88,15 @@ public class Payment extends BaseEntity {
     @Column(name = "raw_response", columnDefinition = "TEXT")
     private String rawResponse;
 
+    /*
+    Payment 는 ReservationLock 으로 직렬화되지만,
+    @Transactional → Lock 획득 순서 구조상 락 획득 전 stale read 가능.
+    @Version 으로 commit 시점에 마지막 방어선 (ObjectOptimisticLockingFailureException).
+     */
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @Builder
     private Payment(Long reservationId, Long memberId, PaymentRole paymentRole,
                     PaymentType paymentType, Long originalAmount, Long discountAmount,
@@ -107,5 +118,51 @@ public class Payment extends BaseEntity {
 
     public boolean isReady() {
         return this.status == PaymentStatus.READY;
+    }
+
+    public boolean isConfirmable() {
+        return this.status == PaymentStatus.READY || this.status == PaymentStatus.PENDING;
+    }
+
+    public boolean isFailable() {
+        return this.status == PaymentStatus.READY || this.status == PaymentStatus.PENDING;
+    }
+
+    public boolean isPaid() {
+        return this.status == PaymentStatus.PAID;
+    }
+
+    public void approve(String portonePaymentId, String rawResponse) {
+        this.status = PaymentStatus.PAID;
+        this.portonePaymentId = portonePaymentId;
+        this.rawResponse = rawResponse;
+        this.approvedAt = LocalDateTime.now();
+    }
+
+    public void fail(String failedReason) {
+        this.status = PaymentStatus.FAILED;
+        this.failedReason = failedReason;
+    }
+
+    public void refund(String cancelReason, String rawResponse) {
+        this.status = PaymentStatus.REFUNDED;
+        this.cancelReason = cancelReason;
+        this.rawResponse = rawResponse;
+        this.refundedAt = LocalDateTime.now();
+    }
+
+    public void cancel(String cancelReason, String rawResponse) {
+        this.status = PaymentStatus.CANCELED;
+        this.cancelReason = cancelReason;
+        this.rawResponse = rawResponse;
+        this.canceledAt = LocalDateTime.now();
+    }
+
+    public void expire(){
+        if (this.status == PaymentStatus.READY || this.status == PaymentStatus.PENDING){
+            this.status = PaymentStatus.EXPIRED;
+            return;
+        }
+        throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
     }
 }

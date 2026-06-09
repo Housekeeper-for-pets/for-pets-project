@@ -16,6 +16,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -88,6 +91,25 @@ public class CouponService {
         return new CouponApplyResult(discountAmount, finalPrice, coupon.getName());
     }
 
+    // 결제 도메인에서 자동 적용할 가장 오래된 ACTIVE 쿠폰 ID를 조회
+    public Optional<Long> findFirstActiveUserCouponId(Long userId) {
+        return userCouponRepository.findFirstByUserIdAndStatusOrderByCreatedAtAsc(
+                        userId,
+                        UserCouponStatus.ACTIVE
+                )
+                .map(UserCoupon::getId);
+    }
+
+    public List<Long> findActiveUserCouponIds(Long userId) {
+        return userCouponRepository.findAllByUserIdAndStatusOrderByCreatedAtAsc(
+                        userId,
+                        UserCouponStatus.ACTIVE
+                )
+                .stream()
+                .map(UserCoupon::getId)
+                .toList();
+    }
+
 
      // 결제 성공 후 쿠폰 상태를 USED로 변경
     @Transactional
@@ -133,5 +155,34 @@ public class CouponService {
         if (userCoupon.getStatus() != UserCouponStatus.ACTIVE) {
             throw new CouponException(CouponErrorCode.COUPON_ALREADY_USED);
         }
+    }
+    // 비관적 락을 사용한 쿠폰 발급 테스트용 로직
+    @Transactional
+    public IssueCouponResponse issueCouponWithPessimisticLock(Long userId, Long couponId) {
+        // 쿠폰 row를 PESSIMISTIC_WRITE로 잠근 상태에서 조회
+        Coupon coupon = couponRepository.findByIdForUpdate(couponId)
+                .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_NOT_FOUND));
+
+        // 잔여 수량이 없으면 발급 중단
+        if (coupon.getRemainingQuantity() <= 0) {
+            throw new CouponException(CouponErrorCode.COUPON_QUANTITY_EXHAUSTED);
+        }
+
+        // 같은 회원의 동일 쿠폰 중복 발급 여부 확인
+        if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
+            throw new CouponException(CouponErrorCode.COUPON_ALREADY_ISSUED);
+        }
+
+        // 비관적 락을 잡은 상태에서 잔여 수량 1개 차감
+        coupon.decreaseRemainingQuantity();
+
+        // 회원 쿠폰 발급 이력 생성
+        UserCoupon userCoupon = UserCoupon.builder()
+                .userId(userId)
+                .couponId(couponId)
+                .build();
+
+        // 발급 이력을 저장하고 응답 DTO로 변환
+        return IssueCouponResponse.of(userCouponRepository.save(userCoupon), coupon);
     }
 }

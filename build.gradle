@@ -18,6 +18,10 @@ repositories {
     mavenCentral()
 }
 
+configurations {
+    mockitoAgent
+}
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -26,9 +30,18 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.apache.commons:commons-pool2'
+
+    // Redisson 기반 분산 락을 사용하기 위한 의존성입니다.
+    implementation 'org.redisson:redisson:3.27.2'
 
     implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    implementation 'org.springframework.ai:spring-ai-core:1.0.0-M6'
+
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+    implementation 'io.github.vaneproject:badwordfiltering:1.0.0'
 
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
     annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
@@ -49,6 +62,14 @@ dependencies {
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     testImplementation 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // metric 을 Prometheus 가 읽을 수 있는 포맷으로 변환해서 노출
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    mockitoAgent('org.mockito:mockito-core') {
+        transitive = false
+    }
 }
 
 // ---------------------------------------------------------------
@@ -59,6 +80,8 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
     jvmArgs '-Dfile.encoding=UTF-8'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.asPath}"
+
     environment 'JAVA_TOOL_OPTIONS', '-Dfile.encoding=UTF-8'
     systemProperty 'spring.profiles.active', 'test'
 
@@ -81,6 +104,6 @@ tasks.named('test') {
         if (mainResDir?.exists()) copy { from mainResDir; into safeMainRes }
 
         classpath = files(safeTest, safeTestRes, safeMain, safeMainRes) +
-                    configurations.testRuntimeClasspath
+                configurations.testRuntimeClasspath
     }
 }

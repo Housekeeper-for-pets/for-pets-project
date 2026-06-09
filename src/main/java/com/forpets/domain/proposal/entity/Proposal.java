@@ -9,9 +9,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "proposal", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"post_id", "sitter_profile_id"})
-})
+@Table(name = "proposal")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Proposal extends BaseEntity {
 
@@ -24,6 +22,9 @@ public class Proposal extends BaseEntity {
 
     @Column(name = "sitter_profile_id", nullable = false)
     private Long sitterProfileId;
+
+    @Column(name = "sitter_member_id", nullable = false)
+    private Long sitterMemberId;
 
     @Column(name = "member_id", nullable = false)
     private Long memberId;
@@ -39,10 +40,11 @@ public class Proposal extends BaseEntity {
     private ProposalStatus status;
 
     @Builder
-    private Proposal(Long postId, Long sitterProfileId, Long memberId,
+    private Proposal(Long postId, Long sitterProfileId, Long memberId, Long sitterMemberId,
                      Integer proposedPrice, String message) {
         this.postId = postId;
         this.sitterProfileId = sitterProfileId;
+        this.sitterMemberId = sitterMemberId;
         this.memberId = memberId;
         this.proposedPrice = proposedPrice;
         this.message = message;

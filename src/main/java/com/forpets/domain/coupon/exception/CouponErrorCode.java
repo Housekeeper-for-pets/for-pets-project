@@ -13,7 +13,8 @@ public enum CouponErrorCode implements ErrorCode {
     COUPON_ALREADY_USED(HttpStatus.CONFLICT, "COUPON_ALREADY_USED", "이미 사용된 쿠폰입니다."),
     COUPON_NOT_OWNED(HttpStatus.FORBIDDEN, "COUPON_NOT_OWNED", "해당 유저의 쿠폰이 아닙니다."),
     COUPON_ALREADY_ISSUED(HttpStatus.CONFLICT, "COUPON_ALREADY_ISSUED", "이미 발급받은 쿠폰입니다."),
-    COUPON_QUANTITY_EXHAUSTED(HttpStatus.BAD_REQUEST, "COUPON_QUANTITY_EXHAUSTED", "잔여 쿠폰 수량이 없습니다.");
+    COUPON_QUANTITY_EXHAUSTED(HttpStatus.BAD_REQUEST, "COUPON_QUANTITY_EXHAUSTED", "잔여 쿠폰 수량이 없습니다."),
+    COUPON_ISSUE_LOCK_FAILED(HttpStatus.CONFLICT, "COUPON_ISSUE_LOCK_FAILED", "쿠폰 발급 요청이 많습니다. 잠시 후 다시 시도해주세요.");
 
     private final HttpStatus status;
     private final String code;

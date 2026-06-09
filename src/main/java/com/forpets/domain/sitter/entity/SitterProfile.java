@@ -1,5 +1,7 @@
 package com.forpets.domain.sitter.entity;
 
+import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.global.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -8,13 +10,18 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "sitter_profile", uniqueConstraints = {
-        @UniqueConstraint(columnNames = "member_id")
-})
+@Table(name = "sitter_profile",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = "member_id")
+        },
+        indexes = {
+                @Index(name = "idx_sitter_approval_created", columnList = "approval_status, created_at")
+        })
 @SQLRestriction("deleted = false")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SitterProfile extends BaseEntity {
@@ -43,9 +50,28 @@ public class SitterProfile extends BaseEntity {
     @Column(nullable = false)
     private int pricePerHour;
 
+    @Column(name = "average_rating", nullable = false, precision = 2, scale = 1)
+    private BigDecimal averageRating = BigDecimal.ZERO;
+
+    @Column(name = "review_count", nullable = false)
+    private int reviewCount = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private SitterProfileStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private SitterApprovalStatus approvalStatus;
+
+    @Column(length = 500)
+    private String rejectReason;
+
+    @Column(name = "evaluated_by")
+    private Long evaluatedBy;
+
+    @Column(name = "evaluated_at")
+    private LocalDateTime evaluatedAt;
 
     @Column(nullable = false)
     private boolean deleted = false;
@@ -63,7 +89,8 @@ public class SitterProfile extends BaseEntity {
         this.possiblePetType = possiblePetType;
         this.possiblePetSize = possiblePetSize == null ? PossiblePetSize.ALL : possiblePetSize;
         this.pricePerHour = pricePerHour;
-        this.status = SitterProfileStatus.RESERVABLE;
+        this.status = SitterProfileStatus.NON_RESERVABLE;
+        this.approvalStatus = SitterApprovalStatus.PENDING;
     }
 
     public void update(String introduction, int experienceYears,
@@ -79,9 +106,48 @@ public class SitterProfile extends BaseEntity {
         this.status = status;
     }
 
+    /**
+     * 리뷰 작성/삭제 시 평균 평점과 리뷰 수를 갱신합니다.
+     * 증분이 아니라 매번 전체 재계산한 값으로 덮어씁니다. (동시성 이슈 방지)
+     */
+    public void updateReviewStats(BigDecimal averageRating, int reviewCount) {
+        this.averageRating = averageRating;
+        this.reviewCount = reviewCount;
+    }
+
+    public void approve(Long adminId) {
+        this.approvalStatus = SitterApprovalStatus.APPROVED;
+        this.rejectReason = null;
+        this.evaluatedBy = adminId;
+        this.evaluatedAt = LocalDateTime.now();
+        this.status = SitterProfileStatus.RESERVABLE;
+    }
+
+    public void reject(Long adminId, String rejectReason) {
+        this.approvalStatus = SitterApprovalStatus.REJECTED;
+        this.rejectReason = rejectReason;
+        this.evaluatedBy = adminId;
+        this.evaluatedAt = LocalDateTime.now();
+    }
+
+
     public void delete() {
         this.deleted = true;
         this.deletedAt = LocalDateTime.now();
+    }
+
+    public void reactivate() {
+        this.deleted = false;
+        this.deletedAt = null;
+        this.approvalStatus = SitterApprovalStatus.PENDING;
+        this.status = SitterProfileStatus.NON_RESERVABLE;
+        this.rejectReason = null;
+        this.evaluatedBy = null;
+        this.evaluatedAt = null;
+    }
+
+    public boolean isApproved() {
+        return this.approvalStatus == SitterApprovalStatus.APPROVED;
     }
 
     public boolean isReservable() {

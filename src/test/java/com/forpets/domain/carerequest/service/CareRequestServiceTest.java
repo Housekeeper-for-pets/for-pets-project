@@ -11,6 +11,7 @@ import com.forpets.domain.carerequest.exception.CareRequestException;
 import com.forpets.domain.carerequest.repository.CareRequestPetRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
 import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.entity.PetGender;
 import com.forpets.domain.pet.entity.PetSize;
@@ -25,13 +26,10 @@ import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.entity.SitterProfileStatus;
-import com.forpets.domain.sitter.exception.SitterErrorCode;
-import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.common.CareType;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.dto.TimeSlotRequest;
-import com.forpets.global.embed.entity.PetSnapshot;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -78,6 +76,9 @@ class CareRequestServiceTest {
     @Mock
     private ReservationService reservationService;
 
+    @Mock
+    private NotificationMessageBroker notificationBroker;
+
     // ── 테스트 픽스처 ──
     private SitterProfile sitterProfile;     // member2의 시터 프로필
     private Pet pet1;                        // member1(째길중)의 타코
@@ -104,6 +105,7 @@ class CareRequestServiceTest {
                 .pricePerHour(15000)
                 .build();
         ReflectionTestUtils.setField(sitterProfile, "id", sitterProfileId);
+        sitterProfile.approve(member3Id);
 
         // member1(째길중)의 반려동물들
         pet1 = Pet.builder()
@@ -134,6 +136,7 @@ class CareRequestServiceTest {
         careRequest = CareRequest.builder()
                 .memberId(member1Id)
                 .sitterProfileId(sitterProfileId)
+                .sitterMemberId(member2Id)
                 .careType(CareType.VISIT)
                 .message("타코 돌봐주세요")
                 .requestPrice(30000)
@@ -189,8 +192,8 @@ class CareRequestServiceTest {
                     List.of(pet1Id), CareType.VISIT, "타코 돌봐주세요",
                     validTimeSlots(), 30000
             );
-            given(sitterService.findById(sitterProfileId)).willReturn(sitterProfile);
-            given(petService.findById(pet1Id)).willReturn(pet1);
+            given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
+            given(petService.validateAndGetPets(member1Id, List.of(pet1Id))).willReturn(List.of(pet1));
             willDoNothing().given(timeSlotValidator).validate(anyList());
             given(careRequestRepository.findAllBySitterProfileIdAndStatus(sitterProfileId, CareRequestStatus.PENDING))
                     .willReturn(List.of());
@@ -225,6 +228,7 @@ class CareRequestServiceTest {
             CareRequest existingPending = CareRequest.builder()
                     .memberId(member1Id)
                     .sitterProfileId(sitterProfileId)
+                    .sitterMemberId(member2Id)
                     .careType(CareType.VISIT)
                     .message("기존 요청")
                     .requestPrice(30000)
@@ -242,8 +246,8 @@ class CareRequestServiceTest {
                     .build();
             ReflectionTestUtils.setField(savedRequest, "id", 201L);
 
-            given(sitterService.findById(sitterProfileId)).willReturn(sitterProfile);
-            given(petService.findById(pet2Id)).willReturn(pet2);
+            given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
+            given(petService.validateAndGetPets(member1Id, List.of(pet2Id))).willReturn(List.of(pet2));
             willDoNothing().given(timeSlotValidator).validate(anyList());
             given(careRequestRepository.findAllBySitterProfileIdAndStatus(sitterProfileId, CareRequestStatus.PENDING))
                     .willReturn(List.of(existingPending));
@@ -268,7 +272,7 @@ class CareRequestServiceTest {
             CreateCareRequestDto request = new CreateCareRequestDto(
                     List.of(pet1Id), CareType.VISIT, "요청", validTimeSlots(), 30000
             );
-            given(sitterService.findById(sitterProfileId)).willReturn(sitterProfile);
+            given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
 
             // when & then
             assertThatThrownBy(() -> careRequestService.create(member1Id, sitterProfileId, request))
@@ -284,7 +288,7 @@ class CareRequestServiceTest {
             CreateCareRequestDto request = new CreateCareRequestDto(
                     List.of(pet1Id), CareType.VISIT, "요청", validTimeSlots(), 30000
             );
-            given(sitterService.findById(sitterProfileId)).willReturn(sitterProfile);
+            given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
 
             // when & then
             assertThatThrownBy(() -> careRequestService.create(member2Id, sitterProfileId, request))
@@ -297,22 +301,12 @@ class CareRequestServiceTest {
         @DisplayName("[실패] 타인 반려동물로 요청 시 차단")
         void carerequest_test_05() {
             // given — member3(지민냥)의 pet으로 요청
-            Pet otherPet = Pet.builder()
-                    .memberId(member3Id)
-                    .name("갈색")
-                    .species(PetSpecies.ETC)
-                    .breed("제주도 거대 말")
-                    .size(PetSize.LARGE)
-                    .age(6)
-                    .gender(PetGender.MALE)
-                    .build();
-            ReflectionTestUtils.setField(otherPet, "id", 12L);
-
             CreateCareRequestDto request = new CreateCareRequestDto(
                     List.of(12L), CareType.VISIT, "요청", validTimeSlots(), 30000
             );
-            given(sitterService.findById(sitterProfileId)).willReturn(sitterProfile);
-            given(petService.findById(12L)).willReturn(otherPet);
+            given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
+            given(petService.validateAndGetPets(member1Id, List.of(12L)))
+                    .willThrow(new PetException(PetErrorCode.NOT_PET_OWNER));
 
             // when & then
             assertThatThrownBy(() -> careRequestService.create(member1Id, sitterProfileId, request))
@@ -331,6 +325,7 @@ class CareRequestServiceTest {
             CareRequest existingPending = CareRequest.builder()
                     .memberId(member1Id)
                     .sitterProfileId(sitterProfileId)
+                    .sitterMemberId(member2Id)
                     .careType(CareType.VISIT)
                     .message("기존 요청")
                     .requestPrice(30000)
@@ -339,8 +334,8 @@ class CareRequestServiceTest {
 
             CareRequestPet existingPet = createCareRequestPet(999L, pet1);
 
-            given(sitterService.findById(sitterProfileId)).willReturn(sitterProfile);
-            given(petService.findById(pet1Id)).willReturn(pet1);
+            given(sitterService.findApprovedById(sitterProfileId)).willReturn(sitterProfile);
+            given(petService.validateAndGetPets(member1Id, List.of(pet1Id))).willReturn(List.of(pet1));
             willDoNothing().given(timeSlotValidator).validate(anyList());
             given(careRequestRepository.findAllBySitterProfileIdAndStatus(sitterProfileId, CareRequestStatus.PENDING))
                     .willReturn(List.of(existingPending));
@@ -437,7 +432,7 @@ class CareRequestServiceTest {
         @DisplayName("[성공] 시터가 받은 요청 목록 조회 성공")
         void carerequest_test_11() {
             // given
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(careRequestRepository.findAllBySitterProfileId(sitterProfileId)).willReturn(List.of(careRequest));
             stubToResponseDto();
 
@@ -513,7 +508,7 @@ class CareRequestServiceTest {
             List<CareRequestPet> crPets = List.of(createCareRequestPet(careRequestId, pet1));
             List<CareRequestTimeSlot> crSlots = List.of(createCareRequestTimeSlot(careRequestId, 1));
 
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(careRequestRepository.findById(careRequestId)).willReturn(Optional.of(careRequest));
             given(careRequestTimeSlotRepository.findAllByCareRequestIdOrderByTimeSlotInfoSequence(careRequestId))
                     .willReturn(crSlots);
@@ -543,7 +538,7 @@ class CareRequestServiceTest {
                     .build();
             ReflectionTestUtils.setField(otherSitter, "id", 101L);
 
-            given(sitterService.findByMemberId(member3Id)).willReturn(otherSitter);
+            given(sitterService.findApprovedByMemberId(member3Id)).willReturn(otherSitter);
             given(careRequestRepository.findById(careRequestId)).willReturn(Optional.of(careRequest));
 
             // when & then
@@ -558,7 +553,7 @@ class CareRequestServiceTest {
         void carerequest_test_17() {
             // given
             careRequest.reject(); // REJECTED 상태로 변경
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(careRequestRepository.findById(careRequestId)).willReturn(Optional.of(careRequest));
 
             // when & then
@@ -574,7 +569,7 @@ class CareRequestServiceTest {
             // given
             List<CareRequestTimeSlot> crSlots = List.of(createCareRequestTimeSlot(careRequestId, 1));
 
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(careRequestRepository.findById(careRequestId)).willReturn(Optional.of(careRequest));
             given(careRequestTimeSlotRepository.findAllByCareRequestIdOrderByTimeSlotInfoSequence(careRequestId))
                     .willReturn(crSlots);
@@ -599,7 +594,7 @@ class CareRequestServiceTest {
         @DisplayName("[성공] 시터가 요청 거절 성공")
         void carerequest_test_19() {
             // given
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(careRequestRepository.findById(careRequestId)).willReturn(Optional.of(careRequest));
             stubToResponseDto();
 
@@ -624,7 +619,7 @@ class CareRequestServiceTest {
                     .build();
             ReflectionTestUtils.setField(otherSitter, "id", 101L);
 
-            given(sitterService.findByMemberId(member3Id)).willReturn(otherSitter);
+            given(sitterService.findApprovedByMemberId(member3Id)).willReturn(otherSitter);
             given(careRequestRepository.findById(careRequestId)).willReturn(Optional.of(careRequest));
 
             // when & then
@@ -639,7 +634,7 @@ class CareRequestServiceTest {
         void carerequest_test_21() {
             // given
             careRequest.accept(); // ACCEPTED 상태로 변경
-            given(sitterService.findByMemberId(member2Id)).willReturn(sitterProfile);
+            given(sitterService.findApprovedByMemberId(member2Id)).willReturn(sitterProfile);
             given(careRequestRepository.findById(careRequestId)).willReturn(Optional.of(careRequest));
 
             // when & then

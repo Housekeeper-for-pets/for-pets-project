@@ -11,24 +11,19 @@ import com.forpets.domain.carerequest.exception.CareRequestException;
 import com.forpets.domain.carerequest.repository.CareRequestPetRepository;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
+import com.forpets.domain.notification.event.NotificationEvent;
 import com.forpets.domain.pet.entity.Pet;
-import com.forpets.domain.pet.exception.PetErrorCode;
-import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.service.PetService;
-import com.forpets.domain.post.entity.Post;
-import com.forpets.domain.proposal.entity.Proposal;
-import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
-import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.service.SitterService;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.dto.TimeSlotRequest;
 import com.forpets.global.embed.entity.TimeSlotInfo;
-import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
+import com.forpets.global.sse.SseEventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +39,7 @@ import java.util.List;
 @Slf4j
 public class CareRequestService {
 
+    private static final String NAME = CareRequestService.class.getSimpleName();
     private final CareRequestRepository careRequestRepository;
     private final CareRequestPetRepository careRequestPetRepository;
     private final CareRequestTimeSlotRepository careRequestTimeSlotRepository;
@@ -51,6 +47,7 @@ public class CareRequestService {
     private final SitterService sitterService;
     private final TimeSlotValidator timeSlotValidator;
     private final ReservationService reservationService;
+    private final NotificationMessageBroker notificationBroker;
 
     /*
     케어 요청 등록
@@ -63,7 +60,7 @@ public class CareRequestService {
      */
     @Transactional
     public CareRequestResponseDto create(Long memberId, Long sitterId, CreateCareRequestDto request) {
-        SitterProfile sitter = sitterService.findById(sitterId);
+        SitterProfile sitter = sitterService.findApprovedById(sitterId);
         validateReservable(sitter);
 
         log.info("로그인 한 유저의 member Id: {}", memberId);
@@ -71,13 +68,14 @@ public class CareRequestService {
 
         validateNotSelf(memberId, sitter.getMemberId());
 
-        List<Pet> pets = validateAndGetPets(memberId, request.petIds());
+        List<Pet> pets = petService.validateAndGetPets(memberId, request.petIds());
         timeSlotValidator.validate(request.timeSlots());
         validateNoDuplicatePendingRequest(sitter.getId(), request.petIds());
 
         CareRequest careRequest = careRequestRepository.save(CareRequest.builder()
                 .memberId(memberId)
                 .sitterProfileId(sitter.getId())
+                .sitterMemberId(sitter.getMemberId())
                 .careType(request.careType())
                 .message(request.message())
                 .requestPrice(request.requestPrice())
@@ -85,6 +83,19 @@ public class CareRequestService {
 
         List<CareRequestPet> careRequestPets = saveCareRequestPets(careRequest.getId(), pets);
         List<CareRequestTimeSlot> careRequestTimeSlots = saveCareRequestTimeSlots(careRequest.getId(), request.timeSlots());
+
+        // 시터에게 "새 케어 신청 도착" 알림
+        notificationBroker.publish(NotificationEvent.of(
+                sitter.getMemberId(),         // 시터 (받는 사람)
+                memberId,                     // 보호자 (신청한 사람)
+                SseEventType.REQUEST_RECEIVED,
+                "새로운 케어 신청이 도착했습니다.",
+                careRequest.getId(),
+                "CARE_REQUEST"
+        ));
+        log.info("{} => 케어 신청 알림 발행: sitterMemberId={}, guardianId={}",
+                NAME, sitter.getMemberId(), memberId);
+
 
         return CareRequestResponseDto.from(careRequest, careRequestPets, careRequestTimeSlots);
     }
@@ -115,7 +126,7 @@ public class CareRequestService {
     @Transactional
     public CareRequestResponseDto cancel(Long memberId, Long requestId) {
         CareRequest request = findById(requestId);
-        validateOwner(memberId, request);
+        validateCareRequestOwner(memberId, request);
         validatePending(request);
 
         request.cancel();
@@ -127,7 +138,7 @@ public class CareRequestService {
     시터 본인에게 온 요청만 조회
      */
     public List<CareRequestResponseDto> getReceivedRequests(Long memberId) {
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
 
         return careRequestRepository.findAllBySitterProfileId(sitter.getId()).stream()
                 .map(this::toResponseDto)
@@ -148,7 +159,7 @@ public class CareRequestService {
      */
     @Transactional
     public CareRequestResponseDto accept(Long memberId, Long requestId) {
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         CareRequest request = findById(requestId);
         validatePending(request);
         validateTargetSitter(sitter.getId(), request);
@@ -180,7 +191,7 @@ public class CareRequestService {
      */
     @Transactional
     public CareRequestResponseDto reject(Long memberId, Long requestId) {
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         CareRequest request = findById(requestId);
         validatePending(request);
         validateTargetSitter(sitter.getId(), request);
@@ -197,13 +208,13 @@ public class CareRequestService {
     }
 
     private void validateParty(Long memberId, CareRequest careRequest) {
-        if (!careRequest.isOwnedBy(memberId) && !careRequest.getSitterProfileId().equals(memberId)) {
+        if (!careRequest.isOwnedBy(memberId) && !careRequest.getSitterMemberId().equals(memberId)) {
             throw new CareRequestException(CareRequestErrorCode.NOT_CARE_REQUEST_PARTY);
         }
     }
 
     private void validateReservable(SitterProfile sitter) {
-        if (!sitter.isReservable()) {
+        if (!sitter.isReservable() || !sitter.isApproved()) {
             throw new CareRequestException(CareRequestErrorCode.SITTER_NOT_RESERVABLE);
         }
     }
@@ -214,7 +225,7 @@ public class CareRequestService {
         }
     }
 
-    private void validateOwner(Long memberId, CareRequest request) {
+    private void validateCareRequestOwner(Long memberId, CareRequest request) {
         if (!request.isOwnedBy(memberId)) {
             throw new CareRequestException(CareRequestErrorCode.NOT_CARE_REQUEST_OWNER);
         }
@@ -232,17 +243,17 @@ public class CareRequestService {
         }
     }
 
-    private List<Pet> validateAndGetPets(Long memberId, List<Long> petIds) {
-        return petIds.stream()
-                .map(petId -> {
-                    Pet pet = petService.findById(petId);
-                    if (!pet.getMemberId().equals(memberId)) {
-                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
-                    }
-                    return pet;
-                })
-                .toList();
-    }
+//    private List<Pet> validateAndGetPets(Long memberId, List<Long> petIds) {
+//        return petIds.stream()
+//                .map(petId -> {
+//                    Pet pet = petService.findById(petId);
+//                    if (!pet.getMemberId().equals(memberId)) {
+//                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
+//                    }
+//                    return pet;
+//                })
+//                .toList();
+//    }
 
     /*
     동일 시터에게 동일 petIds로 PENDING 중복 요청 방지

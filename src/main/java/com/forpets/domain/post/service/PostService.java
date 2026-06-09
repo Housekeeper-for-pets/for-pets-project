@@ -25,14 +25,12 @@ import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.exception.ProposalErrorCode;
 import com.forpets.domain.proposal.exception.ProposalException;
 import com.forpets.domain.proposal.repository.ProposalRepository;
-import com.forpets.domain.proposal.service.ProposalService;
-import com.forpets.domain.post.exception.PostErrorCode;
 import com.forpets.global.embed.TimeSlotValidator;
 import com.forpets.global.embed.dto.TimeSlotRequest;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -56,6 +54,7 @@ public class PostService {
     private final TimeSlotValidator timeSlotValidator;
     private final MemberService memberService;
     private final ProposalRepository proposalRepository;
+    private final PostCacheService postCacheService;
 
 
     /*
@@ -67,9 +66,10 @@ public class PostService {
     5. PostTimeSlot 생성 (sequence 자동 계산: careDate ASC, startTime ASC)
      */
     @Transactional
+    @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public PostResponseDto create(Long memberId, CreatePostRequest request) {
         Member member = memberService.findById(memberId);
-        List<Pet> pets = validateAndGetPets(memberId, request.petIds());
+        List<Pet> pets = petService.validateAndGetPets(memberId, request.petIds());
         timeSlotValidator.validate(request.timeSlots());
 
         Post post = postRepository.save(Post.builder()
@@ -97,6 +97,7 @@ public class PostService {
     PetSnapshot은 수정 시점의 최신 Pet 정보로 재생성
      */
     @Transactional
+    @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public PostResponseDto update(Long memberId, Long postId, UpdatePostRequest request) {
         Member member = memberService.findById(memberId);
 
@@ -105,7 +106,7 @@ public class PostService {
         validateOpen(post);
         validateNoActiveProposal(postId);
 
-        List<Pet> pets = validateAndGetPets(memberId, request.petIds());
+        List<Pet> pets = petService.validateAndGetPets(memberId, request.petIds());
         timeSlotValidator.validate(request.timeSlots());
 
         post.update(
@@ -136,6 +137,7 @@ public class PostService {
     아니면 void 반환해줘도 될 것 같음 고민해보기
      */
     @Transactional
+    @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public PostResponseDto closePost(Long memberId, Long postId) {
         Member member = memberService.findById(memberId);
 
@@ -160,6 +162,7 @@ public class PostService {
     - 본인 공고만
      */
     @Transactional
+    @CacheEvict(cacheNames = "postings", allEntries = true, cacheManager = "shortTtlCacheManager")
     public void delete(Long memberId, Long postId) {
         Post post = findById(postId);
         validateAuthor(memberId, post);
@@ -213,9 +216,7 @@ public class PostService {
         validatePageRequest(page, size);
         validateSortField(sort);
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sort));
-
-        return postRepository.searchPosts(condition, pageable);
+        return postCacheService.searchPostings(condition, page, size, sort);
     }
 
     public PostPageResponse searchMyPosts(Long memberId, String status, int page, int size) {
@@ -250,17 +251,17 @@ public class PostService {
     반려동물 존재 여부 + 본인 소유 검증
     PetService.findById로 존재 확인 후 본인 소유 검증
      */
-    private List<Pet> validateAndGetPets(Long memberId, List<Long> petIds) {
-        return petIds.stream()
-                .map(petId -> {
-                    Pet pet = petService.findById(petId);
-                    if (!pet.getMemberId().equals(memberId)) {
-                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
-                    }
-                    return pet;
-                })
-                .toList();
-    }
+//    private List<Pet> validateAndGetPets(Long memberId, List<Long> petIds) {
+//        return petIds.stream()
+//                .map(petId -> {
+//                    Pet pet = petService.findById(petId);
+//                    if (!pet.getMemberId().equals(memberId)) {
+//                        throw new PetException(PetErrorCode.NOT_PET_OWNER);
+//                    }
+//                    return pet;
+//                })
+//                .toList();
+//    }
 
     private void validateAuthor(Long memberId, Post post) {
         if (!post.isOwnedBy(memberId)) {
@@ -273,19 +274,6 @@ public class PostService {
             throw new PostException(PostErrorCode.POST_NOT_OPEN);
         }
     }
-
-    /*
-    PENDING 또는 ACCEPTED Proposal이 있으면 수정, 상태변경, 삭제 불가
-
-    MVP 정책이 원래 PENDING Proposal만 있으면 상태 변경, 삭제 가능이었는데
-    그냥 구분하지 않고 모든 요청을 다 REJECT 처리 다 해야 상태 변경, 삭제 가능하도록 하는게 깔끔할듯
-     */
-    // 순환참조........
-//    private void validateNoActiveProposal(Long postId) {
-//         if (proposalService.existsPendingOrAcceptedByPostId(postId)) {
-//             throw new BusinessException(CommonErrorCode.HAS_ACTIVE_PROPOSAL);
-//         }
-//    }
 
     private void validateNoActiveProposal(Long postId) {
         if (proposalRepository.existsByPostIdAndStatusIn(
@@ -325,22 +313,5 @@ public class PostService {
         }
 
         return postTimeSlotRepository.saveAll(postTimeSlots);
-    }
-
-//    public List<PostResponseDto> getTest() {
-//        return postRepository.findAll().stream()
-//                .map(post -> PostResponseDto.from(
-//                        post,
-//                        postPetRepository.findAllByPostId(post.getId()),
-//                        postTimeSlotRepository.findAllByPostIdOrderByTimeSlotInfoSequence(post.getId())
-//                ))
-//                .toList();
-//    }
-
-    public boolean existsActivePostByPetId(Long petId) {
-        return postRepository.existsByPetIdAndStatusIn(
-                petId,
-                List.of(PostStatus.OPEN)
-        );
     }
 }

@@ -1,5 +1,6 @@
 package com.forpets.domain.carerequest.entity;
 
+import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.global.common.CareType;
 import com.forpets.global.entity.BaseEntity;
 import jakarta.persistence.*;
@@ -24,6 +25,9 @@ public class CareRequest extends BaseEntity {
     @Column(name = "sitter_profile_id", nullable = false)
     private Long sitterProfileId;
 
+    @Column(name = "sitter_member_id", nullable = false)
+    private Long sitterMemberId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private CareType careType;
@@ -39,10 +43,11 @@ public class CareRequest extends BaseEntity {
     private CareRequestStatus status;
 
     @Builder
-    private CareRequest(Long memberId, Long sitterProfileId,
+    private CareRequest(Long memberId, Long sitterProfileId, Long sitterMemberId,
                         CareType careType, String message, int requestPrice) {
         this.memberId = memberId;
         this.sitterProfileId = sitterProfileId;
+        this.sitterMemberId = sitterMemberId;
         this.careType = careType;
         this.message = message;
         this.status = CareRequestStatus.PENDING;
@@ -72,4 +77,6 @@ public class CareRequest extends BaseEntity {
     public boolean isTargetSitter(Long sitterProfileId) {
         return this.sitterProfileId.equals(sitterProfileId);
     }
+
+    public void restoreToPending() { this.status = CareRequestStatus.PENDING; }
 }

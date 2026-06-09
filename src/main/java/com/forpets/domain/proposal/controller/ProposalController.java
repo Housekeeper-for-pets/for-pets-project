@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,6 +38,7 @@ public class ProposalController {
     /*
     1. 공고에 제안 등록 (역방향)
      */
+//    @PreAuthorize("hasRole('SITTER')")
     @PostMapping("/api/posts/{postId}/proposals")
     public ResponseEntity<ApiResponse<ProposalResponseDto>> create(
             @LoginUser CurrentMember currentMember,
@@ -58,7 +60,7 @@ public class ProposalController {
     }
 
     /*
-    3. 시터가 본인이 등록한 공고 목록을 조회
+    3. 시터가 본인이 등록한 제안 목록을 조회
      */
     @GetMapping("/api/proposals/me")
     public ResponseEntity<ApiResponse<List<ProposalResponseDto>>> getMyProposals(

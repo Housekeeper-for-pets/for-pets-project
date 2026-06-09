@@ -2,22 +2,25 @@ package com.forpets.global.exception;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.forpets.domain.post.exception.PostErrorCode;
+import com.forpets.domain.review.exception.ReviewErrorCode;
 import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.global.common.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 /**
  * 컨트롤러 전역에서 발생한 예외를 공통 응답 형식으로 변환합니다.
  * 예상 가능한 예외는 warn 로그로 남기고, 예상하지 못한 예외는 error 로그로 남깁니다.
@@ -83,6 +86,26 @@ public class GlobalExceptionHandler {
                 .orElse(CommonErrorCode.VALIDATION_FAILED.getMessage());
 
         log.warn("[ValidationException] message={}, path={}", message, request.getRequestURI());
+
+        if (request.getRequestURI().startsWith("/api/reviews")) {
+            ErrorCode errorCode = CommonErrorCode.VALIDATION_FAILED;
+            for (var fieldError : exception.getBindingResult().getFieldErrors()) {
+                if ("rating".equals(fieldError.getField())) {
+                    errorCode = ReviewErrorCode.INVALID_RATING;
+                    message = fieldError.getDefaultMessage();
+                    break;
+                }
+                if ("reviewComment".equals(fieldError.getField())) {
+                    errorCode = ReviewErrorCode.INVALID_REVIEW_COMMENT;
+                    message = fieldError.getDefaultMessage();
+                    break;
+                }
+            }
+
+            return ResponseEntity
+                    .status(errorCode.getStatus())
+                    .body(ApiResponse.fail(ErrorResponse.of(errorCode, message, request.getRequestURI())));
+        }
 
         return ResponseEntity
                 .badRequest()
@@ -198,6 +221,36 @@ public class GlobalExceptionHandler {
                 .status(CommonErrorCode.CONFLICT.getStatus())
                 .body(ApiResponse.fail(ErrorResponse.of(CommonErrorCode.CONFLICT, request.getRequestURI())));
     }
+
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePessimisticLockingFailureException(
+            PessimisticLockingFailureException exception,
+            HttpServletRequest request
+    ) {
+        log.warn("[PessimisticLockingFailureException] path={}", request.getRequestURI(), exception);
+
+        return ResponseEntity
+                .status(CommonErrorCode.CONFLICT.getStatus())
+                .body(ApiResponse.fail(ErrorResponse.of(
+                        CommonErrorCode.CONFLICT,
+                        request.getRequestURI()
+                )));
+    }
+
+//    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+//    public ResponseEntity<ApiResponse<Void>> handleObjectOptimisticLockingFailureException(
+//            ObjectOptimisticLockingFailureException exception,
+//            HttpServletRequest request)
+//    {
+//        log.warn("[ObjectOptimisticLockingFailureException] path={}", request.getRequestURI(), exception);
+//
+//        return ResponseEntity
+//                .status(CommonErrorCode.CONFLICT.getStatus())
+//                .body(ApiResponse.fail(ErrorResponse.of(
+//                        CommonErrorCode.CONFLICT,
+//                        request.getRequestURI()
+//                )));
+//    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(

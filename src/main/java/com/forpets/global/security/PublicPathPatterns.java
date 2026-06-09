@@ -10,13 +10,15 @@ public final class PublicPathPatterns {
             "/health",
             "/actuator/**",
             "/error",
-            "/favicon.ico"
+            "/favicon.ico",
+            "/ws/**"
     };
 
     public static final String[] PUBLIC_POST = {
             "/api/auth/signup",
             "/api/auth/login",
-            "/api/auth/reissue"
+            "/api/auth/reissue",
+            "/api/payments/webhook/portone"
     };
 
     public static final String[] PUBLIC_GET = {

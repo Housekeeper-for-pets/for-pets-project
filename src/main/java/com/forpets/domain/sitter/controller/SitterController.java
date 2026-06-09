@@ -1,5 +1,6 @@
 package com.forpets.domain.sitter.controller;
 
+import com.forpets.domain.member.entity.MemberGender;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.dto.profile.CreateSitterRequest;
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
@@ -15,7 +16,6 @@ import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -47,7 +47,7 @@ public class SitterController {
     - 인증 불필요 (공개 API)
     - 캐시 전략: Cache-Control public, max-age=3600
     - 캐시 Key: sitters:{region}:{possiblePetType}:{possiblePetSize}:{minPrice}:{maxPrice}:{page}:{size}:{sort}
-    - 정렬 화이트리스트: createdAt(기본), pricePerHour, experienceYears
+    - 정렬 화이트리스트: createdAt(기본), pricePerHour, experienceYears, averageRating
      */
     @GetMapping
     public ResponseEntity<ApiResponse<SitterPageResponse>> search(
@@ -56,19 +56,19 @@ public class SitterController {
             @RequestParam(required = false) PossiblePetSize possiblePetSize,
             @RequestParam(required = false) Integer minPrice,
             @RequestParam(required = false) Integer maxPrice,
+            @RequestParam(required = false) MemberGender gender,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sort
+            @RequestParam(defaultValue = "createdAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction
     ) {
         SitterSearchCondition condition = new SitterSearchCondition(
-                region, possiblePetType, possiblePetSize, minPrice, maxPrice
+                region, possiblePetType, possiblePetSize, minPrice, maxPrice, gender
         );
 
-        SitterPageResponse response = sitterService.searchSitters(condition, page,size,sort);
+        SitterPageResponse response = sitterService.searchSitters(condition, page, size, sort, direction);
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
-                .body(ApiResponse.success(response));
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
 
@@ -87,9 +87,7 @@ public class SitterController {
     // 3. 시터 상세 조회 (로그인 필수)
     @GetMapping("/{sitterId}")
     public ResponseEntity<ApiResponse<SitterResponseDto>> getSitter(@PathVariable Long sitterId) {
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
-                .body(ApiResponse.success(sitterService.getSitterById(sitterId)));
+        return ResponseEntity.ok(ApiResponse.success(sitterService.getSitterById(sitterId)));
     }
 
     // 4. 내 시터 프로필 조회

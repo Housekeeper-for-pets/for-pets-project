@@ -11,13 +11,60 @@ spring:
   jpa:
     open-in-view: false
 
+  notifications:
+    # broker: direct         # v0
+    # broker: redis-stream   # v1 전환 시
+    broker: kafka          # v2 전환 시
+    kafka:
+      topic: notification-events
+      consumer-group: notification-service
+      partitions: 3
+      replicas: 1
+
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 100MB
 
+  data:
+    redis:
+      timeout: 2000ms # redis 장애시 빠른 실패처리
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 10
+          min-idle: 2
+          max-wait: 1000ms
+
 management:
   endpoints:
     web:
       exposure:
-        include: health, info
+        include: health, info, metrics, prometheus
+
+  metrics:
+    distribution:
+      percentiles:
+        coupon.issue.duration: 0.95, 0.99
+      percentiles-histogram:
+        coupon.issue.duration: true
+
+portone:
+  store-id: ${PORTONE_STORE_ID:}
+  api-secret: ${PORTONE_API_SECRET:}
+
+forpets:
+  ai:
+    rag:
+      collection-name: forpets_reviews
+      vector-size: 3072
+      search-limit: 5
+      score-threshold: 0.7
+    qdrant:
+      base-url: ${QDRANT_BASE_URL:http://localhost:6333}
+    gemini:
+      embedding-model: gemini-embedding-001
+  cache:
+    enabled: true # true(캐시활성화)/false(비활성화)
+  dummy-data:
+    enabled: false # true일 때만 더미데이터(시터·공고) 삽입 — 성능측정 시에만 사용. 평소·운영 false

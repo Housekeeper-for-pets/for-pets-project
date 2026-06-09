@@ -13,6 +13,13 @@ public enum PaymentErrorCode implements ErrorCode {
     NOT_PAYMENT_PARTY(HttpStatus.FORBIDDEN, "NOT_PAYMENT_PARTY", "결제 요청 권한이 없습니다."),
     DUPLICATE_PAYMENT_REQUEST(HttpStatus.CONFLICT, "DUPLICATE_PAYMENT_REQUEST", "이미 진행 중인 결제가 있습니다."),
     INVALID_PAYMENT_STATUS(HttpStatus.BAD_REQUEST, "INVALID_PAYMENT_STATUS", "결제 가능한 상태가 아닙니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "PAYMENT_AMOUNT_MISMATCH", "결제 금액이 일치하지 않습니다."),
+    PAYMENT_ID_MISMATCH(HttpStatus.BAD_REQUEST, "PAYMENT_ID_MISMATCH", "결제 ID가 일치하지 않습니다."),
+    PORTONE_PAYMENT_NOT_PAID(HttpStatus.BAD_REQUEST, "PORTONE_PAYMENT_NOT_PAID", "결제가 완료되지 않았습니다."),
+    PORTONE_PAYMENT_VERIFY_FAILED(HttpStatus.BAD_REQUEST, "PORTONE_PAYMENT_VERIFY_FAILED", "PortOne 결제 검증에 실패했습니다."),
+    PORTONE_PAYMENT_CANCEL_FAILED(HttpStatus.BAD_REQUEST, "PORTONE_PAYMENT_CANCEL_FAILED", "PortOne 결제 취소에 실패했습니다."),
+    PAYMENT_LOCK_FAILED(HttpStatus.CONFLICT, "PAYMENT_LOCK_FAILED", "결제 처리 중입니다. 잠시 후 다시 시도해주세요."),
+    PAYMENT_EXPIRED(HttpStatus.GONE, "PAYMENT_EXPIRED", "결제 시간이 만료되었습니다. 만료 후 도착한 PG 결제는 자동 환불 처리됩니다."),
     ;
 
     private final HttpStatus status;

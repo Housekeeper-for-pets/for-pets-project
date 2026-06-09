@@ -1,7 +1,10 @@
 package com.forpets.domain.reservation.controller;
 
+import com.forpets.domain.member.entity.MemberRole;
+import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.reservation.dto.CancelReservationRequest;
 import com.forpets.domain.reservation.dto.ReservationResponseDto;
+import com.forpets.domain.reservation.entity.ReservationRole;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
@@ -28,9 +31,11 @@ public class ReservationController {
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<List<ReservationResponseDto>>> getMyReservations(
-            @LoginUser CurrentMember currentMember) {
+            @LoginUser CurrentMember currentMember,
+            @RequestParam(required = false) ReservationRole roleAs
+    ) {
         return ResponseEntity.ok(
-                ApiResponse.success(reservationService.getMyReservations(currentMember.id())));
+                ApiResponse.success(reservationService.getMyReservations(currentMember.id(), roleAs)));
     }
 
     @GetMapping("/{reservationId}")
@@ -39,19 +44,6 @@ public class ReservationController {
             @PathVariable Long reservationId) {
         return ResponseEntity.ok(
                 ApiResponse.success(reservationService.getDetail(currentMember.id(), reservationId)));
-    }
-
-    /*
-    예약 확정
-    보호자 또는 시터가 각각 호출해서 결제 진행 (V2) MVP 에서는 호출만 하면 결제를 한걸로 침
-    양쪽 다 완료되면 그 때 CONFIRMED
-     */
-    @PatchMapping("/{reservationId}/confirm")
-    public ResponseEntity<ApiResponse<ReservationResponseDto>> confirm(
-            @LoginUser CurrentMember currentMember,
-            @PathVariable Long reservationId) {
-        return ResponseEntity.ok(
-                ApiResponse.success(reservationService.confirm(currentMember.id(), reservationId)));
     }
 
     /*

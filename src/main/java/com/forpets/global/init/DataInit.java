@@ -30,10 +30,10 @@ import com.forpets.domain.reservation.repository.ReservationPaymentRepository;
 import com.forpets.domain.reservation.repository.ReservationPetRepository;
 import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.repository.ReservationTimeSlotRepository;
-import com.forpets.domain.sitter.entity.PossiblePetSize;
-import com.forpets.domain.sitter.entity.PossiblePetType;
-import com.forpets.domain.sitter.entity.SitterProfile;
-import com.forpets.domain.sitter.entity.SitterSchedule;
+import com.forpets.domain.review.entity.Review;
+import com.forpets.domain.review.repository.ReviewQueryRepository;
+import com.forpets.domain.review.repository.ReviewRepository;
+import com.forpets.domain.sitter.entity.*;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
 import com.forpets.global.common.CareType;
@@ -41,6 +41,8 @@ import com.forpets.global.embed.entity.PetSnapshot;
 import com.forpets.global.embed.entity.TimeSlotInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,8 +52,10 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.*;
 
+@Profile({"local", "docker", "prod"})
 @Component
 @RequiredArgsConstructor
+@Order(1)
 public class DataInit implements CommandLineRunner {
 
     private final MemberRepository memberRepository;
@@ -69,6 +73,8 @@ public class DataInit implements CommandLineRunner {
     private final ReservationPetRepository reservationPetRepository;
     private final ReservationTimeSlotRepository reservationTimeSlotRepository;
     private final ReservationPaymentRepository reservationPaymentRepository;
+    private final ReviewRepository reviewRepository;
+    private final ReviewQueryRepository reviewQueryRepository;
     private final PasswordEncoder passwordEncoder;
 
     // 루프 기반 생성에서 사용할 시드 (동일 데이터 재현 보장)
@@ -79,6 +85,7 @@ public class DataInit implements CommandLineRunner {
     public void run(String... args) {
         if (memberRepository.count() > 0) return;
 
+        Member adminMember = saveMember("dragonRock@test.com", "소란석", "010-0000-0000", MemberGender.MALE, Region.YONGSAN);
         // =============================================
         // 1. Member 5명 (기존)
         // =============================================
@@ -124,6 +131,10 @@ public class DataInit implements CommandLineRunner {
                 PossiblePetType.DOG, PossiblePetSize.SMALL, 15000);
         SitterProfile sitter3 = saveSitter(member4.getId(), "모든 반려동물 케어 가능합니다", 5,
                 PossiblePetType.ALL, PossiblePetSize.ALL, 20000);
+
+        sitter1.approve(1L);
+        sitter2.approve(1L);
+        sitter3.approve(1L);
 
         // =============================================
         // 4. SitterSchedule (기존)
@@ -218,48 +229,48 @@ public class DataInit implements CommandLineRunner {
         // =============================================
         // 6. Proposal (기존)
         // =============================================
-        saveProposal(post1.getId(), sitter1.getId(), member2.getId(), 45000, "구피 백마리도 키워봤어요");
-        saveProposal(post1.getId(), sitter2.getId(), member3.getId(), 50000, "제주도 사람입니다. 더 볼 거 있나요?");
-        saveProposal(post1.getId(), sitter3.getId(), member4.getId(), 48000, "근처에요");
+        saveProposal(post1.getId(), sitter1.getId(), member2.getId(), sitter1.getMemberId(),45000, "구피 백마리도 키워봤어요");
+        saveProposal(post1.getId(), sitter2.getId(), member3.getId(), sitter2.getMemberId(),50000, "제주도 사람입니다. 더 볼 거 있나요?");
+        saveProposal(post1.getId(), sitter3.getId(), member4.getId(), sitter3.getMemberId(),48000, "근처에요");
 
-        saveProposal(post2.getId(), sitter1.getId(), member2.getId(), 110000, "강아지 고양이 둘 다 경험 있습니다");
-        saveProposal(post2.getId(), sitter3.getId(), member4.getId(), 115000, "고양이 진짜 진짜 잘 놀아줘요!!");
+        saveProposal(post2.getId(), sitter1.getId(), member2.getId(), sitter1.getMemberId(),110000, "강아지 고양이 둘 다 경험 있습니다");
+        saveProposal(post2.getId(), sitter3.getId(), member4.getId(), sitter3.getMemberId(),115000, "고양이 진짜 진짜 잘 놀아줘요!!");
 
-        saveProposal(post3.getId(), sitter2.getId(), member3.getId(), 28000, "밥 맛있는걸로다가 주겠습니다~");
+        saveProposal(post3.getId(), sitter2.getId(), member3.getId(), sitter2.getMemberId(),28000, "밥 맛있는걸로다가 주겠습니다~");
 
-        Proposal proposal41 = saveProposal(post4.getId(), sitter1.getId(), member2.getId(), 60000, "다중 돌봄 경험 있습니다.");
-        saveProposal(post4.getId(), sitter2.getId(), member3.getId(), 70000, null);
+        Proposal proposal41 = saveProposal(post4.getId(), sitter1.getId(), member2.getId(), sitter1.getMemberId(),60000, "다중 돌봄 경험 있습니다.");
+        saveProposal(post4.getId(), sitter2.getId(), member3.getId(), sitter2.getMemberId(),70000, null);
 
-        saveProposal(post5.getId(), sitter3.getId(), member4.getId(), 55000, "고양이 전문이라 겁 많은 아이도 잘 다룹니다");
+        saveProposal(post5.getId(), sitter3.getId(), member4.getId(), sitter3.getMemberId(),55000, "고양이 전문이라 겁 많은 아이도 잘 다룹니다");
 
-        Proposal proposal71 = saveProposal(post7.getId(), sitter1.getId(), member2.getId(), 1000, "와 진짜 무료로도 해드리고 싶어요");
-        saveProposal(post7.getId(), sitter3.getId(), member4.getId(), 78000, "경마장 알바 경험 있습니다.");
+        Proposal proposal71 = saveProposal(post7.getId(), sitter1.getId(), member2.getId(), sitter1.getMemberId(),1000, "와 진짜 무료로도 해드리고 싶어요");
+        saveProposal(post7.getId(), sitter3.getId(), member4.getId(), sitter3.getMemberId(),78000, "경마장 알바 경험 있습니다.");
 
-        saveProposal(post10.getId(), sitter2.getId(), member3.getId(), 23000, "소형 반려동물 전문입니다");
-        Proposal proposal103 = saveProposal(post10.getId(), sitter3.getId(), member4.getId(), 24000, "오후 시간 괜찮아요");
+        saveProposal(post10.getId(), sitter2.getId(), member3.getId(), sitter2.getMemberId(),23000, "소형 반려동물 전문입니다");
+        Proposal proposal103 = saveProposal(post10.getId(), sitter3.getId(), member4.getId(), sitter3.getMemberId(),24000, "오후 시간 괜찮아요");
 
         // =============================================
         // 7. CareRequest (기존 4개)
         // =============================================
-        CareRequest request1 = saveCareRequest(member1.getId(), sitter3.getId(), CareType.VISIT,
+        CareRequest request1 = saveCareRequest(member1.getId(), sitter3.getId(), sitter3.getMemberId(), CareType.VISIT,
                 "구피 여러 마리 한꺼번에 봐주실 수 있나요?", 55000);
         saveCareRequestPet(request1.getId(), pet1);
         saveCareRequestPet(request1.getId(), pet2);
         saveCareRequestPet(request1.getId(), pet6);
         saveCareRequestTimeSlot(request1.getId(), "2026-06-18", "10:00", "14:00", 1);
 
-        CareRequest request2 = saveCareRequest(member5.getId(), sitter1.getId(), CareType.BOARDING,
+        CareRequest request2 = saveCareRequest(member5.getId(), sitter1.getId(), sitter1.getMemberId(), CareType.BOARDING,
                 "고양이 전문가시라고 해서 연락드려요", 90000);
         saveCareRequestPet(request2.getId(), pet16);
         saveCareRequestTimeSlot(request2.getId(), "2026-06-20", "00:00", "23:59", 1);
         saveCareRequestTimeSlot(request2.getId(), "2026-06-21", "00:00", "23:59", 2);
 
-        CareRequest request3 = saveCareRequest(member2.getId(), sitter3.getId(), CareType.VISIT,
+        CareRequest request3 = saveCareRequest(member2.getId(), sitter3.getId(), sitter3.getMemberId(), CareType.VISIT,
                 "하루종일 같이 있어주실 수 있나요?", 180000);
         saveCareRequestPet(request3.getId(), pet10);
         saveCareRequestTimeSlot(request3.getId(), "2026-06-25", "08:00", "20:00", 1);
 
-        CareRequest request4 = saveCareRequest(member3.getId(), sitter3.getId(), CareType.VISIT,
+        CareRequest request4 = saveCareRequest(member3.getId(), sitter3.getId(), sitter3.getMemberId(), CareType.VISIT,
                 "소형견인데 괜찮으실까요?", 35000);
         saveCareRequestPet(request4.getId(), pet11);
         saveCareRequestTimeSlot(request4.getId(), "2026-06-28", "15:00", "19:00", 1);
@@ -430,6 +441,8 @@ public class DataInit implements CommandLineRunner {
                     sitterMember.getId(), sitterIntros[i],
                     2 + random.nextInt(7), petTypes[i], petSizes[i], prices[i]
             );
+            sp.approve(1L);
+            sp.changeStatus(SitterProfileStatus.RESERVABLE);
             allSitters.add(sp);
             sitterByMemberId.put(sitterMember.getId(), sp);
         }
@@ -452,6 +465,16 @@ public class DataInit implements CommandLineRunner {
                         String.format("%02d:00", endHour));
             }
         }
+
+        saveAiReviewDemoData(
+                allSitters,
+                List.of(
+                        new DemoReviewGuardian(member1, pet1),
+                        new DemoReviewGuardian(member2, pet10),
+                        new DemoReviewGuardian(member3, pet11),
+                        new DemoReviewGuardian(member5, pet15)
+                )
+        );
 
         // =============================================
         // ★ 신규 Post 21개 (총 30개)
@@ -576,6 +599,7 @@ public class DataInit implements CommandLineRunner {
                         post.getId(),
                         sp.getId(),
                         sitterMemberId,
+                        post.getMemberId(),
                         proposedPrice,
                         proposalMessages[proposalCount % proposalMessages.length]
                 );
@@ -625,6 +649,7 @@ public class DataInit implements CommandLineRunner {
                 CareRequest cr = saveCareRequest(
                         requester.getId(),
                         targetSitter.getId(),
+                        targetSitter.getMemberId(),
                         careType,
                         careRequestMessages[careRequestCount % careRequestMessages.length],
                         price
@@ -761,7 +786,7 @@ public class DataInit implements CommandLineRunner {
 
                 // CareRequest를 먼저 만들고 그것의 ID를 sourceId로 사용
                 CareRequest cr = saveCareRequest(
-                        requester.getId(), sp.getId(), careType,
+                        requester.getId(), sp.getId(), sp.getMemberId(), careType,
                         "예약용 돌봄 요청", price
                 );
                 Pet firstPet = requesterPets.get(0);
@@ -801,6 +826,10 @@ public class DataInit implements CommandLineRunner {
                 crResCount++;
             }
         }
+
+        // saveAiReviewDemoData는 reviewRepository.save()를 직접 호출해 ReviewService를 거치지 않으므로
+        // averageRating / reviewCount가 0인 채로 남는다. 모든 시드 데이터 삽입 후 1회 일괄 재계산한다.
+        syncAllSitterReviewStats(allSitters);
     }
 
     // ===== 상태 분포 적용 =====
@@ -939,22 +968,24 @@ public class DataInit implements CommandLineRunner {
         ));
     }
 
-    private Proposal saveProposal(Long postId, Long sitterProfileId, Long memberId,
+    private Proposal saveProposal(Long postId, Long sitterProfileId, Long memberId, Long sitterMemberId,
                                   Integer proposedPrice, String message) {
         return proposalRepository.save(Proposal.builder()
                 .postId(postId)
                 .sitterProfileId(sitterProfileId)
+                .sitterMemberId(sitterMemberId)
                 .memberId(memberId)
                 .proposedPrice(proposedPrice)
                 .message(message)
                 .build());
     }
 
-    private CareRequest saveCareRequest(Long memberId, Long sitterProfileId,
+    private CareRequest saveCareRequest(Long memberId, Long sitterProfileId, Long sitterMemberId,
                                         CareType careType, String message, int requestPrice) {
         return careRequestRepository.save(CareRequest.builder()
                 .memberId(memberId)
                 .sitterProfileId(sitterProfileId)
+                .sitterMemberId(sitterMemberId)
                 .careType(careType)
                 .message(message)
                 .requestPrice(requestPrice)
@@ -1014,5 +1045,122 @@ public class DataInit implements CommandLineRunner {
         return reservationPaymentRepository.save(
                 ReservationPayment.create(reservationId, price, (int) (price * 0.2))
         );
+    }
+
+    // 프론트/RAG 시연에서 리뷰 요약과 의미 기반 검색 품질을 확인할 수 있는 local seed 데이터.
+    private void saveAiReviewDemoData(List<SitterProfile> sitters, List<DemoReviewGuardian> guardians) {
+        String[] comments = {
+                "말티즈가 낯을 많이 가리는데 천천히 적응시켜주시고 사진도 자주 보내주셔서 안심됐습니다.",
+                "분리불안이 있는 아이를 차분하게 돌봐주셨어요. 산책 강도도 무리하지 않게 맞춰주셨습니다.",
+                "응답이 빠르고 케어 후 아이 상태를 자세히 알려주셔서 좋았습니다. 소형견 케어에 익숙해 보였어요.",
+                "사진 공유가 꼼꼼했고 낯가림 있는 아이를 억지로 만지지 않고 기다려주셔서 만족했습니다.",
+                "전반적으로 만족했습니다. 다만 대형견보다는 소형견 케어 후기가 더 잘 맞는 시터님이라는 인상을 받았습니다.",
+                "시간 약속은 잘 지켰지만 케어 일지가 조금 짧아서 아이 상태를 더 자세히 알고 싶었습니다.",
+                "응답은 빨랐지만 산책 후 사진 공유가 한 장뿐이라 다음에는 조금 더 자주 공유되면 좋겠습니다.",
+                "아이를 다정하게 봐주셨지만 활발한 대형견 산책에는 아직 조심스러워 보였습니다.",
+                "예약 진행은 매끄러웠지만 약속 시간보다 10분 늦게 도착해서 조금 아쉬웠습니다.",
+                "노령견이라 걱정했는데 이동 속도에 맞춰 천천히 산책해주시고 물 먹는 양도 확인해주셨습니다.",
+                "투약 보조가 필요한 아이였는데 보호자가 남긴 안내를 꼼꼼히 확인하고 시간 맞춰 챙겨주셨습니다.",
+                "고양이가 낯선 사람을 경계하는 편인데 거리를 유지하면서 화장실과 급식 상태를 잘 확인해주셨습니다.",
+                "대형견 산책 경험이 많아 보였고 리드줄 관리가 안정적이라 보호자 입장에서 믿음이 갔습니다.",
+                "케어 중간중간 짧은 영상까지 보내주셔서 아이가 편안한지 바로 확인할 수 있었습니다.",
+                "예약 전 상담은 친절했지만 실제 케어 후 피드백이 늦게 와서 기다리는 시간이 조금 불안했습니다.",
+                "아이 밥그릇 정리는 잘 되어 있었지만 장난감 정리가 덜 되어 있어 세심함은 조금 아쉬웠습니다.",
+                "산책 코스를 미리 공유해주고 더운 시간대를 피해 움직여주셔서 만족했습니다.",
+                "예민한 아이를 무리하게 안으려 하지 않고 보호자 요청대로 천천히 접근해주셨습니다.",
+                "응급 상황은 아니었지만 아이가 기침을 하자 바로 연락을 주셔서 대응이 좋았습니다.",
+                "처음 이용이라 걱정했는데 체크리스트처럼 급식, 배변, 산책 내용을 정리해주셔서 좋았습니다.",
+                "리뷰가 좋아 기대했는데 사진 수가 적고 케어 메모가 짧아 기대보다는 아쉬웠습니다.",
+                "방문 시간이 조금 들쭉날쭉해서 정해진 루틴이 중요한 아이에게는 맞지 않을 수도 있겠다고 느꼈습니다.",
+                "활발한 강아지와 오래 놀아주셨고 귀가 후에도 아이가 안정적으로 쉬고 있었습니다.",
+                "소형견 두 마리를 함께 맡겼는데 각각 성격에 맞춰 다르게 케어해주신 점이 좋았습니다.",
+                "배변 실수가 있었는데 상황과 정리 내용을 솔직하게 공유해주셔서 신뢰가 갔습니다.",
+                "가격 대비 케어는 무난했지만 특별히 자세한 관찰 기록은 부족했습니다.",
+                "예약 확정 후 질문에 대한 답변이 느려서 급하게 확인해야 하는 보호자에게는 아쉬울 수 있습니다.",
+                "아이 피부가 예민한 편이라 산책 후 발 닦는 방법을 요청드렸는데 그대로 지켜주셨습니다.",
+                "분리불안이 심한 아이였는데 보호자 냄새가 있는 담요를 활용해 안정시켜주셨습니다.",
+                "고양이 모래 상태와 물그릇 교체 여부를 사진으로 남겨주셔서 집을 비운 동안 안심됐습니다."
+        };
+
+        int reviewIndex = 0;
+        for (SitterProfile sitter : sitters) {
+            int savedCount = 0;
+            int guardianIndex = 0;
+            while (savedCount < 10 && guardianIndex < guardians.size() * 4) {
+                DemoReviewGuardian guardian = guardians.get(guardianIndex % guardians.size());
+                guardianIndex++;
+
+                if (guardian.member().getId().equals(sitter.getMemberId())) {
+                    continue;
+                }
+
+                LocalDate careDate = LocalDate.of(2026, 4, 1).plusDays(reviewIndex);
+                int startHour = 9 + (reviewIndex % 5);
+                saveCompletedReservationReview(
+                        guardian.member(),
+                        sitter,
+                        guardian.pet(),
+                        careDate.toString(),
+                        String.format("%02d:00", startHour),
+                        String.format("%02d:00", startHour + 3),
+                        40000 + (reviewIndex % 6) * 5000,
+                        comments[reviewIndex % comments.length],
+                        resolveDemoReviewRating(reviewIndex)
+                );
+
+                reviewIndex++;
+                savedCount++;
+            }
+        }
+    }
+
+    private int resolveDemoReviewRating(int reviewIndex) {
+        return switch (reviewIndex % 12) {
+            case 5, 6, 7, 10 -> 4;
+            case 8, 11 -> 3;
+            case 9 -> 2;
+            default -> 5;
+        };
+    }
+
+    private void saveCompletedReservationReview(Member guardian, SitterProfile sitter, Pet pet,
+                                                String careDate, String startTime, String endTime,
+                                                int price, String reviewComment, int rating) {
+        Reservation reservation = saveReservation(
+                guardian.getId(),
+                sitter.getMemberId(),
+                sitter.getId(),
+                CareType.VISIT,
+                ReservationSource.CARE_REQUEST,
+                0L,
+                price
+        );
+        saveReservationPet(reservation.getId(), pet);
+        saveReservationTimeSlot(reservation.getId(), careDate, startTime, endTime, 1);
+
+        ReservationPayment payment = saveReservationPayment(reservation.getId(), price);
+        payment.guardianConfirm();
+        payment.sitterConfirm();
+
+        reservation.confirm();
+        reservation.complete();
+
+        reviewRepository.save(Review.builder()
+                .reservationId(reservation.getId())
+                .reviewerId(guardian.getId())
+                .revieweeId(sitter.getMemberId())
+                .reviewComment(reviewComment)
+                .rating(rating)
+                .build());
+    }
+
+    private void syncAllSitterReviewStats(List<SitterProfile> sitters) {
+        for (SitterProfile sitter : sitters) {
+            var stats = reviewQueryRepository.calculateSitterReviewStats(sitter.getMemberId());
+            sitter.updateReviewStats(stats.averageRating(), (int) stats.reviewCount());
+        }
+    }
+
+    private record DemoReviewGuardian(Member member, Pet pet) {
     }
 }

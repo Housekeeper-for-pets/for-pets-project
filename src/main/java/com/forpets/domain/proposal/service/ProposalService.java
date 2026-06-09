@@ -1,12 +1,12 @@
 package com.forpets.domain.proposal.service;
 
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
+import com.forpets.domain.notification.event.NotificationEvent;
 import com.forpets.domain.post.entity.Post;
 import com.forpets.domain.post.entity.PostPet;
-import com.forpets.domain.post.entity.PostStatus;
 import com.forpets.domain.post.entity.PostTimeSlot;
 import com.forpets.domain.post.exception.PostErrorCode;
 import com.forpets.domain.post.exception.PostException;
-import com.forpets.domain.post.repository.PostRepository;
 import com.forpets.domain.post.service.PostService;
 import com.forpets.domain.proposal.dto.CreateProposalRequest;
 import com.forpets.domain.proposal.dto.ProposalResponseDto;
@@ -15,11 +15,14 @@ import com.forpets.domain.proposal.entity.ProposalStatus;
 import com.forpets.domain.proposal.exception.ProposalErrorCode;
 import com.forpets.domain.proposal.exception.ProposalException;
 import com.forpets.domain.proposal.repository.ProposalRepository;
+import com.forpets.domain.reservation.exception.ReservationErrorCode;
+import com.forpets.domain.reservation.exception.ReservationException;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
+import com.forpets.domain.sitter.exception.SitterErrorCode;
+import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.service.SitterService;
-import com.forpets.global.exception.BusinessException;
-import com.forpets.global.exception.CommonErrorCode;
+import com.forpets.global.sse.SseEventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,10 +36,13 @@ import java.util.List;
 @Slf4j
 public class ProposalService {
 
+    private static final String NAME = ProposalService.class.getSimpleName();
+
     private final ProposalRepository proposalRepository;
     private final SitterService sitterService;
     private final ReservationService reservationService;
     private final PostService postService;
+    private final NotificationMessageBroker notificationBroker;
 
 
     // ===== API =====
@@ -53,27 +59,40 @@ public class ProposalService {
     public ProposalResponseDto create(Long memberId, Long postId, CreateProposalRequest request) {
         Post post = postService.findById(postId);
         validatePostOpen(post);
+        // 본인 공고 검증을 먼저 수행: 시터 프로필 조회/중복 검증 비용 절감 +
+        // 시터 프로필 없는 작성자가 본인 공고에 제안 시도 시 명확한 메시지("본인 공고에 제안할 수 없습니다") 노출
         validateNotOwnPost(memberId, post);
 
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         validateNoDuplicate(postId, sitter.getId());
         // 정책 수정으로 CONFIRMED 예약이 있어도 Proposal 은 언제든 받을 수 있음
+
+
+        List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(postId);
+        if (reservationService.hasConfirmedConflict(sitter.getId(), postTimeSlots)) {
+            throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
+        }
 
         Proposal proposal = proposalRepository.save(Proposal.builder()
                 .postId(postId)
                 .sitterProfileId(sitter.getId())
+                .sitterMemberId(sitter.getMemberId())
                 .memberId(memberId)
                 .proposedPrice(request.proposedPrice())
                 .message(request.message())
                 .build());
 
-        /*
-         V2: 등록 후 Event send 하는 로직 추가
-         Kafka 로 Post 의 proposal 개수 저장 (모니터링)
-         sitter 에게 메시지 : 제안이 등록되었습니다.
-         공고 작성자에게 메시지 : 새로운 제안이 들어왔습니다.
-         ... 또 뭐가 있을까
-         */
+        // 보호자에게 "새 제안 도착" 알림
+        notificationBroker.publish(NotificationEvent.of(
+                post.getMemberId(),
+                memberId,
+                SseEventType.PROPOSAL_ARRIVED,
+                "새로운 제안이 도착했습니다.",
+                proposal.getId(),
+                "PROPOSAL"
+        ));
+        log.info("{} => 제안 등록 알림 발행: postId={}, guardianId={}",
+                NAME, postId, post.getMemberId());
 
         return ProposalResponseDto.from(proposal);
     }
@@ -98,7 +117,7 @@ public class ProposalService {
     시터 본인의 제안만 조회
      */
     public List<ProposalResponseDto> getMyProposals(Long memberId) {
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
 
         return proposalRepository.findAllBySitterProfileId(sitter.getId()).stream()
                 .map(ProposalResponseDto::from)
@@ -137,23 +156,34 @@ public class ProposalService {
 //        Post post = findPost(proposal.getPostId());
         Post post = postService.findById(proposal.getPostId());
 
-        SitterProfile sitterProfile = sitterService.findById(proposal.getSitterProfileId());
+        SitterProfile sitterProfile = sitterService.findApprovedById(proposal.getSitterProfileId());
         validatePostAuthor(memberId, post);
+        // accept 가능한 예약이 존재하는 시점은 어차피 OPEN 밖에 없다
         validatePostOpen(post);
 
-        // 제안 채택
+        List<PostPet> postPets = postService.findPetsByPostId(post.getId());
+        List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(post.getId());
+
+        // 어차피 한 예약이 확정되고 나면 겹치는 예약들은 withdraw 처리 되니까 이 로직이 실행 될 일은 없음
+        if (reservationService.hasConfirmedConflict(sitterProfile.getId(), postTimeSlots)) {
+            throw new ReservationException(ReservationErrorCode.RESERVATION_CONFLICT);
+        }
+
         proposal.accept();
 
-        log.info("[ProposalService] PENDING 상태의 예약 생성");
+        reservationService.createFromProposal(proposal, post, sitterProfile.getMemberId(), postPets, postTimeSlots);
 
-        // Reservation 자동 생성
-        // 동기 처리로 구현하는게 좋을듯 나중에 주석 빼기
-
-         List<PostPet> postPets = postService.findPetsByPostId(post.getId());
-         List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(post.getId());
-         reservationService.createFromProposal(proposal, post, sitterProfile.getMemberId(), postPets, postTimeSlots);
-
-        // 비동기 처리 (eventListener 또는 kafka) 는 알림이나 로그.. 같은거 작성 할 때 쓰자 ~
+        // 시터에게 "제안 수락, 예약 생성" 알림
+        notificationBroker.publish(NotificationEvent.of(
+                sitterProfile.getMemberId(),   // 시터 (받는 사람)
+                memberId,                      // 보호자 (수락한 사람)
+                SseEventType.MATCHING_CONFIRMED,
+                "보호자가 제안을 수락했습니다. 예약이 생성되었습니다.",
+                proposal.getId(),
+                "PROPOSAL"
+        ));
+        log.info("{} => 제안 수락 알림 발행: sitterMemberId={}, proposalId={}",
+                NAME, sitterProfile.getMemberId(), proposalId);
 
         return ProposalResponseDto.from(proposal);
     }
@@ -187,7 +217,7 @@ public class ProposalService {
         Proposal proposal = findById(proposalId);
         validatePending(proposal);
 
-        SitterProfile sitter = sitterService.findByMemberId(memberId);
+        SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         validateProposalOwner(sitter.getId(), proposal);
 
         proposal.withdraw();
@@ -200,14 +230,6 @@ public class ProposalService {
     public Proposal findById(Long proposalId) {
         return proposalRepository.findById(proposalId)
                 .orElseThrow(() -> new ProposalException(ProposalErrorCode.PROPOSAL_NOT_FOUND));
-    }
-
-    /*
-    PostService에서 사용 — 공고 수정 시 PENDING/ACCEPTED Proposal 존재 여부 확인
-     */
-    public boolean existsPendingOrAcceptedByPostId(Long postId) {
-        return proposalRepository.existsByPostIdAndStatusIn(
-                postId, List.of(ProposalStatus.PENDING, ProposalStatus.ACCEPTED));
     }
 
     private void validatePostOpen(Post post) {
@@ -227,7 +249,7 @@ public class ProposalService {
     잘못 보낸 제안이 있으면 취소하고 다시 넣을 수 있으면 좋으니까 -> 수정 안 만들어도 됨
      */
     private void validateNoDuplicate(Long postId, Long sitterProfileId) {
-        if (proposalRepository.existsByPostIdAndSitterProfileId(postId, sitterProfileId)) {
+        if (proposalRepository.existsByPostIdAndSitterProfileIdAndStatus(postId, sitterProfileId, ProposalStatus.PENDING)) {
             throw new ProposalException(ProposalErrorCode.DUPLICATE_PROPOSAL);
         }
     }
@@ -253,14 +275,14 @@ public class ProposalService {
         Post post = postService.findById(proposal.getPostId());
 
 
-        if (!post.isOwnedBy(memberId) && !proposal.getMemberId().equals(memberId)) {
+        if (!post.isOwnedBy(memberId) && !proposal.getSitterMemberId().equals(memberId)) {
             throw new ProposalException(ProposalErrorCode.NOT_PROPOSAL_PARTY);
         }
     }
 
     private void validateProposalOwner(Long sitterProfileId, Proposal proposal) {
         if (!proposal.isOwnedBySitter(sitterProfileId)) {
-            throw new ProposalException(ProposalErrorCode.NOT_PROPOSAL_PARTY);
+            throw new ProposalException(ProposalErrorCode.NOT_PROPOSAL_OWNER);
         }
     }
 
@@ -274,13 +296,4 @@ public class ProposalService {
                 .filter(p -> !p.getId().equals(acceptedProposalId))
                 .forEach(Proposal::reject);
     }
-
-    /*
-    PostService 와 ProposalService 사이에 순환참조 발생
-    -> ProposalService 에서 PostRepository 를 직접 참조하도록 함
-     */
-//    private Post findPost(Long postId) {
-//        return postRepository.findById(postId)
-//                .orElseThrow(() -> new BusinessException(CommonErrorCode.POST_NOT_FOUND));
-//    }
 }
