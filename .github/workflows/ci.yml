@@ -112,6 +112,11 @@ jobs:
               exit 1
             fi
 
+            if [ -z "${{ secrets.REDIS_HOST }}" ]; then
+              echo "❌ REDIS_HOST secret이 비어있습니다. ElastiCache Redis 엔드포인트를 GitHub Secrets에 등록해야 합니다."
+              exit 1
+            fi
+
             # ECR 로그인
             aws ecr get-login-password --region ap-northeast-2 \
               | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
@@ -180,6 +185,9 @@ jobs:
               -e JWT_REFRESH_TOKEN_VALIDITY_TIME="${{ secrets.JWT_REFRESH_TOKEN_VALIDITY_TIME }}" \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_NOTIFICATIONS_BROKER=direct \
+              -e SPRING_DATA_REDIS_HOST="${{ secrets.REDIS_HOST }}" \
+              -e SPRING_DATA_REDIS_PORT="${{ secrets.REDIS_PORT || '6379' }}" \
+              -e SPRING_DATA_REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
               -e SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/ \
               "$IMAGE_URI"
 
