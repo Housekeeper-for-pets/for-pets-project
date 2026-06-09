@@ -3,6 +3,7 @@ package com.forpets.global.init;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,7 +18,7 @@ import java.util.Random;
 /**
  * PET-214: 인덱스 효과 검증용 더미 데이터 삽입 — post (건수: DummyDataConstants.TARGET_COUNT)
  *
- * 실행 조건: spring.profiles.active=local
+ * 실행 조건: local 프로파일 + forpets.dummy-data.enabled=true (성능측정 시에만 활성화)
  * SitterDummyDataInserter(@Order(2)) 이후에 실행됩니다.
  *
  * [rewriteBatchedStatements 안내]
@@ -35,6 +36,7 @@ import java.util.Random;
 @Slf4j
 @Component
 @Profile("local")
+@ConditionalOnProperty(name = "forpets.dummy-data.enabled", havingValue = "true")
 @Order(3)
 @RequiredArgsConstructor
 public class PostDummyDataInserter implements CommandLineRunner {

@@ -3,6 +3,7 @@ package com.forpets.global.init;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,7 +21,7 @@ import java.util.Set;
 /**
  * PET-214: 인덱스 효과 검증용 더미 데이터 삽입 — sitter_profile (건수: DummyDataConstants.TARGET_COUNT)
  *
- * 실행 조건: spring.profiles.active=local
+ * 실행 조건: local 프로파일 + forpets.dummy-data.enabled=true (성능측정 시에만 활성화)
  *
  * [rewriteBatchedStatements 안내]
  * 배치 INSERT 성능을 최대화하려면 DataSource URL에 아래 파라미터를 추가하세요:
@@ -43,6 +44,7 @@ import java.util.Set;
 @Slf4j
 @Component
 @Profile("local")
+@ConditionalOnProperty(name = "forpets.dummy-data.enabled", havingValue = "true")
 @Order(2)
 @RequiredArgsConstructor
 public class SitterDummyDataInserter implements CommandLineRunner {

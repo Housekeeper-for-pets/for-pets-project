@@ -66,3 +66,5 @@ forpets:
       embedding-model: text-embedding-004
   cache:
     enabled: true # true(캐시활성화)/false(비활성화)
+  dummy-data:
+    enabled: false # true일 때만 더미데이터(시터·공고) 삽입 — 성능측정 시에만 사용. 평소·운영 false
