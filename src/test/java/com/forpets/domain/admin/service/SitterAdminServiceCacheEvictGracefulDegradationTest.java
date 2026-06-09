@@ -4,6 +4,7 @@ import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.entity.MemberGender;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.member.service.MemberService;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
 import com.forpets.domain.sitter.dto.admin.AdminSitterResponseDto;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
@@ -97,6 +98,11 @@ class SitterAdminServiceCacheEvictGracefulDegradationTest {
         @Bean
         MemberService memberService() {
             return mock(MemberService.class);
+        }
+
+        @Bean
+        NotificationMessageBroker notificationMessageBroker() {
+            return mock(NotificationMessageBroker.class);
         }
 
         @Bean

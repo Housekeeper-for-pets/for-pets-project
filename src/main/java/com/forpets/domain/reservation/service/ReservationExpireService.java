@@ -2,12 +2,15 @@ package com.forpets.domain.reservation.service;
 
 import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.repository.CareRequestRepository;
+import com.forpets.domain.notification.broker.NotificationMessageBroker;
+import com.forpets.domain.notification.event.NotificationEvent;
 import com.forpets.domain.payment.service.PaymentRefundService;
 import com.forpets.domain.proposal.entity.Proposal;
 import com.forpets.domain.proposal.repository.ProposalRepository;
 import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.entity.ReservationSource;
 import com.forpets.domain.reservation.repository.ReservationRepository;
+import com.forpets.global.sse.SseEventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,7 @@ public class ReservationExpireService {
     private final PaymentRefundService paymentRefundService;
     private final ProposalRepository proposalRepository;
     private final CareRequestRepository careRequestRepository;
+    private final NotificationMessageBroker notificationBroker;
 
     @Transactional
     public void expireOne(Long reservationId) {
@@ -65,8 +69,32 @@ public class ReservationExpireService {
         paymentRefundService.refundPaidPayments(reservationId, EXPIRE_REFUND_REASON);
         paymentRefundService.expireNonPaidPayments(reservationId);
         restoreSource(reservation);
+        sendReservationExpiredNotifications(reservation);
 
         log.info("[ReservationExpireService] 만료 처리 완료 reservationId={}", reservationId);
+    }
+
+    private void sendReservationExpiredNotifications(Reservation reservation) {
+        notificationBroker.publish(NotificationEvent.of(
+                reservation.getGuardianId(),
+                null,
+                SseEventType.RESERVATION_EXPIRED,
+                "예약 결제 제한 시간이 초과되어 예약이 만료되었습니다.",
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        notificationBroker.publish(NotificationEvent.of(
+                reservation.getSitterMemberId(),
+                null,
+                SseEventType.RESERVATION_EXPIRED,
+                "예약 결제 제한 시간이 초과되어 예약이 만료되었습니다.",
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        log.info("[ReservationExpireService] 예약 만료 알림 발행 reservationId={}, guardianId={}, sitterMemberId={}",
+                reservation.getId(), reservation.getGuardianId(), reservation.getSitterMemberId());
     }
 
     private void restoreSource(Reservation reservation) {
