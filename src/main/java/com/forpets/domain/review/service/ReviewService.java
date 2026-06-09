@@ -22,7 +22,9 @@ import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.service.SitterCacheService;
+import com.forpets.global.monitoring.TrackExecutionTime;
 import com.vane.badwordfiltering.BadWordFiltering;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -49,8 +51,10 @@ public class ReviewService {
     private final SitterProfileRepository sitterProfileRepository;
     private final SitterCacheService sitterCacheService;
     private final AiReviewSummaryStaleService aiReviewSummaryStaleService;
+    private final MeterRegistry meterRegistry;
     private final BadWordFiltering badWordFiltering = new BadWordFiltering();
 
+    @TrackExecutionTime("review.create")
     @Transactional
     public ReviewResponse create(Long memberId, CreateReviewRequest request) {
         Reservation reservation = reservationRepository.findById(request.reservationId())
@@ -77,6 +81,7 @@ public class ReviewService {
         return ReviewResponse.from(review);
     }
 
+    @TrackExecutionTime("review.delete")
     @Transactional
     public void delete(Long memberId, Long reviewId) {
         Review review = reviewRepository.findById(reviewId)
@@ -208,6 +213,7 @@ public class ReviewService {
 
     private void validateBadWord(String reviewComment) {
         if (badWordFiltering.check(reviewComment)) {
+            meterRegistry.counter("review.blocked.total", "reason", "badword").increment();
             throw new ReviewException(ReviewErrorCode.CONTAIN_BAD_WORD);
         }
     }

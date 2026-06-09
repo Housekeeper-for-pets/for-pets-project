@@ -3,6 +3,7 @@ package com.forpets.domain.post.service;
 import com.forpets.domain.post.dto.PostPageResponse;
 import com.forpets.domain.post.dto.PostSearchCondition;
 import com.forpets.domain.post.repository.PostRepository;
+import com.forpets.global.monitoring.TrackExecutionTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
@@ -16,6 +17,7 @@ public class PostCacheService {
 
     private final PostRepository postRepository;
 
+    @TrackExecutionTime("post.search")
     @Cacheable(
             cacheNames = "postings",
             keyGenerator = "postCacheKeyGenerator",
