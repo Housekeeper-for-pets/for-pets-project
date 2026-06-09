@@ -30,11 +30,13 @@ public class GeminiRagEmbeddingClient implements RagEmbeddingClient {
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final String embeddingModel;
+    private final Integer outputDimensionality;
 
     public GeminiRagEmbeddingClient(
             ObjectMapper objectMapper,
             @Value("${GEMINI_API_KEY:}") String apiKey,
-            @Value("${forpets.ai.gemini.embedding-model:text-embedding-004}") String embeddingModel,
+            @Value("${forpets.ai.gemini.embedding-model:gemini-embedding-001}") String embeddingModel,
+            @Value("${forpets.ai.rag.vector-size:768}") Integer outputDimensionality,
             @Value("${forpets.ai.gemini.connect-timeout-ms:2000}") Long connectTimeoutMs,
             @Value("${forpets.ai.gemini.read-timeout-ms:5000}") Long readTimeoutMs
     ) {
@@ -44,6 +46,7 @@ public class GeminiRagEmbeddingClient implements RagEmbeddingClient {
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.embeddingModel = embeddingModel;
+        this.outputDimensionality = outputDimensionality;
     }
 
     private SimpleClientHttpRequestFactory requestFactory(Long connectTimeoutMs, Long readTimeoutMs) {
@@ -90,6 +93,10 @@ public class GeminiRagEmbeddingClient implements RagEmbeddingClient {
                 "model", "models/" + embeddingModel,
                 "content", Map.of(
                         "parts", List.of(Map.of("text", text))
+                ),
+                "embedContentConfig", Map.of(
+                        "outputDimensionality", outputDimensionality,
+                        "autoTruncate", true
                 )
         );
     }

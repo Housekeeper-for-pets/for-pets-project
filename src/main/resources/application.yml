@@ -57,13 +57,13 @@ forpets:
   ai:
     rag:
       collection-name: forpets_reviews
-      vector-size: 768
+      vector-size: 3072
       search-limit: 5
       score-threshold: 0.7
     qdrant:
       base-url: ${QDRANT_BASE_URL:http://localhost:6333}
     gemini:
-      embedding-model: text-embedding-004
+      embedding-model: gemini-embedding-001
   cache:
     enabled: true # true(캐시활성화)/false(비활성화)
   dummy-data:
