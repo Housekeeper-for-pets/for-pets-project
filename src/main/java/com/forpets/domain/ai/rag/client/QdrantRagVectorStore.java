@@ -58,21 +58,15 @@ public class QdrantRagVectorStore implements RagVectorStore {
     @Override
     public void initializeCollection() {
         try {
-            restClient.put()
-                    .uri("/collections/{collectionName}", collectionName)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of(
-                            "vectors", Map.of(
-                                    "size", vectorSize,
-                                    "distance", "Cosine"
-                            )
-                    ))
-                    .retrieve()
-                    .toBodilessEntity();
+            if (collectionExistsWithExpectedVectorSize()) {
+                return;
+            }
+            createCollection();
         } catch (HttpClientErrorException exception) {
             if (exception.getStatusCode() == HttpStatus.CONFLICT) {
-                log.debug("Qdrant collection already exists. collection={}", collectionName);
-                return;
+                if (collectionExistsWithExpectedVectorSize()) {
+                    return;
+                }
             }
             log.warn("Qdrant collection 초기화 실패. collection={}, message={}", collectionName, exception.getMessage(), exception);
             throw new AiRagException(AiRagErrorCode.RAG_INDEX_FAILED);
@@ -80,6 +74,72 @@ public class QdrantRagVectorStore implements RagVectorStore {
             log.warn("Qdrant collection 초기화 실패. collection={}, message={}", collectionName, exception.getMessage(), exception);
             throw new AiRagException(AiRagErrorCode.RAG_INDEX_FAILED);
         }
+    }
+
+    private boolean collectionExistsWithExpectedVectorSize() {
+        try {
+            String rawResponse = restClient.get()
+                    .uri("/collections/{collectionName}", collectionName)
+                    .retrieve()
+                    .body(String.class);
+
+            Integer existingVectorSize = extractVectorSize(rawResponse);
+            if (vectorSize.equals(existingVectorSize)) {
+                log.debug("Qdrant collection already exists. collection={}, vectorSize={}", collectionName, vectorSize);
+                return true;
+            }
+
+            log.info("Qdrant collection vector size mismatch. collection={}, expected={}, actual={}. Recreating collection.",
+                    collectionName, vectorSize, existingVectorSize);
+            deleteCollection();
+            return false;
+        } catch (HttpClientErrorException exception) {
+            if (exception.getStatusCode() == HttpStatus.NOT_FOUND) {
+                return false;
+            }
+            throw exception;
+        } catch (Exception exception) {
+            log.warn("Qdrant collection 조회 실패. collection={}, message={}", collectionName, exception.getMessage(), exception);
+            throw new AiRagException(AiRagErrorCode.RAG_INDEX_FAILED);
+        }
+    }
+
+    private Integer extractVectorSize(String rawResponse) {
+        try {
+            JsonNode vectors = objectMapper.readTree(rawResponse)
+                    .path("result")
+                    .path("config")
+                    .path("params")
+                    .path("vectors");
+            if (vectors.path("size").isNumber()) {
+                return vectors.path("size").asInt();
+            }
+        } catch (Exception exception) {
+            log.warn("Qdrant collection vector size 파싱 실패. collection={}, message={}",
+                    collectionName, exception.getMessage(), exception);
+        }
+        return null;
+    }
+
+    private void createCollection() {
+        restClient.put()
+                .uri("/collections/{collectionName}", collectionName)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(
+                        "vectors", Map.of(
+                                "size", vectorSize,
+                                "distance", "Cosine"
+                        )
+                ))
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    private void deleteCollection() {
+        restClient.delete()
+                .uri("/collections/{collectionName}", collectionName)
+                .retrieve()
+                .toBodilessEntity();
     }
 
     @Override

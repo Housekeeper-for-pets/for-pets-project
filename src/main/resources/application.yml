@@ -52,7 +52,7 @@ forpets:
   ai:
     rag:
       collection-name: forpets_reviews
-      vector-size: 768
+      vector-size: 3072
       search-limit: 5
       score-threshold: 0.7
     qdrant:
