@@ -6,9 +6,12 @@ import com.forpets.domain.post.dto.PostPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import com.forpets.global.cache.GracefulDegradationCacheErrorHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.interceptor.CacheErrorHandler;
+import org.springframework.cache.support.NoOpCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -34,20 +37,30 @@ public class RedisCacheConfig implements CachingConfigurer {//errorHandler 오�
 
     @Bean
     @Primary
-    public RedisCacheManager longTtlCacheManager(
+    public CacheManager longTtlCacheManager(
             RedisConnectionFactory redisConnectionFactory,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            @Value("${forpets.cache.enabled:true}") boolean cacheEnabled
     ) {
+        if (!cacheEnabled) {
+            log.warn("[CACHE_DISABLED] longTtlCacheManager -> NoOpCacheManager (측정 모드, forpets.cache.enabled=false)");
+            return new NoOpCacheManager();
+        }
         return RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(redisCacheConfiguration(objectMapper, this::longTtl))
                 .build();
     }
 
     @Bean
-    public RedisCacheManager shortTtlCacheManager(
+    public CacheManager shortTtlCacheManager(
             RedisConnectionFactory redisConnectionFactory,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            @Value("${forpets.cache.enabled:true}") boolean cacheEnabled
     ) {
+        if (!cacheEnabled) {
+            log.warn("[CACHE_DISABLED] shortTtlCacheManager -> NoOpCacheManager (측정 모드, forpets.cache.enabled=false)");
+            return new NoOpCacheManager();
+        }
         return RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(redisCacheConfiguration(objectMapper, this::shortTtl))
                 .build();

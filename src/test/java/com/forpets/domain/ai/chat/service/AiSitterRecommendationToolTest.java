@@ -62,7 +62,7 @@ class AiSitterRecommendationToolTest {
         );
 
         given(sitterService.searchSitters(
-                eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null)),
+                eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null, null)),
                 eq(0),
                 eq(3),
                 eq("createdAt"),
@@ -88,7 +88,7 @@ class AiSitterRecommendationToolTest {
         );
 
         given(sitterService.searchSitters(
-                eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null)),
+                eq(new SitterSearchCondition(Region.MAPO, PossiblePetType.DOG, PossiblePetSize.SMALL, null, null, null)),
                 eq(0),
                 eq(3),
                 eq("createdAt"),
@@ -138,6 +138,8 @@ class AiSitterRecommendationToolTest {
                 1L,
                 3L,
                 Region.MAPO,
+                null,
+                null,
                 "소형견 케어 경험이 많습니다.",
                 3,
                 PossiblePetType.DOG,

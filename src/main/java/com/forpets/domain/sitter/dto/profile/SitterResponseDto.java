@@ -1,5 +1,6 @@
 package com.forpets.domain.sitter.dto.profile;
 
+import com.forpets.domain.member.entity.MemberGender;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.dto.schedule.ScheduleResponseDto;
 import com.forpets.domain.sitter.entity.*;
@@ -12,6 +13,8 @@ public record SitterResponseDto(
         Long id,
         Long memberId,
         Region region,
+        String nickname,
+        MemberGender gender,
         String introduction,
         Integer experienceYears,
         PossiblePetType possiblePetType,
@@ -26,15 +29,17 @@ public record SitterResponseDto(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
-    public static SitterResponseDto from(SitterProfile sitter, Region region) {
-        return from(sitter, region, List.of());
+    public static SitterResponseDto from(SitterProfile sitter, Region region, String nickname, MemberGender gender) {
+        return from(sitter, region, nickname, gender, List.of());
     }
 
-    public static SitterResponseDto from(SitterProfile sitter, Region region, List<SitterSchedule> schedules) {
+    public static SitterResponseDto from(SitterProfile sitter, Region region, String nickname, MemberGender gender, List<SitterSchedule> schedules) {
         return new SitterResponseDto(
                 sitter.getId(),
                 sitter.getMemberId(),
                 region,
+                nickname,
+                gender,
                 sitter.getIntroduction(),
                 sitter.getExperienceYears(),
                 sitter.getPossiblePetType(),

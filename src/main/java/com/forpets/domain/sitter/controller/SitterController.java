@@ -1,5 +1,6 @@
 package com.forpets.domain.sitter.controller;
 
+import com.forpets.domain.member.entity.MemberGender;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.sitter.dto.profile.CreateSitterRequest;
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
@@ -55,13 +56,14 @@ public class SitterController {
             @RequestParam(required = false) PossiblePetSize possiblePetSize,
             @RequestParam(required = false) Integer minPrice,
             @RequestParam(required = false) Integer maxPrice,
+            @RequestParam(required = false) MemberGender gender,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sort,
             @RequestParam(defaultValue = "desc") String direction
     ) {
         SitterSearchCondition condition = new SitterSearchCondition(
-                region, possiblePetType, possiblePetSize, minPrice, maxPrice
+                region, possiblePetType, possiblePetSize, minPrice, maxPrice, gender
         );
 
         SitterPageResponse response = sitterService.searchSitters(condition, page, size, sort, direction);

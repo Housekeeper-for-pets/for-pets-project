@@ -308,7 +308,7 @@ class SitterServiceTest {
             assertThatThrownBy(() -> sitterService.getMyProfile(member2Id))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
-                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+                            .isEqualTo(SitterErrorCode.SITTER_PROFILE_REQUIRED));
         }
     }
 
@@ -358,7 +358,7 @@ class SitterServiceTest {
             assertThatThrownBy(() -> sitterService.update(member2Id, request))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
-                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+                            .isEqualTo(SitterErrorCode.SITTER_PROFILE_REQUIRED));
         }
     }
 
@@ -431,7 +431,7 @@ class SitterServiceTest {
             assertThatThrownBy(() -> sitterService.updateStatus(member2Id, request))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
-                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+                            .isEqualTo(SitterErrorCode.SITTER_PROFILE_REQUIRED));
         }
     }
 
@@ -486,7 +486,7 @@ class SitterServiceTest {
             assertThatThrownBy(() -> sitterService.delete(member2Id))
                     .isInstanceOf(SitterException.class)
                     .satisfies(ex -> assertThat(((SitterException) ex).getErrorCode())
-                            .isEqualTo(SitterErrorCode.SITTER_NOT_FOUND));
+                            .isEqualTo(SitterErrorCode.SITTER_PROFILE_REQUIRED));
         }
     }
 
@@ -498,7 +498,7 @@ class SitterServiceTest {
         @DisplayName("[성공] 기본 조회 요청은 페이지 기본값과 createdAt 정렬로 repository에 위임된다")
         void search_sitters_test_01() {
             // given
-            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null, null);
             SitterPageResponse response = SitterPageResponse.of(List.of(), 0, 0, 0, 10);
             //given(sitterProfileRepository.searchSitters(eq(condition), any())).willReturn(response);
             given(sitterCacheService.searchSitters(eq(condition), eq(0), eq(10), eq("createdAt"), eq("desc")))
@@ -517,7 +517,7 @@ class SitterServiceTest {
         @DisplayName("[성공] 허용된 정렬 필드 pricePerHour, experienceYears는 조회 가능하다")
         void search_sitters_test_02() {
             // given
-            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null, null);
 //            given(sitterProfileRepository.searchSitters(eq(condition), any()))
 //                    .willReturn(SitterPageResponse.of(List.of(), 0, 0, 0, 10));
             given(sitterCacheService.searchSitters(eq(condition), eq(0), eq(10), anyString(), anyString()))
@@ -537,7 +537,7 @@ class SitterServiceTest {
         @DisplayName("[실패] 허용되지 않은 sort 필드는 INVALID_SORT_FIELD를 반환한다")
         void search_sitters_test_03() {
             // given
-            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null, null);
 
             // when & then
             assertThatThrownBy(() -> sitterService.searchSitters(condition, 0, 10, "hacked", "desc"))
@@ -551,7 +551,7 @@ class SitterServiceTest {
         @DisplayName("[실패] page가 음수이면 INVALID_PAGE_REQUEST를 반환한다")
         void search_sitters_test_04() {
             // given
-            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null, null);
 
             // when & then
             assertThatThrownBy(() -> sitterService.searchSitters(condition, -1, 10, "createdAt", "desc"))
@@ -565,7 +565,7 @@ class SitterServiceTest {
         @DisplayName("[실패] size가 0이면 INVALID_PAGE_REQUEST를 반환한다")
         void search_sitters_test_05() {
             // given
-            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null, null);
 
             // when & then
             assertThatThrownBy(() -> sitterService.searchSitters(condition, 0, 0, "createdAt", "desc"))
@@ -579,7 +579,7 @@ class SitterServiceTest {
         @DisplayName("[실패] size가 최대값을 초과하면 INVALID_PAGE_REQUEST를 반환한다")
         void search_sitters_test_06() {
             // given
-            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null, null);
 
             // when & then
             assertThatThrownBy(() -> sitterService.searchSitters(condition, 0, 51, "createdAt", "desc"))
@@ -593,7 +593,7 @@ class SitterServiceTest {
         @DisplayName("[실패] minPrice가 maxPrice보다 크면 INVALID_SEARCH_CONDITION을 반환한다")
         void search_sitters_test_07() {
             // given
-            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, 50000, 10000);
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, 50000, 10000, null);
 
             // when & then
             assertThatThrownBy(() -> sitterService.searchSitters(condition, 0, 10, "createdAt", "desc"))
@@ -607,7 +607,7 @@ class SitterServiceTest {
         @DisplayName("[성공] sort=averageRating, direction=desc 요청은 캐시 서비스에 위임된다")
         void search_sitters_sort_by_average_rating_desc() {
             // given
-            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null, null);
             SitterPageResponse response = SitterPageResponse.of(List.of(), 0, 0, 0, 10);
             given(sitterCacheService.searchSitters(eq(condition), eq(0), eq(10), eq("averageRating"), eq("desc")))
                     .willReturn(response);
@@ -624,7 +624,7 @@ class SitterServiceTest {
         @DisplayName("[성공] sort=averageRating, direction=asc 요청은 캐시 서비스에 위임된다")
         void search_sitters_sort_by_average_rating_asc() {
             // given
-            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null, null);
             SitterPageResponse response = SitterPageResponse.of(List.of(), 0, 0, 0, 10);
             given(sitterCacheService.searchSitters(eq(condition), eq(0), eq(10), eq("averageRating"), eq("asc")))
                     .willReturn(response);
@@ -641,7 +641,7 @@ class SitterServiceTest {
         @DisplayName("[실패] 허용되지 않은 direction 값은 INVALID_SORT_FIELD를 반환한다")
         void search_sitters_invalid_direction() {
             // given
-            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null);
+            SitterSearchCondition condition = new SitterSearchCondition(null, null, null, null, null, null);
 
             // when & then
             assertThatThrownBy(() -> sitterService.searchSitters(condition, 0, 10, "createdAt", "random"))
@@ -661,7 +661,7 @@ class SitterServiceTest {
         void get_sitter_by_id_test_01() {
             // given
             sitterProfile.approve(adminMemberId);
-            SitterResponseDto expected = SitterResponseDto.from(sitterProfile, member1.getRegion(), List.of());
+            SitterResponseDto expected = SitterResponseDto.from(sitterProfile, member1.getRegion(), member1.getNickname(), member1.getGender(), List.of());
             given(sitterCacheService.getSitterById(sitterProfileId)).willReturn(expected);
 
             // when
@@ -692,7 +692,7 @@ class SitterServiceTest {
             ReflectionTestUtils.setField(schedule, "id", 1L);
 
             sitterProfile.approve(adminMemberId);
-            SitterResponseDto expected = SitterResponseDto.from(sitterProfile, member1.getRegion(), List.of(schedule));
+            SitterResponseDto expected = SitterResponseDto.from(sitterProfile, member1.getRegion(), member1.getNickname(), member1.getGender(), List.of(schedule));
             given(sitterCacheService.getSitterById(sitterProfileId)).willReturn(expected);
 
             // when
@@ -707,7 +707,7 @@ class SitterServiceTest {
         void get_sitter_by_id_test_03() {
             // given
             sitterProfile.approve(adminMemberId);
-            SitterResponseDto expected = SitterResponseDto.from(sitterProfile, member1.getRegion(), List.of());
+            SitterResponseDto expected = SitterResponseDto.from(sitterProfile, member1.getRegion(), member1.getNickname(), member1.getGender(), List.of());
             given(sitterCacheService.getSitterById(sitterProfileId)).willReturn(expected);
 
             // when

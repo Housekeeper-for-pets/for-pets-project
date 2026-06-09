@@ -467,7 +467,7 @@ public class ReservationService {
                         .forEach(Proposal::reject);
 
                 // 공고 → CLOSED
-                postRepository.findById(postId).ifPresent(Post::close);
+//                postRepository.findById(postId).ifPresent(Post::close);
             }
         }
 

@@ -6,6 +6,7 @@ import com.forpets.domain.member.exception.*;
 import com.forpets.domain.member.repository.MemberRepository;
 import com.forpets.global.exception.*;
 import com.forpets.global.security.jwt.*;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -112,16 +113,20 @@ public class AuthService {
     @Transactional
     public void logout(HttpServletRequest request) {
         String accessToken = bearerTokenResolver.resolve(request);
-
         if (accessToken == null) {
             throw new BusinessException(CommonErrorCode.UNAUTHORIZED);
         }
 
-        Long memberId = jwtTokenProvider.getMemberId(accessToken);
-        long remainingTime = jwtTokenProvider.getRemainingTime(accessToken);
-
-        tokenRedisService.addToBlacklist(accessToken, remainingTime);
-        tokenRedisService.deleteRefreshToken(memberId);
+        try {
+            Long memberId = jwtTokenProvider.getMemberId(accessToken);
+            long remainingTime = jwtTokenProvider.getRemainingTime(accessToken);
+            tokenRedisService.addToBlacklist(accessToken, remainingTime);
+            tokenRedisService.deleteRefreshToken(memberId);
+        } catch (ExpiredJwtException e) {
+            // 만료 토큰은 블랙리스트 등록 불필요, Refresh Token만 삭제
+            Long memberId = Long.parseLong(e.getClaims().getSubject());
+            tokenRedisService.deleteRefreshToken(memberId);
+        }
     }
 
     private void validateSignUpDuplicate(SignUpRequest request) {

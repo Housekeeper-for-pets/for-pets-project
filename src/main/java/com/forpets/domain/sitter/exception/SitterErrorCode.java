@@ -21,6 +21,7 @@ public enum SitterErrorCode implements ErrorCode {
     SITTER_PROFILE_EXISTS(HttpStatus.CONFLICT, "SITTER_PROFILE_EXISTS", "이미 시터 프로필이 존재합니다."),
     SITTER_PROFILE_ALREADY_REGISTERED(HttpStatus.BAD_REQUEST, "SITTER_PROFILE_ALREADY_REGISTERED", "활성 상태인 시터 프로필이 존재합니다."),
     SITTER_NOT_FOUND(HttpStatus.NOT_FOUND, "SITTER_NOT_FOUND", "존재하지 않는 시터입니다."),
+    SITTER_PROFILE_REQUIRED(HttpStatus.FORBIDDEN, "SITTER_PROFILE_REQUIRED", "시터 프로필 등록 후 이용 가능합니다."),
 
     DUPLICATE_SCHEDULE(HttpStatus.CONFLICT, "DUPLICATE_SCHEDULE", "요일별 1개 시간대만 등록 가능합니다."),
     NOT_SCHEDULE_OWNER(HttpStatus.FORBIDDEN, "NOT_SCHEDULE_OWNER", "본인의 스케줄이 아닙니다."),
@@ -31,6 +32,8 @@ public enum SitterErrorCode implements ErrorCode {
     NOT_PENDING_APPROVAL(HttpStatus.BAD_REQUEST, "NOT_PENDING_APPROVAL", "시터 프로필이 대기 상태가 아닙니다."),
 
     INVALID_SITTER_STATUS(HttpStatus.BAD_REQUEST, "INVALID_SITTER_STATUS", "시터 프로필을 수정 또는 삭제할 수 있는 상태가 아닙니다."),
+    SITTER_PROFILE_PENDING(HttpStatus.FORBIDDEN, "SITTER_PROFILE_PENDING", "시터 프로필 승인 대기 중입니다."),
+    SITTER_PROFILE_REJECTED(HttpStatus.FORBIDDEN, "SITTER_PROFILE_REJECTED", "시터 프로필이 반려되었습니다."),
     REQUEST_ALREADY_REJECTED(HttpStatus.BAD_REQUEST, "REQUEST_ALREADY_REJECTED", "시터 프로필 등록이 거절 상태입니다. 자세한 문의는 고객센터로 해주세요.")
 
 

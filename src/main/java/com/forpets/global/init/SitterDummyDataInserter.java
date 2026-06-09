@@ -3,6 +3,7 @@ package com.forpets.global.init;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,9 +19,9 @@ import java.util.Random;
 import java.util.Set;
 
 /**
- * PET-214: 인덱스 효과 검증용 더미 데이터 삽입 — sitter_profile 1만 건
+ * PET-214: 인덱스 효과 검증용 더미 데이터 삽입 — sitter_profile (건수: DummyDataConstants.TARGET_COUNT)
  *
- * 실행 조건: spring.profiles.active=local
+ * 실행 조건: local 프로파일 + forpets.dummy-data.enabled=true (성능측정 시에만 활성화)
  *
  * [rewriteBatchedStatements 안내]
  * 배치 INSERT 성능을 최대화하려면 DataSource URL에 아래 파라미터를 추가하세요:
@@ -43,13 +44,14 @@ import java.util.Set;
 @Slf4j
 @Component
 @Profile("local")
+@ConditionalOnProperty(name = "forpets.dummy-data.enabled", havingValue = "true")
 @Order(2)
 @RequiredArgsConstructor
 public class SitterDummyDataInserter implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
-    private static final int TARGET_COUNT = 10_000;
+    private static final int TARGET_COUNT = DummyDataConstants.TARGET_COUNT;
     private static final int BATCH_SIZE = 1_000;
     private static final String DUMMY_EMAIL_PATTERN = "dummy-sitter-%d@dummy.local";
     private static final String DUMMY_INTRO = "더미 소개";
@@ -167,7 +169,7 @@ public class SitterDummyDataInserter implements CommandLineRunner {
                 "(member_id, introduction, experience_years, possible_pet_type, possible_pet_size, " +
                 "price_per_hour, average_rating, review_count, status, approval_status, " +
                 "deleted, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED', false, ?, ?)";
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?, ?)";
 
         for (int offset = 0; offset < count; offset += BATCH_SIZE) {
             int end = Math.min(offset + BATCH_SIZE, count);
@@ -177,6 +179,11 @@ public class SitterDummyDataInserter implements CommandLineRunner {
                 LocalDateTime createdAt = randomDateTime(random, oneYearAgo, now);
                 // status: RESERVABLE 85% / NON_RESERVABLE 15%
                 String status = random.nextDouble() < 0.85 ? "RESERVABLE" : "NON_RESERVABLE";
+                // 실제값과 유사하게 변경 approval_status: APPROVED 75% / PENDING 15% / REJECTED 10%
+                double r = random.nextDouble();//
+                String approvalStatus = r < 0.75 ? "APPROVED"
+                        : r < 0.90 ? "PENDING"
+                        : "REJECTED";
                 // average_rating: 0.0 ~ 5.0 (소수 첫째 자리)
                 BigDecimal avgRating = BigDecimal.valueOf(Math.round(random.nextDouble() * 50) / 10.0);
                 batch.add(new Object[]{
@@ -189,6 +196,7 @@ public class SitterDummyDataInserter implements CommandLineRunner {
                         avgRating,                        // average_rating: 0.0~5.0
                         random.nextInt(301),              // review_count: 0~300
                         status,
+                        approvalStatus,
                         createdAt,
                         randomDateTime(random, createdAt, now)
                 });

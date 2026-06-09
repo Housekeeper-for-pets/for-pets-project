@@ -63,8 +63,8 @@ public class ProposalService {
 
         SitterProfile sitter = sitterService.findApprovedByMemberId(memberId);
         validateNoDuplicate(postId, sitter.getId());
-        validateApproved(sitter);
         // 정책 수정으로 CONFIRMED 예약이 있어도 Proposal 은 언제든 받을 수 있음
+
 
         List<PostTimeSlot> postTimeSlots = postService.findTimeSlotsByPostId(postId);
         if (reservationService.hasConfirmedConflict(sitter.getId(), postTimeSlots)) {
@@ -293,9 +293,5 @@ public class ProposalService {
         proposalRepository.findAllByPostIdAndStatus(postId, ProposalStatus.PENDING).stream()
                 .filter(p -> !p.getId().equals(acceptedProposalId))
                 .forEach(Proposal::reject);
-    }
-
-    private void validateApproved(SitterProfile sitter) {
-        if (!sitter.isApproved()) throw new SitterException(SitterErrorCode.INVALID_SITTER_STATUS);
     }
 }
