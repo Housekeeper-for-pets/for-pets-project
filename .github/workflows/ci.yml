@@ -179,6 +179,7 @@ jobs:
               -e JWT_ACCESS_TOKEN_VALIDITY_TIME="${{ secrets.JWT_ACCESS_TOKEN_VALIDITY_TIME }}" \
               -e JWT_REFRESH_TOKEN_VALIDITY_TIME="${{ secrets.JWT_REFRESH_TOKEN_VALIDITY_TIME }}" \
               -e SPRING_PROFILES_ACTIVE=prod \
+              -e SPRING_NOTIFICATIONS_BROKER=direct \
               -e SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/ \
               "$IMAGE_URI"
 
