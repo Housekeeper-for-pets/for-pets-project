@@ -8,6 +8,7 @@ import com.forpets.domain.ai.chat.service.AiChatService;
 import com.forpets.global.common.ApiResponse;
 import com.forpets.global.security.annotation.LoginUser;
 import com.forpets.global.security.dto.CurrentMember;
+import com.forpets.global.sse.SseStreamSupport;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -30,6 +30,7 @@ public class AiChatController {
 
     private final AiChatService aiChatService;
     private final ObjectMapper objectMapper;
+    private final SseStreamSupport sseStreamSupport;
 
     @Value("${forpets.ai.chat.stream-timeout-ms:60000}")
     private long streamTimeoutMs;
@@ -47,25 +48,21 @@ public class AiChatController {
             @LoginUser CurrentMember currentMember,
             @RequestBody @Valid AiChatRequest request
     ) {
-        SseEmitter emitter = new SseEmitter(streamTimeoutMs);
+        SseEmitter emitter = sseStreamSupport.createEmitter(streamTimeoutMs, "AI_CHAT");
 
         CompletableFuture.runAsync(() -> {
             try {
                 AiChatResponse response = aiChatService.chat(currentMember.id(), request);
-                send(emitter, "session", response.sessionId());
+                sseStreamSupport.send(emitter, "session", response.sessionId());
                 for (String chunk : splitAnswer(response.answer())) {
-                    send(emitter, "message", chunk);
+                    sseStreamSupport.send(emitter, "message", chunk);
                 }
-                send(emitter, "sources", toJson(response.sources()));
-                send(emitter, "done", toJson(response));
+                sseStreamSupport.send(emitter, "sources", toJson(response.sources()));
+                sseStreamSupport.send(emitter, "done", toJson(response));
                 emitter.complete();
             } catch (Exception exception) {
                 log.warn("AI 챗봇 SSE 응답 실패", exception);
-                try {
-                    send(emitter, "error", "AI 추천 응답을 스트리밍하는 중 문제가 발생했습니다.");
-                } catch (IOException ignored) {
-                    log.debug("AI 챗봇 SSE error event 전송 실패", ignored);
-                }
+                sseStreamSupport.sendError(emitter, "AI 추천 응답을 스트리밍하는 중 문제가 발생했습니다.");
                 emitter.completeWithError(exception);
             }
         });
@@ -95,11 +92,5 @@ public class AiChatController {
 
     private String toJson(Object value) throws JsonProcessingException {
         return objectMapper.writeValueAsString(value);
-    }
-
-    private void send(SseEmitter emitter, String eventName, Object data) throws IOException {
-        emitter.send(SseEmitter.event()
-                .name(eventName)
-                .data(data));
     }
 }
