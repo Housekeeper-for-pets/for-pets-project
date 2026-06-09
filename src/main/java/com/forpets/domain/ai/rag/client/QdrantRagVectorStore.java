@@ -9,9 +9,11 @@ import com.forpets.domain.ai.rag.exception.AiRagErrorCode;
 import com.forpets.domain.ai.rag.exception.AiRagException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
@@ -67,6 +69,13 @@ public class QdrantRagVectorStore implements RagVectorStore {
                     ))
                     .retrieve()
                     .toBodilessEntity();
+        } catch (HttpClientErrorException exception) {
+            if (exception.getStatusCode() == HttpStatus.CONFLICT) {
+                log.debug("Qdrant collection already exists. collection={}", collectionName);
+                return;
+            }
+            log.warn("Qdrant collection 초기화 실패. collection={}, message={}", collectionName, exception.getMessage(), exception);
+            throw new AiRagException(AiRagErrorCode.RAG_INDEX_FAILED);
         } catch (Exception exception) {
             log.warn("Qdrant collection 초기화 실패. collection={}, message={}", collectionName, exception.getMessage(), exception);
             throw new AiRagException(AiRagErrorCode.RAG_INDEX_FAILED);
