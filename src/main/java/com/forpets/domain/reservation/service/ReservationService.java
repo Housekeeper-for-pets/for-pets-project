@@ -1,5 +1,6 @@
 package com.forpets.domain.reservation.service;
 
+import com.forpets.domain.carelog.repository.CareLogRepository;
 import com.forpets.domain.carerequest.entity.CareRequest;
 import com.forpets.domain.carerequest.entity.CareRequestPet;
 import com.forpets.domain.carerequest.entity.CareRequestTimeSlot;
@@ -72,6 +73,7 @@ public class ReservationService {
 
     private final TimeSlotValidator timeSlotValidator;
     private final CareRequestRepository careRequestRepository;
+    private final CareLogRepository careLogRepository;
 
     private final NotificationMessageBroker notificationBroker;
 
@@ -315,6 +317,7 @@ public class ReservationService {
         Reservation reservation = findById(reservationId);
         validateParty(memberId, reservation);
         validateCancelable(reservation);
+        validateNoCareLog(reservationId);
 
         CanceledBy canceledBy = reservation.isGuardian(memberId) ? CanceledBy.GUARDIAN : CanceledBy.SITTER;
 
@@ -423,6 +426,17 @@ public class ReservationService {
     private void validateCancelable(Reservation reservation) {
         if (!reservation.isCancelable()) {
             throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION);
+        }
+    }
+
+    /*
+    케어 일지가 1건이라도 등록되어 있으면 예약 취소 불가
+    돌봄이 이미 시작 또는 완료 단계에 들어선 것이므로 일반 취소 흐름 차단
+    (UNAVOIDABLE 사유의 관리자 검토 요청도 동일하게 막음 — 케어 일지 시점부터는 정산/분쟁 영역으로 이동)
+     */
+    private void validateNoCareLog(Long reservationId) {
+        if (careLogRepository.existsByReservationId(reservationId)) {
+            throw new ReservationException(ReservationErrorCode.CARE_LOG_EXISTS_CANNOT_CANCEL);
         }
     }
 

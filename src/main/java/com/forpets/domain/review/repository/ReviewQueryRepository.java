@@ -4,6 +4,7 @@ import com.forpets.domain.reservation.entity.ReservationStatus;
 import com.forpets.domain.review.dto.MyReceivedReviewResponse;
 import com.forpets.domain.review.dto.MyWrittenReviewResponse;
 import com.forpets.domain.review.dto.SitterReviewStats;
+import com.forpets.global.monitoring.TrackExecutionTime;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
@@ -113,6 +114,7 @@ public class ReviewQueryRepository {
      * (review JOIN reservation 으로 COMPLETED 조건을 반드시 적용)
      * 리뷰가 0개이면 averageRating = 0.0, reviewCount = 0 으로 반환합니다.
      */
+    @TrackExecutionTime("review.stats.calculate")
     public SitterReviewStats calculateSitterReviewStats(Long sitterMemberId) {
         Tuple result = queryFactory
                 .select(review.rating.avg(), review.count())
