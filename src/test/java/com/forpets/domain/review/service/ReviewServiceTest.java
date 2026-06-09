@@ -26,13 +26,13 @@ import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.service.SitterCacheService;
 import com.forpets.global.common.CareType;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -54,7 +54,6 @@ import static org.mockito.Mockito.never;
 @ExtendWith(MockitoExtension.class)
 class ReviewServiceTest {
 
-    @InjectMocks
     private ReviewService reviewService;
 
     @Mock
@@ -85,6 +84,16 @@ class ReviewServiceTest {
 
     @BeforeEach
     void setUp() {
+        reviewService = new ReviewService(
+                reviewRepository,
+                reviewQueryRepository,
+                reservationRepository,
+                sitterProfileRepository,
+                sitterCacheService,
+                aiReviewSummaryStaleService,
+                new SimpleMeterRegistry()
+        );
+
         completedReservation = createReservation();
         completedReservation.confirm();
         completedReservation.complete();
