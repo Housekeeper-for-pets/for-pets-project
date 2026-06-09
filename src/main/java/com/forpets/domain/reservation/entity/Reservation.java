@@ -152,6 +152,26 @@ public class Reservation extends BaseEntity {
         return this.status == ReservationStatus.CONFIRMED;
     }
 
+    public boolean isExpired() {
+        return this.status == ReservationStatus.EXPIRED;
+    }
+
+    public boolean isCanceled() {
+        return this.status == ReservationStatus.CANCELED;
+    }
+
+    public boolean isCompleted() {
+        return this.status == ReservationStatus.COMPLETED;
+    }
+
+    /*
+    결제 가능 여부 — PENDING 일 때만 결제 시도/재시도 가능
+    프론트의 결제 버튼 노출 조건과 1:1 대응되는 단일 진실(single source of truth)
+     */
+    public boolean isPayable() {
+        return this.status == ReservationStatus.PENDING;
+    }
+
     public boolean isCancelable() {
         return isPending() || isConfirmed();
     }

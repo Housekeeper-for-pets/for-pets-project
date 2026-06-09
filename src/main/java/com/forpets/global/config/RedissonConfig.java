@@ -22,13 +22,17 @@ public class RedissonConfig {
     @Value("${spring.data.redis.password:}")
     private String redisPassword;
 
+    @Value("${spring.data.redis.ssl.enabled:false}")
+    private boolean redisSslEnabled;
+
     // Redis 단일 서버에 연결하는 RedissonClient 생성
     @Bean(destroyMethod = "shutdown")
     public RedissonClient redissonClient() {
         Config config = new Config();
+        String protocol = redisSslEnabled ? "rediss://" : "redis://";
 
         config.useSingleServer()
-                .setAddress("redis://" + redisHost + ":" + redisPort);
+                .setAddress(protocol + redisHost + ":" + redisPort);
 
         // Redis 비밀번호가 설정된 환경에서만 password 적용
         if (StringUtils.hasText(redisPassword)) {

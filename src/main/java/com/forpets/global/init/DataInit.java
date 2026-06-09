@@ -9,7 +9,6 @@ import com.forpets.domain.carerequest.repository.CareRequestRepository;
 import com.forpets.domain.carerequest.repository.CareRequestTimeSlotRepository;
 import com.forpets.domain.member.entity.Member;
 import com.forpets.domain.member.entity.MemberGender;
-import com.forpets.domain.member.entity.MemberRole;
 import com.forpets.domain.member.entity.Region;
 import com.forpets.domain.member.repository.MemberRepository;
 import com.forpets.domain.pet.entity.Pet;

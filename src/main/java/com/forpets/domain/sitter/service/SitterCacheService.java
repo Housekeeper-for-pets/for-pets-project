@@ -11,6 +11,7 @@ import com.forpets.domain.sitter.exception.SitterErrorCode;
 import com.forpets.domain.sitter.exception.SitterException;
 import com.forpets.domain.sitter.repository.SitterProfileRepository;
 import com.forpets.domain.sitter.repository.SitterScheduleRepository;
+import com.forpets.global.monitoring.TrackExecutionTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -29,6 +30,7 @@ public class SitterCacheService {
     private final SitterScheduleRepository sitterScheduleRepository;
     private final MemberService memberService;
 
+    @TrackExecutionTime("sitter.search")
     @Cacheable(cacheNames = "sitters", keyGenerator = "sitterCacheKeyGenerator",
             cacheManager = "longTtlCacheManager")
     public SitterPageResponse searchSitters(SitterSearchCondition condition,
