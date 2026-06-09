@@ -120,7 +120,7 @@ jobs:
             docker pull "$IMAGE_URI"
 
             # Nginx와 Spring 컨테이너가 서로 이름으로 통신할 Docker network 준비
-            docker network create forpets-network || true
+            docker network inspect forpets-network >/dev/null 2>&1 || docker network create forpets-network
 
             # Nginx reverse proxy 설정 준비
             mkdir -p /home/ec2-user/nginx
@@ -182,10 +182,29 @@ jobs:
               -e SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/ \
               "$IMAGE_URI"
 
-            # Spring 컨테이너가 바로 죽으면 Nginx만 떠서 502가 되므로 여기서 배포를 실패 처리
-            sleep 15
+            # Spring 컨테이너가 바로 죽으면 여기서 배포를 실패 처리
             if [ "$(docker inspect -f '{{.State.Running}}' forpets 2>/dev/null)" != "true" ]; then
               echo "❌ Spring 컨테이너 실행 실패"
+              docker logs forpets --tail 200 || true
+              exit 1
+            fi
+
+            # 컨테이너가 Running이어도 Spring이 아직 HTTP 요청을 받을 준비가 안 됐을 수 있음
+            APP_READY=false
+            for i in $(seq 1 30); do
+              if docker run --rm --network forpets-network nginx:1.27-alpine \
+                sh -c "wget -q -O - http://forpets:8080/health >/dev/null"; then
+                APP_READY=true
+                break
+              fi
+
+              echo "⏳ Spring health 대기 중... ($i/30)"
+              sleep 3
+            done
+
+            if [ "$APP_READY" != "true" ]; then
+              echo "❌ Spring health check 실패"
+              docker ps -a
               docker logs forpets --tail 200 || true
               exit 1
             fi
@@ -199,5 +218,16 @@ jobs:
               nginx:1.27-alpine
 
             # 헬스체크: 이제 외부 진입점은 Nginx 80번 포트
-            sleep 10
-            curl -f http://localhost/health
+            for i in $(seq 1 10); do
+              if curl -f http://localhost/health; then
+                exit 0
+              fi
+
+              echo "⏳ Nginx health 대기 중... ($i/10)"
+              sleep 3
+            done
+
+            echo "❌ Nginx health check 실패"
+            docker logs forpets-nginx --tail 100 || true
+            docker logs forpets --tail 200 || true
+            exit 1
