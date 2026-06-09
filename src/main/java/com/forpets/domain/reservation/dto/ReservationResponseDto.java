@@ -15,6 +15,8 @@ public record ReservationResponseDto(
         Long sitterProfileId,
         CareType careType,
         ReservationStatus status,
+        // 결제 버튼 노출/활성화 판단을 위한 단일 진실 — 프론트는 status 분기 대신 이 필드만 보면 됨
+        boolean payable,
         ReservationSource source,
         Long sourceId,
         // ===== 가격 정보 =====
@@ -48,6 +50,7 @@ public record ReservationResponseDto(
                 reservation.getSitterProfileId(),
                 reservation.getCareType(),
                 reservation.getStatus(),
+                reservation.isPayable(),
                 reservation.getSource(),
                 reservation.getSourceId(),
                 payment.getGuardianPrice(),
