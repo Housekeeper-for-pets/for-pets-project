@@ -4,6 +4,7 @@ import com.forpets.domain.chat.dto.ChatMessageBroadcast;
 import com.forpets.domain.chat.dto.ChatMessageRequest;
 import com.forpets.domain.chat.exception.ChatErrorCode;
 import com.forpets.domain.chat.exception.ChatException;
+import com.forpets.domain.chat.redis.ChatRedisPublisher;
 import com.forpets.domain.chat.service.ChatMessageWebSocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +12,6 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.util.Map;
@@ -22,9 +22,8 @@ import java.util.Map;
 public class ChatWebSocketHandler {
 
     private final ChatMessageWebSocketService chatMessageWebSocketService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ChatRedisPublisher chatRedisPublisher;  // SimpMessagingTemplate 대신
 
-    // 메시지 저장 후 구독자에게 전송
     @MessageMapping("/chat-rooms/{chatRoomId}/messages")
     public void sendMessage(
             @DestinationVariable Long chatRoomId,
@@ -39,10 +38,7 @@ public class ChatWebSocketHandler {
                 request
         );
 
-        messagingTemplate.convertAndSend(
-                "/sub/chat-rooms/" + chatRoomId,
-                broadcast
-        );
+        chatRedisPublisher.publish(chatRoomId, broadcast);  // Redis로 발행
     }
 
     private Long getSenderId(SimpMessageHeaderAccessor headerAccessor) {
