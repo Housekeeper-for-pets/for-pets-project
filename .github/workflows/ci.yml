@@ -117,15 +117,30 @@ jobs:
               exit 1
             fi
 
+            RAW_REDIS_HOST="${{ secrets.REDIS_HOST }}"
             REDIS_PORT="${{ secrets.REDIS_PORT || '6379' }}"
 
-            # Redis endpoint 사전 점검: DNS가 안 풀리면 Secret 값이 잘못된 것이고, TCP가 막히면 보안그룹/VPC 문제다.
-            if ! getent hosts "${{ secrets.REDIS_HOST }}" >/dev/null; then
-              echo "❌ REDIS_HOST DNS 해석 실패. GitHub Secret에는 redis://, 포트, 경로를 빼고 ElastiCache 엔드포인트 호스트명만 넣어야 합니다."
+            # GitHub Secret에 redis://, 포트, 슬래시가 섞여 들어와도 호스트명만 사용한다.
+            REDIS_HOST="$RAW_REDIS_HOST"
+            REDIS_HOST="$(printf '%s' "$REDIS_HOST" | tr -d '[:space:]' | tr -d '\"' | tr -d "'")"
+            REDIS_HOST="${REDIS_HOST#redis://}"
+            REDIS_HOST="${REDIS_HOST#rediss://}"
+            REDIS_HOST="${REDIS_HOST%%/*}"
+            REDIS_HOST="${REDIS_HOST%%:*}"
+            REDIS_PORT="$(printf '%s' "$REDIS_PORT" | tr -d '[:space:]')"
+
+            if [ -z "$REDIS_HOST" ]; then
+              echo "❌ REDIS_HOST 정규화 실패. ElastiCache 엔드포인트 값을 확인해야 합니다."
               exit 1
             fi
 
-            if ! timeout 5 bash -c "cat < /dev/null > /dev/tcp/${{ secrets.REDIS_HOST }}/$REDIS_PORT"; then
+            # Redis endpoint 사전 점검: DNS가 안 풀리면 Secret 값이 잘못된 것이고, TCP가 막히면 보안그룹/VPC 문제다.
+            if ! getent hosts "$REDIS_HOST" >/dev/null; then
+              echo "❌ REDIS_HOST DNS 해석 실패. ElastiCache의 Primary endpoint 또는 Configuration endpoint 호스트명을 확인해야 합니다."
+              exit 1
+            fi
+
+            if ! timeout 5 bash -c "cat < /dev/null > /dev/tcp/$REDIS_HOST/$REDIS_PORT"; then
               echo "❌ Redis TCP 연결 실패. ElastiCache 보안그룹 인바운드 6379가 EC2 보안그룹을 허용하는지 확인해야 합니다."
               exit 1
             fi
@@ -198,7 +213,7 @@ jobs:
               -e JWT_REFRESH_TOKEN_VALIDITY_TIME="${{ secrets.JWT_REFRESH_TOKEN_VALIDITY_TIME }}" \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_NOTIFICATIONS_BROKER=direct \
-              -e SPRING_DATA_REDIS_HOST="${{ secrets.REDIS_HOST }}" \
+              -e SPRING_DATA_REDIS_HOST="$REDIS_HOST" \
               -e SPRING_DATA_REDIS_PORT="$REDIS_PORT" \
               -e SPRING_DATA_REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
               -e SPRING_CONFIG_ADDITIONAL_LOCATION=/app/config/ \
