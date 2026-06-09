@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ========== Job 1: 빌드 + 테스트 (항상 실행) ==========
+  # ========= Job 1: 빌드 + 테스트 (항상 실행) ==========
   test:
     name: Build & Test
     runs-on: ubuntu-latest
