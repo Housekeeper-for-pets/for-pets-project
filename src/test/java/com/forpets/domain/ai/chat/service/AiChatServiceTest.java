@@ -3,6 +3,7 @@ package com.forpets.domain.ai.chat.service;
 import com.forpets.domain.ai.chat.client.AiChatClient;
 import com.forpets.domain.ai.chat.dto.AiChatRequest;
 import com.forpets.domain.ai.chat.dto.AiChatResponse;
+import com.forpets.domain.ai.chat.dto.AiChatSessionMessage;
 import com.forpets.domain.ai.chat.dto.RecommendedSitterDto;
 import com.forpets.domain.ai.rag.dto.RagSearchResultDto;
 import com.forpets.domain.ai.rag.dto.RagSourceType;
@@ -39,12 +40,18 @@ class AiChatServiceTest {
     @Mock
     private AiRagService aiRagService;
 
+    @Mock
+    private AiChatSessionStore aiChatSessionStore;
+
     @Test
     @DisplayName("[성공] 사용자 메시지를 자동 Tool Calling 클라이언트에 위임한다")
     void chat_success() {
         // given
         String message = "마포구에서 분리불안 있는 말티즈 맡길 시터 찾아줘";
+        String sessionId = "session-1";
         List<RecommendedSitterDto> candidates = List.of(candidate());
+        given(aiChatSessionStore.resolveSessionId(null)).willReturn(sessionId);
+        given(aiChatSessionStore.loadRecentMessages(1L, sessionId)).willReturn(List.of());
         given(aiChatClient.chatWithTools(message, sitterRecommendationTool))
                 .willReturn(new AiChatResponse("마포구에서 소형견 케어가 가능한 시터를 찾았어요.", candidates));
         given(aiRagService.searchSources(message)).willReturn(List.of(source()));
@@ -55,9 +62,36 @@ class AiChatServiceTest {
         // then
         assertThat(response.answer()).contains("마포구");
         assertThat(response.answer()).contains("리뷰 근거");
+        assertThat(response.sessionId()).isEqualTo(sessionId);
         assertThat(response.recommendedSitters()).hasSize(1);
         assertThat(response.sources()).hasSize(1);
         then(aiChatClient).should().chatWithTools(message, sitterRecommendationTool);
+        then(aiChatSessionStore).should().appendTurn(1L, sessionId, message, response.answer());
+    }
+
+    @Test
+    @DisplayName("[성공] 세션 이력이 있으면 최근 대화 맥락을 함께 전달한다")
+    void chat_with_history() {
+        // given
+        String message = "그중에 가격이 낮은 시터로 다시 알려줘";
+        String sessionId = "session-1";
+        List<AiChatSessionMessage> history = List.of(
+                AiChatSessionMessage.user("분리불안 있는 말티즈를 맡길 시터 찾아줘"),
+                AiChatSessionMessage.assistant("시터 #7님을 추천드려요.")
+        );
+        given(aiChatSessionStore.resolveSessionId(sessionId)).willReturn(sessionId);
+        given(aiChatSessionStore.loadRecentMessages(1L, sessionId)).willReturn(history);
+        given(aiRagService.searchSources(message)).willReturn(List.of());
+        given(aiChatClient.chatWithTools(org.mockito.ArgumentMatchers.contains("[최근 대화]"), org.mockito.ArgumentMatchers.eq(sitterRecommendationTool)))
+                .willReturn(new AiChatResponse("이전 추천 후보 중 가격이 낮은 시터를 다시 정리했어요.", List.of(candidate())));
+
+        // when
+        AiChatResponse response = aiChatService.chat(1L, new AiChatRequest(message, sessionId));
+
+        // then
+        assertThat(response.sessionId()).isEqualTo(sessionId);
+        assertThat(response.answer()).contains("가격이 낮은 시터");
+        then(aiChatSessionStore).should().appendTurn(1L, sessionId, message, response.answer());
     }
 
     private RagSearchResultDto source() {

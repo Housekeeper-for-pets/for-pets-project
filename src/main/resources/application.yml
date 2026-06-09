@@ -55,6 +55,10 @@ portone:
 
 forpets:
   ai:
+    chat:
+      session-ttl-minutes: 30
+      context-turns: 5
+      stream-timeout-ms: 60000
     rag:
       collection-name: forpets_reviews
       vector-size: 3072
