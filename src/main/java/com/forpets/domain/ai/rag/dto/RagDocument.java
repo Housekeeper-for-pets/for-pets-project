@@ -1,7 +1,8 @@
 package com.forpets.domain.ai.rag.dto;
 
 public record RagDocument(
-        Long reviewId,
+        String pointId,
+        Long sourceId,
         Long sitterId,
         Integer rating,
         String content,

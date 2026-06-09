@@ -125,6 +125,7 @@ class AiSitterRecommendationToolTest {
         return new RagSearchResultDto(
                 RagSourceType.REVIEW,
                 10L,
+                10L,
                 1L,
                 5,
                 "분리불안 반려견을 차분하게 케어해주셨어요.",

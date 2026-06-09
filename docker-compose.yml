@@ -127,6 +127,28 @@ services:
       qdrant:
         condition: service_started
 
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: for-pets-nginx
+    ports:
+      - "${NGINX_HOST_PORT:-80}:80"
+    volumes:
+      - ./nginx/docker.conf:/etc/nginx/conf.d/default.conf:ro
+
+  # IntelliJ에서 Spring 앱을 직접 실행할 때 사용하는 로컬 개발용 Nginx
+  # 실행: docker compose --profile local-proxy up -d nginx-local
+  nginx-local:
+    image: nginx:1.27-alpine
+    container_name: for-pets-nginx-local
+    profiles:
+      - local-proxy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${NGINX_HOST_PORT:-80}:80"
+    volumes:
+      - ./nginx/local.conf:/etc/nginx/conf.d/default.conf:ro
+
   k6:
     image: grafana/k6:latest
     container_name: for-pets-k6

@@ -1,5 +1,6 @@
 package com.forpets.domain.ai.rag.dto;
 
 public enum RagSourceType {
-    REVIEW
+    REVIEW,
+    REVIEW_SUMMARY
 }
