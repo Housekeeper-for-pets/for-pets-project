@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.forpets.domain.post.dto.PostPageResponse;
 import com.forpets.domain.sitter.dto.profile.SitterPageResponse;
 import com.forpets.global.cache.GracefulDegradationCacheErrorHandler;
+import com.forpets.global.cache.MeteredCacheManager;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
@@ -40,30 +42,34 @@ public class RedisCacheConfig implements CachingConfigurer {//errorHandler 오�
     public CacheManager longTtlCacheManager(
             RedisConnectionFactory redisConnectionFactory,
             ObjectMapper objectMapper,
+            MeterRegistry meterRegistry,
             @Value("${forpets.cache.enabled:true}") boolean cacheEnabled
     ) {
         if (!cacheEnabled) {
             log.warn("[CACHE_DISABLED] longTtlCacheManager -> NoOpCacheManager (측정 모드, forpets.cache.enabled=false)");
             return new NoOpCacheManager();
         }
-        return RedisCacheManager.builder(redisConnectionFactory)
+        RedisCacheManager redisCacheManager = RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(redisCacheConfiguration(objectMapper, this::longTtl))
                 .build();
+        return new MeteredCacheManager(redisCacheManager, meterRegistry);
     }
 
     @Bean
     public CacheManager shortTtlCacheManager(
             RedisConnectionFactory redisConnectionFactory,
             ObjectMapper objectMapper,
+            MeterRegistry meterRegistry,
             @Value("${forpets.cache.enabled:true}") boolean cacheEnabled
     ) {
         if (!cacheEnabled) {
             log.warn("[CACHE_DISABLED] shortTtlCacheManager -> NoOpCacheManager (측정 모드, forpets.cache.enabled=false)");
             return new NoOpCacheManager();
         }
-        return RedisCacheManager.builder(redisConnectionFactory)
+        RedisCacheManager redisCacheManager = RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(redisCacheConfiguration(objectMapper, this::shortTtl))
                 .build();
+        return new MeteredCacheManager(redisCacheManager, meterRegistry);
     }
 
     @Bean
