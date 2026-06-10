@@ -143,6 +143,16 @@ class PaymentRefundServiceTest {
     }
 
     /**
+     * 보호자 환불 Settlement 시뮬레이션 (관리자 수동 처리 결과)
+     * 새 정책: 보호자 일방 취소 시 보호자 결제는 PG 호출 없이 Settlement 로 환불 처리
+     */
+    private void settleGuardianRefund(long refundAmount) {
+        if (refundAmount <= 0) return;
+        platformHeldGuardian -= refundAmount;
+        guardianWallet += refundAmount;
+    }
+
+    /**
      * 위약금 정산 시뮬레이션
      * Settlement 도메인이 아직 없으므로 테스트에서 직접 wallet 이동 처리
      */
@@ -165,8 +175,15 @@ class PaymentRefundServiceTest {
     class RefundWithPenaltyTest {
 
         @Test
-        @DisplayName("[시나리오 2] 보호자 PERSONAL 취소 → 보호자 8만원, 시터 4만원")
+        @DisplayName("[시나리오 2] 보호자 PERSONAL 취소 → 보호자 결제는 Settlement 수동처리, 시터 예약금만 즉시 PG 환불")
         void scenario_2_guardian_personal_cancel() {
+            /*
+            정책 변경: PG 부분환불 502 이슈 우회를 위해
+              - 보호자 결제(10만) → PG 호출 X, Settlement 2건 생성
+                · GUARDIAN_PARTIAL_REFUND 8만 (관리자 수동 환불)
+                · OWNER_CANCEL_PENALTY 2만 (시터에게 위약금 보상)
+              - 시터 예약금(2만) → 시터 무귀책이므로 즉시 PG 전액 환불
+             */
             // given
             given(paymentRepository.findAllByReservationIdAndStatusIn(
                     reservationId, List.of(PaymentStatus.PAID)))
@@ -174,23 +191,25 @@ class PaymentRefundServiceTest {
             given(reservationPaymentRepository.findByReservationId(reservationId))
                     .willReturn(Optional.of(reservationPayment));
 
-            stubPgRefund("merchant-guardian-001", PaymentRole.GUARDIAN);
+            // 시터 결제만 PG 환불 stub (보호자는 PG 호출 안 됨)
             stubPgRefund("merchant-sitter-001", PaymentRole.SITTER);
 
             // when — 보호자가 취소
             paymentRefundService.refundWithPenalty(
                     reservationId, "개인 사정", CanceledBy.GUARDIAN);
 
-            // 위약금 정산 시뮬레이션 (실제로는 Settlement 도메인에서)
+            // 위약금/환불분 Settlement 시뮬레이션 (실제로는 관리자 수동 처리)
             long guardianPenalty = GUARDIAN_PAYMENT_AMOUNT * 20 / 100; // 2만
+            long guardianRefundAmount = GUARDIAN_PAYMENT_AMOUNT - guardianPenalty; // 8만
             settlePenalty(guardianPenalty, CanceledBy.GUARDIAN);
+            settleGuardianRefund(guardianRefundAmount);
 
             // then ── wallet 검증 ──
             assertThat(guardianWallet)
-                    .as("보호자는 10만원에서 위약금 2만원 빼고 8만원 환불받음")
+                    .as("보호자는 위약금 2만원 빼고 8만원 환불받음 (Settlement 수동 처리)")
                     .isEqualTo(80_000L);
             assertThat(sitterWallet)
-                    .as("시터는 자기 예약금 2만원 + 보상금 2만원 = 4만원")
+                    .as("시터는 자기 예약금 2만원 (PG 환불) + 위약금 보상 2만원 = 4만원")
                     .isEqualTo(40_000L);
             assertThat(platformHeldGuardian).as("보호자 보관금 모두 정리").isEqualTo(0L);
             assertThat(platformHeldSitter).as("시터 보관금 모두 정리").isEqualTo(0L);
@@ -199,16 +218,20 @@ class PaymentRefundServiceTest {
             assertThat(guardianPayment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
             assertThat(sitterPayment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
 
-            // PG 호출 검증 — 둘 다 부분환불 호출됨
-            ArgumentCaptor<Long> amountCaptor = ArgumentCaptor.forClass(Long.class);
+            // PG 호출 검증 — 보호자는 호출 안 되고 시터만 전액 환불
+            then(portOnePaymentClient).should(never())
+                    .cancelPayment(eq("merchant-guardian-001"), any(), anyString());
             then(portOnePaymentClient).should()
-                    .cancelPayment(eq("merchant-guardian-001"), amountCaptor.capture(), anyString());
-            assertThat(amountCaptor.getValue()).isEqualTo(80_000L);
+                    .cancelPayment(eq("merchant-sitter-001"), eq(20_000L), anyString());
 
-            then(portOnePaymentClient).should()
-                    .cancelPayment(eq("merchant-sitter-001"), amountCaptor.capture(), anyString());
-            assertThat(amountCaptor.getValue()).isEqualTo(20_000L);
-
+            // Settlement 호출 검증 — 보호자 환불분 + 위약금 보상 각각 생성
+            then(settlementService).should().createGuardianRefundSettlement(
+                    eq(reservationId),
+                    eq(guardianMemberId),
+                    eq(guardianPayment.getId()),
+                    eq(80_000L),
+                    anyString()
+            );
             then(settlementService).should().createPenaltySettlement(
                     reservationId,
                     sitterMemberId,

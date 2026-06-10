@@ -214,51 +214,85 @@ public class PaymentRefundService {
             return;
         }
 
-        ReservationPayment reservationPayment = reservationPaymentRepository
-                .findByReservationId(reservationId)
-                .orElseThrow(() -> new ReservationException(
-                        ReservationErrorCode.RESERVATION_NOT_FOUND));
+        ReservationPayment reservationPayment = reservationPaymentRepository.findByReservationId(reservationId)
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
-        // 1단계: PG 환불 (각자 결제한 곳으로 위약금 뺀 금액 환불)
-        long penaltyAmount = 0L;
-        Long penaltySourcePaymentId = null;
         for (Payment payment : paidPayments) {
             if (!payment.isPaid()) continue;
 
             long penalty = calculatePenalty(payment, canceledBy);
             long refundAmount = payment.getFinalAmount() - penalty;
-            penaltyAmount += penalty;
-            if (penalty > 0) {
-                penaltySourcePaymentId = payment.getId();
+
+            /*
+            [보호자 일방 취소 + 시터 예약금]
+            시터에게는 귀책 사유가 없으므로 즉시 PG 전액 환불해서 묶어두지 않는다.
+            (보호자 결제분은 Settlement 로 관리자 수동 처리해야 해서 시간이 걸리지만
+             시터 예약금은 즉시 풀어줘야 사용자 경험상 자연스러움)
+            Settlement 도 생성하지 않으므로 continue 로 다음 payment 처리.
+             */
+            if (canceledBy == CanceledBy.GUARDIAN
+                    && payment.getPaymentRole() == PaymentRole.SITTER) {
+                refund(payment, reservationPayment, "보호자 취소에 따른 시터 예약금 환불");
+                continue;
             }
 
-            if (refundAmount > 0) {
-                partialRefund(payment, reservationPayment, refundAmount, reason);
-            } else {
-                // 시터가 취소한 경우, 시터 결제는 전액 위약금이라 PG 환불 0원
-                // 상태만 REFUNDED 로 닫는다
-                markAsRefundedWithoutPgCall(payment, reservationPayment, reason);
+            /*
+            [시터 일방 취소 + 보호자 결제]
+            보호자에게는 귀책 사유가 없으므로 PG 전액 환불 (정책: "기존과 동일").
+            시터 위약금은 별도 Settlement 로 보호자에게 보상.
+             */
+            if (canceledBy == CanceledBy.SITTER
+                    && payment.getPaymentRole() == PaymentRole.GUARDIAN) {
+                refund(payment, reservationPayment, "시터 취소에 따른 보호자 전액 환불");
+                continue;
             }
-        }
 
-        // 2단계: 위약금을 상대방에게 보상금으로 정산
-        if (penaltyAmount > 0) {
-            Long receiverMemberId = findPenaltyReceiverMemberId(paidPayments, canceledBy);
-            SettlementType settlementType = getPenaltySettlementType(canceledBy);
-            String settlementReason = getPenaltySettlementReason(canceledBy, reason);
+            // PG 호출 없이 상태만 REFUNDED로 닫음 (부분 취소 PG 제약 우회)
+            markAsRefundedWithoutPgCall(payment, reservationPayment, reason);
 
-            settlementService.createPenaltySettlement(
-                    reservationId,
-                    receiverMemberId,
-                    penaltySourcePaymentId,
-                    penaltyAmount,
-                    settlementType,
-                    settlementReason
-            );
+            // 보호자 취소: 환불분 Settlement + 위약금 Settlement 각각 생성
+            // 시터 취소: 보호자 전액 환불은 기존 refund() 호출, 시터 쪽만 이 분기 탐
+            if (canceledBy == CanceledBy.GUARDIAN
+                    && payment.getPaymentRole() == PaymentRole.GUARDIAN) {
 
-            log.info("[PaymentRefundService] 위약금 정산 예정 reservationId={}, 위약금총액={}, 취소주체={}, 보상수신자={}",
-                    reservationId, penaltyAmount, canceledBy,
-                    canceledBy == CanceledBy.GUARDIAN ? "SITTER" : "GUARDIAN");
+                if (refundAmount > 0) {
+                    settlementService.createGuardianRefundSettlement(
+                            reservationId,
+                            payment.getMemberId(),
+                            payment.getId(),
+                            refundAmount,
+                            "보호자 취소 환불분 - " + reason
+                    );
+                }
+
+                if (penalty > 0) {
+                    Long sitterMemberId = findPenaltyReceiverMemberId(paidPayments, canceledBy);
+                    settlementService.createPenaltySettlement(
+                            reservationId,
+                            sitterMemberId,
+                            payment.getId(),
+                            penalty,
+                            SettlementType.OWNER_CANCEL_PENALTY,
+                            getPenaltySettlementReason(canceledBy, reason)
+                    );
+                }
+            }
+
+            // 시터 취소: 시터 위약금 Settlement (보호자 결제는 별도 refund() 로 PG 전액 환불)
+            if (canceledBy == CanceledBy.SITTER
+                    && payment.getPaymentRole() == PaymentRole.SITTER
+                    && penalty > 0) {
+
+                Long guardianMemberId = findPenaltyReceiverMemberId(paidPayments, canceledBy);
+                settlementService.createPenaltySettlement(
+                        reservationId,
+                        guardianMemberId,
+                        payment.getId(),
+                        penalty,
+                        SettlementType.SITTER_CANCEL_PENALTY,
+                        getPenaltySettlementReason(canceledBy, reason)
+                );
+            }
         }
     }
 

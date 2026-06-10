@@ -173,7 +173,7 @@ public class Reservation extends BaseEntity {
     }
 
     public boolean isCancelable() {
-        return isPending() || isConfirmed();
+        return isPending() || isConfirmed() || isCancelRequested();
     }
 
     public boolean isParty(Long memberId) {

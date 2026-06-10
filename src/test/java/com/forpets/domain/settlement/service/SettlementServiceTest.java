@@ -64,8 +64,9 @@ class SettlementServiceTest {
         @Test
         @DisplayName("[성공] 기본 플랫폼 수수료 10%를 차감한 READY 정산 생성")
         void settlement_test_01() {
-            // given
-            given(settlementRepository.existsByReservationId(reservationId)).willReturn(false);
+            // given — 정책 변경: (예약, 정산타입) 조합으로 중복 차단하도록 변경됨
+            given(settlementRepository.existsByReservationIdAndSettlementType(
+                    reservationId, SettlementType.CARE_COMPLETION)).willReturn(false);
             given(settlementRepository.save(any(Settlement.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
 
@@ -85,8 +86,9 @@ class SettlementServiceTest {
         @Test
         @DisplayName("[실패] 같은 예약에 정산이 이미 있으면 중복 생성 차단")
         void settlement_test_02() {
-            // given
-            given(settlementRepository.existsByReservationId(reservationId)).willReturn(true);
+            // given — 같은 예약 + 같은 타입(CARE_COMPLETION) 조합이 이미 존재
+            given(settlementRepository.existsByReservationIdAndSettlementType(
+                    reservationId, SettlementType.CARE_COMPLETION)).willReturn(true);
 
             // when & then
             assertThatThrownBy(() -> settlementService.createCareCompletionSettlement(
@@ -126,8 +128,9 @@ class SettlementServiceTest {
         @Test
         @DisplayName("[성공] 위약금 정산은 수수료 없이 보상금 전액을 정산금으로 생성")
         void settlement_test_03() {
-            // given
-            given(settlementRepository.existsByReservationId(reservationId)).willReturn(false);
+            // given — 정책 변경: (예약, 정산타입) 조합으로 중복 차단
+            given(settlementRepository.existsByReservationIdAndSettlementType(
+                    reservationId, SettlementType.OWNER_CANCEL_PENALTY)).willReturn(false);
             given(settlementRepository.save(any(Settlement.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
 
