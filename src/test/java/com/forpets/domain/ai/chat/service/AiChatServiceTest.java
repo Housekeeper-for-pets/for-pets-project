@@ -22,6 +22,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
@@ -82,7 +84,12 @@ class AiChatServiceTest {
         given(aiChatSessionStore.resolveSessionId(sessionId)).willReturn(sessionId);
         given(aiChatSessionStore.loadRecentMessages(1L, sessionId)).willReturn(history);
         given(aiRagService.searchSources(message)).willReturn(List.of());
-        given(aiChatClient.chatWithTools(org.mockito.ArgumentMatchers.contains("[최근 대화]"), org.mockito.ArgumentMatchers.eq(sitterRecommendationTool)))
+        given(aiChatClient.chatWithTools(argThat(prompt ->
+                        prompt.contains("[최근 대화]")
+                                && prompt.contains("이전 추천 후보 범위 안에서")
+                                && prompt.contains("이전 조건을 유지")
+                                && prompt.contains("조건과 맞지 않는 시터는 가격이 낮거나 경력이 길어도 추천하지 마세요")
+                ), eq(sitterRecommendationTool)))
                 .willReturn(new AiChatResponse("이전 추천 후보 중 가격이 낮은 시터를 다시 정리했어요.", List.of(candidate())));
 
         // when
