@@ -204,6 +204,8 @@ jobs:
             docker run -d --name forpets \
               --network forpets-network \
               --restart unless-stopped \
+              -e TZ=Asia/Seoul \
+              -e JAVA_TOOL_OPTIONS="-Duser.timezone=Asia/Seoul" \
               -v /home/ec2-user/config/application-prod.yml:/app/config/application-prod.yml \
               -e DB_URL="${{ secrets.DB_URL }}" \
               -e DB_USERNAME="${{ secrets.DB_USERNAME }}" \
