@@ -236,6 +236,17 @@ public class PaymentRefundService {
                 continue;
             }
 
+            /*
+            [시터 일방 취소 + 보호자 결제]
+            보호자에게는 귀책 사유가 없으므로 PG 전액 환불 (정책: "기존과 동일").
+            시터 위약금은 별도 Settlement 로 보호자에게 보상.
+             */
+            if (canceledBy == CanceledBy.SITTER
+                    && payment.getPaymentRole() == PaymentRole.GUARDIAN) {
+                refund(payment, reservationPayment, "시터 취소에 따른 보호자 전액 환불");
+                continue;
+            }
+
             // PG 호출 없이 상태만 REFUNDED로 닫음 (부분 취소 PG 제약 우회)
             markAsRefundedWithoutPgCall(payment, reservationPayment, reason);
 

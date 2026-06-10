@@ -793,19 +793,25 @@ class ReservationServiceTest {
         }
 
         @Test
-        @DisplayName("[실패] CANCEL_REQUESTED 예약 재취소 시도")
+        @DisplayName("[성공] CANCEL_REQUESTED 예약을 PERSONAL 사유로 재취소 → 즉시 CANCELED (위약금 차감)")
         void reservation_test_23_b() {
-            // given — 이미 CANCEL_REQUESTED 상태
+            // given — UNAVOIDABLE 로 취소 요청 후 관리자 검토 기다리지 않고
+            // 보호자가 PERSONAL 사유로 위약금 감수하고 즉시 취소하는 시나리오
+            // (정책: isCancelable() 이 CANCEL_REQUESTED 도 허용하도록 확장됨)
             reservation.confirm();
             reservation.requestCancel("불가피한 사유", CancelCategory.UNAVOIDABLE, CanceledBy.GUARDIAN);
             given(reservationRepository.findById(reservationId)).willReturn(Optional.of(reservation));
+            stubToResponseDto(reservationId, reservation, payment);
 
-            // when & then — isCancelable() 이 false 라 차단
-            assertThatThrownBy(() -> reservationService.cancel(
-                    member1Id, reservationId, personalCancelRequest))
-                    .isInstanceOf(ReservationException.class)
-                    .satisfies(ex -> assertThat(((ReservationException) ex).getErrorCode())
-                            .isEqualTo(ReservationErrorCode.INVALID_RESERVATION_STATUS_TRANSITION));
+            // when
+            ReservationResponseDto result = reservationService.cancel(
+                    member1Id, reservationId, personalCancelRequest);
+
+            // then — CANCELED 로 확정, 위약금 차감 환불 흐름 호출
+            assertThat(result.status()).isEqualTo(ReservationStatus.CANCELED);
+            assertThat(result.canceledBy()).isEqualTo(CanceledBy.GUARDIAN);
+            then(paymentRefundService).should()
+                    .refundWithPenalty(reservationId, personalCancelRequest.cancelReason(), CanceledBy.GUARDIAN);
         }
 
         @Test
