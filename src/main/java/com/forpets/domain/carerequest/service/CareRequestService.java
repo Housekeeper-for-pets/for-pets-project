@@ -17,6 +17,7 @@ import com.forpets.domain.pet.entity.Pet;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
+import com.forpets.domain.reservation.entity.Reservation;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.SitterProfile;
 import com.forpets.domain.sitter.service.SitterService;
@@ -180,7 +181,17 @@ public class CareRequestService {
          List<CareRequestPet> crPets = careRequestPetRepository.findAllByCareRequestId(request.getId());
          List<CareRequestTimeSlot> crTimeSlots =
              careRequestTimeSlotRepository.findAllByCareRequestIdOrderByTimeSlotInfoSequence(request.getId());
-         reservationService.createFromCareRequest(request, memberId, crPets, crTimeSlots);
+         Reservation reservation = reservationService.createFromCareRequest(request, memberId, crPets, crTimeSlots);
+         notificationBroker.publish(NotificationEvent.of(
+                 request.getMemberId(),
+                 memberId,
+                 SseEventType.REQUEST_ACCEPTED,
+                 "케어 신청이 수락되어 예약이 생성되었습니다.",
+                 reservation.getId(),
+                 "RESERVATION"
+         ));
+         log.info("{} => 케어 신청 수락 알림 발행: guardianId={}, sitterMemberId={}, reservationId={}",
+                 NAME, request.getMemberId(), memberId, reservation.getId());
         return toResponseDto(request);
     }
 
@@ -197,6 +208,17 @@ public class CareRequestService {
         validateTargetSitter(sitter.getId(), request);
 
         request.reject();
+        notificationBroker.publish(NotificationEvent.of(
+                request.getMemberId(),
+                memberId,
+                SseEventType.REQUEST_REJECTED,
+                "케어 신청이 거절되었습니다.",
+                request.getId(),
+                "CARE_REQUEST"
+        ));
+        log.info("{} => 케어 신청 거절 알림 발행: guardianId={}, sitterMemberId={}, requestId={}",
+                NAME, request.getMemberId(), memberId, request.getId());
+
         return toResponseDto(request);
     }
 
