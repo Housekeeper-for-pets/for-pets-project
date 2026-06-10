@@ -217,7 +217,7 @@ jobs:
               -e PORTONE_STORE_ID="${{ secrets.PORTONE_STORE_ID }}" \
               -e PORTONE_API_SECRET="${{ secrets.PORTONE_API_SECRET }}" \
               -e QDRANT_BASE_URL="${{ secrets.QDRANT_BASE_URL || 'http://qdrant:6333' }}" \
-              -e SPRING_PROFILES_ACTIVE=prod \
+              -e SPRING_PROFILES_ACTIVE=prod,ai \
               -e SPRING_NOTIFICATIONS_BROKER=direct \
               -e SPRING_DATA_REDIS_HOST="$REDIS_HOST" \
               -e SPRING_DATA_REDIS_PORT="$REDIS_PORT" \
