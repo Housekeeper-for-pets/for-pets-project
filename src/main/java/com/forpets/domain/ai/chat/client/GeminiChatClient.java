@@ -295,7 +295,7 @@ public class GeminiChatClient implements AiChatClient {
                         "parts", List.of(Map.of("text", TOOL_CALLING_SYSTEM_INSTRUCTION))
                 ),
                 "contents", contents,
-                "tools", List.of(Map.of("functionDeclarations", buildFunctionDeclarations(callbacks))),
+                "tools", List.of(Map.of("function_declarations", buildFunctionDeclarations(callbacks))),
                 "toolConfig", Map.of("functionCallingConfig", Map.of("mode", "AUTO")),
                 "generationConfig", Map.of("temperature", temperature, "maxOutputTokens", maxTokens)
         );
