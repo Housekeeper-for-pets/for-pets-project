@@ -21,6 +21,8 @@ import com.forpets.domain.pet.exception.PetException;
 import com.forpets.domain.pet.service.PetService;
 import com.forpets.domain.reservation.exception.ReservationErrorCode;
 import com.forpets.domain.reservation.exception.ReservationException;
+import com.forpets.domain.reservation.entity.Reservation;
+import com.forpets.domain.reservation.entity.ReservationSource;
 import com.forpets.domain.reservation.service.ReservationService;
 import com.forpets.domain.sitter.entity.PossiblePetSize;
 import com.forpets.domain.sitter.entity.PossiblePetType;
@@ -84,6 +86,7 @@ class CareRequestServiceTest {
     private Pet pet1;                        // member1(째길중)의 타코
     private Pet pet2;                        // member1의 연두
     private CareRequest careRequest;         // PENDING 상태 요청
+    private Reservation reservation;         // CareRequest 수락으로 생성되는 예약
 
     private final Long member1Id = 1L;       // 째길중 — 보호자
     private final Long member2Id = 2L;       // 타코맘 — 시터
@@ -92,6 +95,7 @@ class CareRequestServiceTest {
     private final Long pet1Id = 10L;
     private final Long pet2Id = 11L;
     private final Long careRequestId = 200L;
+    private final Long reservationId = 600L;
 
     @BeforeEach
     void setUp() {
@@ -142,6 +146,16 @@ class CareRequestServiceTest {
                 .requestPrice(30000)
                 .build();
         ReflectionTestUtils.setField(careRequest, "id", careRequestId);
+
+        reservation = Reservation.builder()
+                .guardianId(member1Id)
+                .sitterMemberId(member2Id)
+                .sitterProfileId(sitterProfileId)
+                .careType(CareType.VISIT)
+                .source(ReservationSource.CARE_REQUEST)
+                .sourceId(careRequestId)
+                .build();
+        ReflectionTestUtils.setField(reservation, "id", reservationId);
     }
 
     // ── 헬퍼 ──
@@ -514,6 +528,8 @@ class CareRequestServiceTest {
                     .willReturn(crSlots);
             given(reservationService.hasConfirmedConflict(eq(sitterProfileId), anyList())).willReturn(false);
             given(careRequestPetRepository.findAllByCareRequestId(careRequestId)).willReturn(crPets);
+            given(reservationService.createFromCareRequest(careRequest, member2Id, crPets, crSlots))
+                    .willReturn(reservation);
 
             // when
             CareRequestResponseDto result = careRequestService.accept(member2Id, careRequestId);

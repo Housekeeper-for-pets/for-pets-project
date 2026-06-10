@@ -90,8 +90,10 @@ public class ReservationAdminService {
         Reservation reservation = findById(reservationId);
         validateCancelRequested(reservation);
 
+        Long requesterId = getCancelRequesterId(reservation);
         reservation.restoreToConfirmed();
         log.info("[관리자 취소 거절] reservationId={}, CONFIRMED 복원", reservationId);
+        sendReservationCancelRejectedNotification(reservation, requesterId);
 
         return toResponseDto(reservation);
     }
@@ -136,6 +138,27 @@ public class ReservationAdminService {
 
         log.info("[ReservationAdminService] 예약 취소 승인 알림 발행 reservationId={}, guardianId={}, sitterMemberId={}",
                 reservation.getId(), reservation.getGuardianId(), reservation.getSitterMemberId());
+    }
+
+    private Long getCancelRequesterId(Reservation reservation) {
+        if (reservation.getCanceledBy() == CanceledBy.GUARDIAN) {
+            return reservation.getGuardianId();
+        }
+        return reservation.getSitterMemberId();
+    }
+
+    private void sendReservationCancelRejectedNotification(Reservation reservation, Long requesterId) {
+        notificationBroker.publish(NotificationEvent.of(
+                requesterId,
+                null,
+                SseEventType.RESERVATION_CANCEL_REJECTED,
+                "예약 취소 요청이 거절되었습니다.",
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        log.info("[ReservationAdminService] 예약 취소 요청 거절 알림 발행 reservationId={}, requesterId={}",
+                reservation.getId(), requesterId);
     }
 
     private ReservationResponseDto toResponseDto(Reservation reservation) {

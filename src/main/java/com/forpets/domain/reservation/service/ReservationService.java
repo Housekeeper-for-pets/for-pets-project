@@ -44,6 +44,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -56,6 +57,7 @@ public class ReservationService {
     private static final String NAME = ReservationService.class.getSimpleName();
 
     private static final int DEPOSIT_RATIO = 20;
+    private static final long PAYMENT_EXPIRE_HOURS = 2L;
 
     private final ReservationRepository reservationRepository;
     private final ReservationPetRepository reservationPetRepository;
@@ -81,7 +83,7 @@ public class ReservationService {
     예약 생성 1: 순방향로직에서 Reservation 생성 (트리거: CareRequest 수락)
      */
     @Transactional
-    public void createFromCareRequest(CareRequest careRequest, Long sitterMemberId,
+    public Reservation createFromCareRequest(CareRequest careRequest, Long sitterMemberId,
                                              List<CareRequestPet> crPets,
                                              List<CareRequestTimeSlot> crTimeSlots) {
         Reservation reservation = reservationRepository.save(Reservation.builder()
@@ -107,15 +109,20 @@ public class ReservationService {
                 careRequest.getRequestPrice(),
                 (careRequest.getRequestPrice() * DEPOSIT_RATIO) / 100 ));
 
-        // 나중에 return 값 써야하면 쓰기 .... Kafka 같은 곳에서!
-//        return reservation;
+        sendReservationCreatedNotification(
+                reservation.getSitterMemberId(),
+                reservation,
+                "케어 신청 수락으로 예약이 생성되었습니다. 제한 시간 안에 결제를 완료하면 예약이 확정됩니다."
+        );
+
+        return reservation;
     }
 
     /*
     예약 생성2: 역방향 매칭 (트리거: proposal 수락)
      */
     @Transactional
-    public void createFromProposal(Proposal proposal, Post post, Long sitterMemberId,
+    public Reservation createFromProposal(Proposal proposal, Post post, Long sitterMemberId,
                                           List<PostPet> postPets,
                                           List<PostTimeSlot> postTimeSlots) {
         Reservation reservation = reservationRepository.save(Reservation.builder()
@@ -141,7 +148,13 @@ public class ReservationService {
                 proposal.getProposedPrice(),
                 (proposal.getProposedPrice() * DEPOSIT_RATIO) / 100 ));
 
-//        return reservation;
+        sendReservationCreatedNotification(
+                reservation.getGuardianId(),
+                reservation,
+                "제안 수락으로 예약이 생성되었습니다. 제한 시간 안에 결제를 완료하면 예약이 확정됩니다."
+        );
+
+        return reservation;
     }
 
 
@@ -195,6 +208,7 @@ public class ReservationService {
         ReservationPayment payment = findPayment(reservationId);
         // 한쪽만 결제한 상황이면 아직 PENDING 으로 둬야함
         if (!payment.isBothPaid()) {
+            sendPartnerPaymentCompletedNotification(reservation, payment);
             return toResponseDto(reservation);
         }
 
@@ -344,6 +358,7 @@ public class ReservationService {
             reservation.requestCancel(request.cancelReason(), request.cancelCategory(), canceledBy);
             log.info("[취소 요청] UNAVOIDABLE 관리자 검토 대기 reservationId={}, 취소주체={}",
                     reservationId, canceledBy);
+            sendReservationCancelRequestedNotification(reservation, memberId);
             return toResponseDto(reservation);
         }
 
@@ -362,6 +377,86 @@ public class ReservationService {
     // 예약 만료 처리는 ReservationExpireScheduler + ReservationExpireService 로 이동
 
     // transaction 아닌 애들 ==========
+
+    private void sendReservationCreatedNotification(Long receiverId, Reservation reservation, String message) {
+        notificationBroker.publish(NotificationEvent.of(
+                receiverId,
+                null,
+                SseEventType.RESERVATION_CREATED,
+                message,
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        log.info("{} => 예약 생성 알림 발행: reservationId={}, receiverId={}",
+                NAME, reservation.getId(), receiverId);
+    }
+
+    private void sendPartnerPaymentCompletedNotification(Reservation reservation, ReservationPayment payment) {
+        if (payment.isGuardianPaid() && !payment.isSitterPaid()) {
+            notificationBroker.publish(NotificationEvent.of(
+                    reservation.getSitterMemberId(),
+                    reservation.getGuardianId(),
+                    SseEventType.PAYMENT_PARTNER_COMPLETED,
+                    "보호자가 결제를 완료했습니다. " + buildPaymentDeadlineMessage(reservation),
+                    reservation.getId(),
+                    "RESERVATION"
+            ));
+            log.info("{} => 보호자 결제 완료 알림 발행: reservationId={}, receiverId={}",
+                    NAME, reservation.getId(), reservation.getSitterMemberId());
+            return;
+        }
+
+        if (payment.isSitterPaid() && !payment.isGuardianPaid()) {
+            notificationBroker.publish(NotificationEvent.of(
+                    reservation.getGuardianId(),
+                    reservation.getSitterMemberId(),
+                    SseEventType.PAYMENT_PARTNER_COMPLETED,
+                    "시터가 결제를 완료했습니다. " + buildPaymentDeadlineMessage(reservation),
+                    reservation.getId(),
+                    "RESERVATION"
+            ));
+            log.info("{} => 시터 결제 완료 알림 발행: reservationId={}, receiverId={}",
+                    NAME, reservation.getId(), reservation.getGuardianId());
+        }
+    }
+
+    private String buildPaymentDeadlineMessage(Reservation reservation) {
+        if (reservation.getCreatedAt() == null) {
+            return "남은 시간 안에 결제하면 예약이 확정됩니다.";
+        }
+
+        LocalDateTime deadline = reservation.getCreatedAt().plusHours(PAYMENT_EXPIRE_HOURS);
+        long remainingMinutes = Duration.between(LocalDateTime.now(), deadline).toMinutes();
+        if (remainingMinutes <= 0) {
+            return "결제 제한 시간이 곧 만료될 수 있습니다.";
+        }
+
+        long hours = remainingMinutes / 60;
+        long minutes = remainingMinutes % 60;
+        if (hours > 0) {
+            return "약 " + hours + "시간 " + minutes + "분 안에 결제하면 예약이 확정됩니다.";
+        }
+        return "약 " + minutes + "분 안에 결제하면 예약이 확정됩니다.";
+    }
+
+    private void sendReservationCancelRequestedNotification(Reservation reservation, Long requesterId) {
+        Long receiverId = reservation.isGuardian(requesterId)
+                ? reservation.getSitterMemberId()
+                : reservation.getGuardianId();
+
+        notificationBroker.publish(NotificationEvent.of(
+                receiverId,
+                requesterId,
+                SseEventType.RESERVATION_CANCEL_REQUESTED,
+                "상대방이 예약 취소를 요청했습니다.",
+                reservation.getId(),
+                "RESERVATION"
+        ));
+
+        log.info("{} => 예약 취소 요청 알림 발행: reservationId={}, requesterId={}, receiverId={}",
+                NAME, reservation.getId(), requesterId, receiverId);
+    }
 
     private void sendReservationCanceledNotifications(Reservation reservation) {
         notificationBroker.publish(NotificationEvent.of(
