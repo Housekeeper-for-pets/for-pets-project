@@ -102,6 +102,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 20m
           script: |
             set -e
 
@@ -244,8 +245,14 @@ jobs:
             wait_for_app_health() {
               TARGET_CONTAINER="$1"
               for i in $(seq 1 30); do
+                if [ "$(docker inspect -f '{{.State.Running}}' "$TARGET_CONTAINER" 2>/dev/null)" != "true" ]; then
+                  echo "❌ Spring 컨테이너가 health 대기 중 종료됨: $TARGET_CONTAINER"
+                  docker logs "$TARGET_CONTAINER" --tail 200 || true
+                  return 1
+                fi
+
                 if docker run --rm --network forpets-network nginx:1.27-alpine \
-                  sh -c "wget -q -O - http://$TARGET_CONTAINER:8080/health >/dev/null"; then
+                  sh -c "wget -q -T 2 -t 1 -O - http://$TARGET_CONTAINER:8080/health >/dev/null"; then
                   return 0
                 fi
 
@@ -255,17 +262,24 @@ jobs:
               return 1
             }
 
-            if docker ps --format '{{.Names}}' | grep -q '^forpets-blue$'; then
-              ACTIVE_CONTAINER=forpets-blue
-              NEXT_CONTAINER=forpets-green
-            elif docker ps --format '{{.Names}}' | grep -q '^forpets-green$'; then
-              ACTIVE_CONTAINER=forpets-green
-              NEXT_CONTAINER=forpets-blue
-            elif docker ps --format '{{.Names}}' | grep -q '^forpets$'; then
+            ACTIVE_CONTAINER=
+            if [ -f /home/ec2-user/forpets-active-container ]; then
+              SAVED_ACTIVE_CONTAINER="$(cat /home/ec2-user/forpets-active-container)"
+              if [ -n "$SAVED_ACTIVE_CONTAINER" ] \
+                && docker ps --format '{{.Names}}' | grep -q "^$SAVED_ACTIVE_CONTAINER$"; then
+                ACTIVE_CONTAINER="$SAVED_ACTIVE_CONTAINER"
+              fi
+            fi
+
+            if [ -z "$ACTIVE_CONTAINER" ] && docker ps --format '{{.Names}}' | grep -q '^forpets$'; then
               ACTIVE_CONTAINER=forpets
+            fi
+
+            if [ "$ACTIVE_CONTAINER" = "forpets-blue" ]; then
+              NEXT_CONTAINER=forpets-green
+            elif [ "$ACTIVE_CONTAINER" = "forpets-green" ]; then
               NEXT_CONTAINER=forpets-blue
             else
-              ACTIVE_CONTAINER=
               NEXT_CONTAINER=forpets-blue
             fi
 
