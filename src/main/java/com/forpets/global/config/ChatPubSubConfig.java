@@ -1,6 +1,8 @@
 package com.forpets.global.config;
 
 import com.forpets.domain.chat.redis.ChatRedisSubscriber;
+import com.forpets.domain.notification.pubsub.NotificationRedisPublisher;
+import com.forpets.domain.notification.pubsub.NotificationRedisSubscriber;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +17,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 public class ChatPubSubConfig {
 
     private final ChatRedisSubscriber chatRedisSubscriber;
+    private final NotificationRedisSubscriber notificationRedisSubscriber;
 
     @Bean
     public RedisMessageListenerContainer chatMessageListenerContainer(
@@ -24,6 +27,7 @@ public class ChatPubSubConfig {
         container.setConnectionFactory(connectionFactory);
         // "chat-room:*" 패턴으로 모든 채팅방 토픽 구독
         container.addMessageListener(chatRedisSubscriber, new PatternTopic("chat-room:*"));
+        container.addMessageListener(notificationRedisSubscriber, new PatternTopic(NotificationRedisPublisher.TOPIC));
         return container;
     }
 }

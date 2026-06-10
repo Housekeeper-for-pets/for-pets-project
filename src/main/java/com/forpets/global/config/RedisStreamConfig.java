@@ -3,6 +3,7 @@ package com.forpets.global.config;
 import com.forpets.domain.notification.broker.NotificationStreamConsumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,10 +29,12 @@ public class RedisStreamConfig {
     private static final String NAME = RedisStreamConfig.class.getSimpleName();
     public static final String STREAM_KEY = "notification-stream";
     public static final String GROUP_NAME = "notification-group";
-    public static final String CONSUMER_NAME = "notification-consumer-1";
 
     private final StringRedisTemplate redisTemplate;
     private final NotificationStreamConsumer notificationStreamConsumer;
+
+    @Value("${spring.notifications.redis.consumer-name:${HOSTNAME:notification-consumer}}")
+    private String consumerName;
 
     /**
      * Consumer Group 생성
@@ -56,14 +59,14 @@ public class RedisStreamConfig {
 
         // Consumer 등록
         container.receiveAutoAck(
-                Consumer.from(GROUP_NAME, CONSUMER_NAME),
+                Consumer.from(GROUP_NAME, consumerName),
                 StreamOffset.create(STREAM_KEY, ReadOffset.lastConsumed()),
                 notificationStreamConsumer
         );
 
         container.start();
-        log.info("{} => Redis Stream Consumer 시작: stream={}, group={}",
-                NAME, STREAM_KEY, GROUP_NAME);
+        log.info("{} => Redis Stream Consumer 시작: stream={}, group={}, consumer={}",
+                NAME, STREAM_KEY, GROUP_NAME, consumerName);
 
         return container;
     }

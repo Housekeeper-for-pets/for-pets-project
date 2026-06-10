@@ -1,8 +1,10 @@
 package com.forpets.domain.notification.service;
 
+import com.forpets.domain.notification.dto.NotificationRealtimeMessage;
 import com.forpets.domain.notification.entity.Notification;
 import com.forpets.domain.notification.exception.NotificationErrorCode;
 import com.forpets.domain.notification.exception.NotificationException;
+import com.forpets.domain.notification.pubsub.NotificationRedisPublisher;
 import com.forpets.domain.notification.repository.NotificationRepository;
 import com.forpets.global.sse.SseEmitterManager;
 import com.forpets.global.sse.SseEventType;
@@ -21,10 +23,11 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final SseEmitterManager sseEmitterManager;
+    private final NotificationRedisPublisher notificationRedisPublisher;
 
     /**
-     * 알림 생성 + SSE 전송
-     * 핵심: DB 먼저 저장 → SSE는 "있으면 보내고 없으면 말고"
+     * 알림 생성 + 실시간 알림 broadcast 발행
+     * 핵심: DB 저장은 한 인스턴스만, SSE 전송은 Redis Pub/Sub으로 모든 인스턴스가 시도
      */
     @Transactional
     public Notification notify(
@@ -49,18 +52,21 @@ public class NotificationService {
         notificationRepository.save(notification);
         log.info("알림 저장: type={}, receiver={}", type, receiverId);
 
-        // SSE 전송
-        sseEmitterManager.sendToUser(receiverId, type.name(),
-                Map.of(
-                        "id", notification.getId(),
-                        "type", type.name(),
-                        "message", message,
-                        "referenceId", referenceId != null ? referenceId : "",
-                        "referenceType", referenceType != null ? referenceType : "",
-                        "createdAt", notification.getCreatedAt().toString()
-                ));
+        notificationRedisPublisher.publish(NotificationRealtimeMessage.from(notification));
 
         return notification;
+    }
+
+    public void sendRealtime(NotificationRealtimeMessage message) {
+        sseEmitterManager.sendToUser(message.receiverId(), message.type(),
+                Map.of(
+                        "id", message.id(),
+                        "type", message.type(),
+                        "message", message.message(),
+                        "referenceId", message.referenceId() != null ? message.referenceId() : "",
+                        "referenceType", message.referenceType() != null ? message.referenceType() : "",
+                        "createdAt", message.createdAt().toString()
+                ));
     }
 
     /**
