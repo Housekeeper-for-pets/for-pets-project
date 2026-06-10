@@ -37,4 +37,12 @@ public class SseStreamSupport {
             log.debug("SSE error event 전송 실패", exception);
         }
     }
+
+    public void complete(SseEmitter emitter) {
+        try {
+            emitter.complete();
+        } catch (IllegalStateException exception) {
+            log.debug("SSE 스트림이 이미 종료되었습니다.", exception);
+        }
+    }
 }

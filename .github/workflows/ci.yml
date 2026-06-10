@@ -211,6 +211,8 @@ jobs:
               -e JWT_SECRET_KEY="${{ secrets.JWT_SECRET_KEY }}" \
               -e JWT_ACCESS_TOKEN_VALIDITY_TIME="${{ secrets.JWT_ACCESS_TOKEN_VALIDITY_TIME }}" \
               -e JWT_REFRESH_TOKEN_VALIDITY_TIME="${{ secrets.JWT_REFRESH_TOKEN_VALIDITY_TIME }}" \
+              -e GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+              -e QDRANT_BASE_URL="${{ secrets.QDRANT_BASE_URL || 'http://qdrant:6333' }}" \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_NOTIFICATIONS_BROKER=direct \
               -e SPRING_DATA_REDIS_HOST="$REDIS_HOST" \

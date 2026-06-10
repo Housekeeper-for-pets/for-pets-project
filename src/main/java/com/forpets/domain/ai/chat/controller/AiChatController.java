@@ -59,11 +59,11 @@ public class AiChatController {
                 }
                 sseStreamSupport.send(emitter, "sources", toJson(response.sources()));
                 sseStreamSupport.send(emitter, "done", toJson(response));
-                emitter.complete();
+                sseStreamSupport.complete(emitter);
             } catch (Exception exception) {
                 log.warn("AI 챗봇 SSE 응답 실패", exception);
                 sseStreamSupport.sendError(emitter, "AI 추천 응답을 스트리밍하는 중 문제가 발생했습니다.");
-                emitter.completeWithError(exception);
+                sseStreamSupport.complete(emitter);
             }
         });
 
