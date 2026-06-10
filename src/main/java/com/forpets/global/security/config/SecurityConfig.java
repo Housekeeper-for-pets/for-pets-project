@@ -14,6 +14,7 @@ import org.springframework.security.web.*;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.*;
 
+import jakarta.servlet.DispatcherType;
 import java.util.List;
 
 /**
@@ -53,6 +54,7 @@ public class SecurityConfig {
                                 .accessDeniedHandler(jwtAccessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(PublicPathPatterns.ANY_METHOD).permitAll()
                         .requestMatchers(HttpMethod.POST, PublicPathPatterns.PUBLIC_POST).permitAll()
