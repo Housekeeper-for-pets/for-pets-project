@@ -80,12 +80,22 @@ public class Post extends BaseEntity {
     }
 
     public void close() {
-        if (!isOpen()) throw new PostException(PostErrorCode.INVALID_STATUS_TRANSITION);
+        // 만료된 공고도 작성자가 닫을 수 있음 (목록 정리 목적)
+        if (!isOpen() && !isExpired()) throw new PostException(PostErrorCode.INVALID_STATUS_TRANSITION);
         this.status = PostStatus.CLOSED;
+    }
+
+    public void expire() {
+        if (!isOpen()) return;
+        this.status = PostStatus.EXPIRED;
     }
 
     public boolean isOpen() {
         return this.status == PostStatus.OPEN;
+    }
+
+    public boolean isExpired() {
+        return this.status == PostStatus.EXPIRED;
     }
 
     public boolean isOwnedBy(Long memberId) {

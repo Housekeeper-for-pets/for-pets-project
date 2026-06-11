@@ -25,10 +25,10 @@ public enum PostErrorCode implements ErrorCode {
     INVALID_SEARCH_CONDITION(HttpStatus.BAD_REQUEST, "INVALID_SEARCH_CONDITION", "검색 조건이 올바르지 않습니다."),
     INVALID_CARE_TYPE(HttpStatus.BAD_REQUEST, "INVALID_CARE_TYPE", "허용되지 않은 돌봄 유형입니다."),
     INVALID_PAGE_REQUEST(HttpStatus.BAD_REQUEST, "INVALID_PAGE_REQUEST", "페이지 번호 또는 크기 값이 올바르지 않습니다."),
-    INVALID_SORT_FIELD(HttpStatus.BAD_REQUEST, "INVALID_SORT_FIELD", "허용되지 않은 정렬 필드입니다.");
+    INVALID_SORT_FIELD(HttpStatus.BAD_REQUEST, "INVALID_SORT_FIELD", "허용되지 않은 정렬 필드입니다."),
 
-
-    ;
+    // 락 — 만료 스케줄러와 다른 작업(수정/닫기/삭제) 사이의 동시성 보호
+    POST_LOCK_FAILED(HttpStatus.TOO_MANY_REQUESTS, "POST_LOCK_FAILED", "공고 처리 중입니다. 잠시 후 다시 시도해주세요.");
 
     private final HttpStatus status;
     private final String code;
