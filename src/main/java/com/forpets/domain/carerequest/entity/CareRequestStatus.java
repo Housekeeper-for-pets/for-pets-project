@@ -4,5 +4,6 @@ public enum CareRequestStatus {
     PENDING,
     ACCEPTED,
     REJECTED,
-    CANCELED
+    CANCELED,
+    EXPIRED
 }
