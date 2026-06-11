@@ -66,8 +66,21 @@ public class CareRequest extends BaseEntity {
         this.status = CareRequestStatus.CANCELED;
     }
 
+    public void expire() {
+        if (status != CareRequestStatus.PENDING && status != CareRequestStatus.ACCEPTED) return;
+        this.status = CareRequestStatus.EXPIRED;
+    }
+
     public boolean isPending() {
         return this.status == CareRequestStatus.PENDING;
+    }
+
+    public boolean isAccepted() {
+        return this.status == CareRequestStatus.ACCEPTED;
+    }
+
+    public boolean isExpired() {
+        return this.status == CareRequestStatus.EXPIRED;
     }
 
     public boolean isOwnedBy(Long memberId) {
@@ -78,5 +91,9 @@ public class CareRequest extends BaseEntity {
         return this.sitterProfileId.equals(sitterProfileId);
     }
 
-    public void restoreToPending() { this.status = CareRequestStatus.PENDING; }
+    public void restoreToPending() {
+        // ACCEPTED 만 PENDING 으로 복원 — 그 외 상태(EXPIRED 등)에서의 호출은 무시
+        if (status != CareRequestStatus.ACCEPTED) return;
+        this.status = CareRequestStatus.PENDING;
+    }
 }

@@ -63,10 +63,23 @@ public class Proposal extends BaseEntity {
         this.status = ProposalStatus.WITHDRAWN;
     }
 
-    public void restoreToPending() { this.status = ProposalStatus.PENDING; }
+    public void expire() {
+        if (status != ProposalStatus.PENDING && status != ProposalStatus.ACCEPTED) return;
+        this.status = ProposalStatus.EXPIRED;
+    }
+
+    public void restoreToPending() {
+        // ACCEPTED 만 PENDING 으로 복원 — 그 외 상태(EXPIRED 등)에서의 호출은 무시
+        if (status != ProposalStatus.ACCEPTED) return;
+        this.status = ProposalStatus.PENDING;
+    }
 
     public boolean isPending() {
         return this.status == ProposalStatus.PENDING;
+    }
+
+    public boolean isExpired() {
+        return this.status == ProposalStatus.EXPIRED;
     }
 
     public boolean isOwnedBySitter(Long sitterProfileId) {

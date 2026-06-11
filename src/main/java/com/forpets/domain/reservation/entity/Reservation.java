@@ -58,6 +58,15 @@ public class Reservation extends BaseEntity {
     @Column
     private LocalDateTime canceledAt;
 
+    /*
+    UNAVOIDABLE 취소 요청이 들어온 시각.
+    requestCancel() 시 set, restoreToConfirmed() 시 null.
+    자동 승인 스케줄러가 "요청 후 24시간 경과한 다음 날 00시" 시점에 일괄 처리할 때 기준값으로 사용됨.
+    cancel() (취소 확정) 시점에는 audit 용으로 그대로 보존.
+     */
+    @Column
+    private LocalDateTime cancelRequestedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private CanceledBy canceledBy;
@@ -121,6 +130,7 @@ public class Reservation extends BaseEntity {
         this.cancelReason = cancelReason;
         this.cancelCategory = cancelCategory;
         this.canceledBy = canceledBy;
+        this.cancelRequestedAt = LocalDateTime.now();
     }
 
     // 불가피한 이유로 취소 신청을 했지만 받아들여지지 않은 경우 다시 CONFIRMED 상태로 돌림
@@ -132,6 +142,7 @@ public class Reservation extends BaseEntity {
         this.cancelReason = null;
         this.cancelCategory = null;
         this.canceledBy = null;
+        this.cancelRequestedAt = null;
     }
 
     public boolean isCancelRequested() {

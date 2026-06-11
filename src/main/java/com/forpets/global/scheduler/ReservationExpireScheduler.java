@@ -9,6 +9,7 @@ import com.forpets.domain.reservation.service.ReservationExpireService;
 import com.forpets.domain.reservation.service.ReservationLockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -45,6 +46,11 @@ public class ReservationExpireScheduler {
     private final ReservationExpireService reservationExpireService;
 
     @Scheduled(fixedDelayString = "${reservation.expire.fixed-delay:60000}")
+    @SchedulerLock(
+            name = "ReservationExpireScheduler",
+            lockAtMostFor = "PT50S",   // 실행 주기 1분 직전까지 보장 (PG 환불 외부 I/O 고려)
+            lockAtLeastFor = "PT15S"   // 빠르게 끝나도 15초 유지 - 다음 주기 직후 재실행 방지
+    )
     public void expirePendingReservations() {
         LocalDateTime deadline = LocalDateTime.now().minusHours(PAYMENT_EXPIRE_HOURS);
         List<Reservation> targets = reservationRepository

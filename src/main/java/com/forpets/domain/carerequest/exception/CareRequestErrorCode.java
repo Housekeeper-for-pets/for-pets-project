@@ -16,7 +16,10 @@ public enum CareRequestErrorCode implements ErrorCode {
     NOT_TARGET_SITTER(HttpStatus.FORBIDDEN, "NOT_TARGET_SITTER", "본인이 받은 돌봄 요청이 아닙니다."),
     NOT_PENDING_CARE_REQUEST(HttpStatus.BAD_REQUEST, "NOT_PENDING_CARE_REQUEST", "해당 요청은 돌봄 요청이 대기상태 일 때 가능합니다."),
     DUPLICATE_PENDING_REQUEST(HttpStatus.CONFLICT, "DUPLICATE_PENDING_REQUEST", "중복된 돎봄 요청입니다."),
-    NOT_CARE_REQUEST_PARTY(HttpStatus.FORBIDDEN, "NOT_CARE_REQUEST_PARTY", "돌봄 요청 상세 조회는 요청 본인 또는 시터 당사자만 가능합니다.");
+    NOT_CARE_REQUEST_PARTY(HttpStatus.FORBIDDEN, "NOT_CARE_REQUEST_PARTY", "돌봄 요청 상세 조회는 요청 본인 또는 시터 당사자만 가능합니다."),
+
+    // 락 — 만료 스케줄러와 다른 작업(수락/거절/취소) 사이의 동시성 보호
+    CARE_REQUEST_LOCK_FAILED(HttpStatus.TOO_MANY_REQUESTS, "CARE_REQUEST_LOCK_FAILED", "돌봄 요청 처리 중입니다. 잠시 후 다시 시도해주세요.");
 
     private final HttpStatus status;
     private final String code;
