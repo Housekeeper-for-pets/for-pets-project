@@ -9,6 +9,7 @@ import com.forpets.domain.carerequest.service.CareRequestExpireService;
 import com.forpets.domain.carerequest.service.CareRequestLockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -45,6 +46,11 @@ public class CareRequestExpireScheduler {
     private final CareRequestExpireService careRequestExpireService;
 
     @Scheduled(fixedDelayString = "${care-request.expire.fixed-delay:600000}")
+    @SchedulerLock(
+            name = "CareRequestExpireScheduler",
+            lockAtMostFor = "PT9M",    // 실행 주기 10분 직전까지 보장
+            lockAtLeastFor = "PT30S"   // 빠르게 끝나도 30초 유지
+    )
     public void expireCareRequests() {
         LocalDateTime now = LocalDateTime.now();
         LocalDate today = now.toLocalDate();

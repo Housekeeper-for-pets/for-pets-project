@@ -9,6 +9,7 @@ import com.forpets.domain.post.service.PostExpireService;
 import com.forpets.domain.post.service.PostLockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -42,6 +43,11 @@ public class PostExpireScheduler {
     private final PostExpireService postExpireService;
 
     @Scheduled(fixedDelayString = "${post.expire.fixed-delay:600000}")
+    @SchedulerLock(
+            name = "PostExpireScheduler",
+            lockAtMostFor = "PT9M",    // 실행 주기 10분 직전까지 보장
+            lockAtLeastFor = "PT30S"   // 빠르게 끝나도 30초 유지
+    )
     public void expireOpenPosts() {
         LocalDateTime now = LocalDateTime.now();
         LocalDate today = now.toLocalDate();

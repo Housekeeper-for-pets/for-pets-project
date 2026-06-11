@@ -10,6 +10,7 @@ import com.forpets.domain.reservation.repository.ReservationRepository;
 import com.forpets.domain.reservation.service.ReservationLockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -61,6 +62,11 @@ public class UnavoidableCancelAutoApproveScheduler {
     fixedDelay 는 24시간으로 설정 — 실수로 켜둬도 하루 1회 이상 돌지 않음
      */
     @Scheduled(initialDelay = 20 * 60 * 1000L, fixedDelay = 24 * 60 * 60 * 1000L)
+    @SchedulerLock(
+            name = "UnavoidableCancelAutoApproveScheduler",
+            lockAtMostFor = "PT30M",   // 알림 발송 포함 — 혹시 모를 긴 처리 대비
+            lockAtLeastFor = "PT1H"    // N대가 동시에 00:00 트리거해도 첫 인스턴스만 처리하도록
+    )
     public void autoApproveUnavoidableCancelRequests() {
         LocalDateTime cutoff = LocalDate.now().atStartOfDay().minusHours(AUTO_APPROVE_HOURS);
 
