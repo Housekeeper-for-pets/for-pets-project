@@ -66,7 +66,7 @@ services:
   # --------------------------
   prometheus:
     image: prom/prometheus
-    container_name: prometheus
+    container_name: for-pets-prometheus
     ports:
       - "9090:9090"
     command:
@@ -75,14 +75,17 @@ services:
       - --web.enable-lifecycle
       - --web.enable-remote-write-receiver
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      # 기본은 로컬 싱글 앱 기준이다.
+      # 로컬 멀티 앱: PROMETHEUS_CONFIG=./monitoring/prometheus-multi-local.yml docker compose --profile multi up -d prometheus
+      # 운영 멀티 앱: ./monitoring/prometheus-prod.yml 을 EC2 Prometheus 컨테이너에 마운트한다.
+      - ${PROMETHEUS_CONFIG:-./monitoring/prometheus-single.yml}:/etc/prometheus/prometheus.yml
 
   # --------------------------
   # Grafana
   # --------------------------
   grafana:
     image: grafana/grafana
-    container_name: grafana
+    container_name: for-pets-grafana
     ports:
       - "3000:3000"
     environment:

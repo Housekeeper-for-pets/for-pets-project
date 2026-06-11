@@ -1,0 +1,14 @@
+# 로컬 멀티 인스턴스용
+# 실행 예:
+# PROMETHEUS_CONFIG=./monitoring/prometheus-multi-local.yml docker compose --profile multi up -d mysql redis kafka qdrant app-blue app-green nginx-multi prometheus grafana
+global:
+  scrape_interval: 1s
+  evaluation_interval: 1s
+
+scrape_configs:
+  - job_name: 'forpets-local-multi'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'for-pets-app-blue:8080'
+          - 'for-pets-app-green:8080'

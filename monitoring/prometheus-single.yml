@@ -1,6 +1,5 @@
-# 호환용 기본 설정 파일.
-# docker-compose.yml은 기본적으로 prometheus-single.yml을 사용한다.
-# 필요한 경우 PROMETHEUS_CONFIG 환경변수로 다른 설정 파일을 마운트한다.
+# 로컬 싱글 인스턴스용
+# 실행 예: docker compose up -d mysql redis kafka qdrant app prometheus grafana
 global:
   scrape_interval: 1s
   evaluation_interval: 1s
