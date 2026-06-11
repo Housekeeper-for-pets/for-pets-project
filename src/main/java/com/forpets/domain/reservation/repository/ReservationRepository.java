@@ -48,4 +48,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     List<Reservation> findAllByStatusAndCancelCategory(ReservationStatus reservationStatus, CancelCategory cancelCategory);
 
     Page<Reservation> findAllByStatusAndCancelCategory(ReservationStatus reservationStatus, CancelCategory cancelCategory, Pageable pageable);
+
+    /*
+    UNAVOIDABLE 자동 승인 후보 조회
+    조건: status = CANCEL_REQUESTED, cancelCategory = UNAVOIDABLE, cancelRequestedAt <= cutoff
+    - cutoff = 실행일 00:00 - 24시간 (즉 "어제 00:00")
+      예: 6/11 00:00 실행 -> cutoff = 6/10 00:00 -> cancelRequestedAt 이 6/10 00:00 이전인 요청 자동 승인
+      즉 1일 22:00 요청 -> 2일 00:00 cutoff(=1일 00:00) 에는 미해당, 3일 00:00 cutoff(=2일 00:00) 에 해당
+     */
+    List<Reservation> findAllByStatusAndCancelCategoryAndCancelRequestedAtLessThanEqual(
+            ReservationStatus reservationStatus,
+            CancelCategory cancelCategory,
+            LocalDateTime cutoff);
 }
