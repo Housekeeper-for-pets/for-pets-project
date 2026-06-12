@@ -8,6 +8,7 @@ import com.forpets.global.common.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,6 +19,7 @@ public class AiRagController {
 
     private final AiRagService aiRagService;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/api/ai/rag/reviews/index")
     public ResponseEntity<ApiResponse<RagIndexResponse>> indexReviews() {
         return ResponseEntity.ok(ApiResponse.success(aiRagService.indexCompletedReviews()));
