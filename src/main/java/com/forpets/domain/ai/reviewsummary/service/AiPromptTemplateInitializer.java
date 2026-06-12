@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
-@Profile({"local", "postmantest"})
+@Profile({"local", "postmantest", "ai"})
 @RequiredArgsConstructor
 public class AiPromptTemplateInitializer implements CommandLineRunner {
 
